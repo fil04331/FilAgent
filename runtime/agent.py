@@ -80,8 +80,8 @@ class Agent:
                     conversation_id=conversation_id,
                     task_id=task_id,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.start event: {e}")
 
         # Enregistrer le message utilisateur en mémoire persistante
         add_message(
@@ -159,8 +159,8 @@ class Agent:
                                 success=execution_result.is_success(),
                                 output=execution_result.output if execution_result.output else execution_result.error,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"⚠ Failed to log tool call for '{tool_name}': {e}")
 
                     if self.tracker:
                         try:
@@ -175,8 +175,8 @@ class Agent:
                                 start_time=datetime.now().isoformat(),
                                 end_time=datetime.now().isoformat(),
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"⚠ Failed to track tool execution for '{tool_name}': {e}")
 
                 # Injecter les résultats des outils dans le contexte et relancer le modèle
                 formatted_results = self._format_tool_results(tool_results)
@@ -216,8 +216,8 @@ class Agent:
                     response_hash=response_hash,
                     tokens_used=usage["total_tokens"],
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to log generation: {e}")
 
         if self.tracker:
             try:
@@ -235,8 +235,8 @@ class Agent:
                         "usage": usage,
                     },
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to track generation: {e}")
 
         if self.dr_manager and (
             unique_tools
@@ -271,10 +271,10 @@ class Agent:
                             task_id=task_id,
                             metadata={"dr_id": dr.dr_id},
                         )
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as e:
+                        print(f"⚠ Failed to log dr.created event: {e}")
+            except Exception as e:
+                print(f"⚠ Failed to create decision record: {e}")
 
         if self.logger:
             try:
@@ -286,8 +286,8 @@ class Agent:
                     task_id=task_id,
                     metadata={"iterations": iterations},
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.end event: {e}")
 
         return {
             "response": final_response,
