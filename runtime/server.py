@@ -81,9 +81,8 @@ async def health():
 
     # Vérifier la base SQLite
     try:
-        conn = get_connection()
-        conn.execute("SELECT 1")
-        conn.close()
+        with get_connection() as conn:
+            conn.execute("SELECT 1")
         components["database"] = True
     except Exception:
         components["database"] = False
