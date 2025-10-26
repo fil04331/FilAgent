@@ -32,7 +32,7 @@ def test_agent_logs_conversation_start_exception(capsys):
     # Call chat which should trigger the exception
     try:
         agent.chat("test message", "test-conv-id")
-    except:
+    except Exception:
         pass  # We expect some failures due to mocking
     
     # Check that the exception was logged to stdout
@@ -79,7 +79,7 @@ def test_agent_logs_tool_call_exception(capsys):
     
     try:
         agent.chat("Calculate 2+2", "test-conv-id")
-    except:
+    except Exception:
         pass  # We expect some failures due to mocking
     
     # Check that the exception was logged to stdout
@@ -127,7 +127,7 @@ def test_agent_logs_track_tool_execution_exception(capsys):
     
     try:
         agent.chat("Calculate 2+2", "test-conv-id")
-    except:
+    except Exception:
         pass  # We expect some failures due to mocking
     
     # Check that the exception was logged to stdout
@@ -155,8 +155,8 @@ def test_agent_logs_generation_exception(capsys):
     
     try:
         agent.chat("test message", "test-conv-id")
-    except:
-        pass
+    except Exception:
+        pass  # We expect some failures due to mocking
     
     # Check that the exception was logged to stdout
     captured = capsys.readouterr()
@@ -170,7 +170,7 @@ def test_agent_logs_conversation_end_exception(capsys):
     # Mock the logger to raise exception only for conversation.end
     agent.logger = Mock()
     def log_event_side_effect(*args, **kwargs):
-        if kwargs.get('event') == 'conversation.end':
+        if 'event' in kwargs and kwargs['event'] == 'conversation.end':
             raise Exception("End logging failed")
         return None
     
@@ -187,8 +187,8 @@ def test_agent_logs_conversation_end_exception(capsys):
     
     try:
         agent.chat("test message", "test-conv-id")
-    except:
-        pass
+    except Exception:
+        pass  # We expect some failures due to mocking
     
     # Check that the exception was logged to stdout
     captured = capsys.readouterr()
