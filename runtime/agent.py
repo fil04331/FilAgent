@@ -162,7 +162,7 @@ class Agent:
                                 output=execution_result.output if execution_result.output else execution_result.error,
                             )
                         except Exception as e:
-                            print(f"⚠ Failed to log tool call: {e}")
+                            print(f"⚠ Failed to log tool call for '{tool_name}': {e}")
 
                     if self.tracker:
                         try:
@@ -178,7 +178,7 @@ class Agent:
                                 end_time=tool_end_time,
                             )
                         except Exception as e:
-                            print(f"⚠ Failed to track tool execution: {e}")
+                            print(f"⚠ Failed to track tool execution for '{tool_name}': {e}")
 
                 # Injecter les résultats des outils dans le contexte et relancer le modèle
                 formatted_results = self._format_tool_results(tool_results)
@@ -274,7 +274,7 @@ class Agent:
                             metadata={"dr_id": dr.dr_id},
                         )
                     except Exception as e:
-                        print(f"⚠ Failed to log DR created event: {e}")
+                        print(f"⚠ Failed to log dr.created event: {e}")
             except Exception as e:
                 print(f"⚠ Failed to create decision record: {e}")
 
