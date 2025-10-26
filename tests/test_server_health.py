@@ -19,9 +19,6 @@ def test_client():
 @pytest.fixture
 def temp_db():
     """Create a temporary database for tests"""
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    
     # Create temporary database
     tmpdir = tempfile.mkdtemp()
     tmp_db = Path(tmpdir) / "test_episodic.sqlite"
@@ -83,7 +80,7 @@ def test_health_endpoint_database_connection_properly_closed(test_client, temp_d
         assert data["components"]["database"] is True
 
 
-def test_health_endpoint_handles_database_error(test_client):
+def test_health_endpoint_handles_database_error(test_client, temp_db):
     """Test that health endpoint handles database errors gracefully"""
     
     with patch('runtime.server.get_connection') as mock_get_connection, \
@@ -100,11 +97,11 @@ def test_health_endpoint_handles_database_error(test_client):
         mock_agent.return_value.model = mock_model
         
         mock_logger_instance = MagicMock()
-        mock_logger_instance.current_file = "/tmp/test.log"
+        mock_logger_instance.current_file = str(temp_db.parent / "test.log")
         mock_logger.return_value = mock_logger_instance
         
         mock_worm_logger_instance = MagicMock()
-        mock_worm_logger_instance.digest_dir = Path("/tmp/digests")
+        mock_worm_logger_instance.digest_dir = temp_db.parent / "digests"
         mock_worm_logger_instance.digest_dir.mkdir(exist_ok=True)
         mock_worm_logger.return_value = mock_worm_logger_instance
         
