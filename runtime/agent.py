@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 
 from .config import get_config
-from .model_interface import GenerationConfig
+from .model_interface import GenerationConfig, GenerationResult
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry
 from tools.base import BaseTool, ToolResult, ToolStatus
