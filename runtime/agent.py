@@ -145,7 +145,9 @@ class Agent:
                     if not tool_name:
                         continue
 
+                    tool_start_time = datetime.now().isoformat()
                     execution_result = self._execute_tool(tool_call)
+                    tool_end_time = datetime.now().isoformat()
                     tool_results.append(execution_result)
                     tools_used.append(tool_name)
 
@@ -172,8 +174,8 @@ class Agent:
                                 tool_input_hash=input_hash,
                                 tool_output_hash=output_hash,
                                 task_id=task_id or conversation_id,
-                                start_time=datetime.now().isoformat(),
-                                end_time=datetime.now().isoformat(),
+                                start_time=tool_start_time,
+                                end_time=tool_end_time,
                             )
                         except Exception:
                             pass
