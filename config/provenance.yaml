@@ -1,0 +1,72 @@
+# Schémas PROV et exigences de signature
+# Horodatage, chaînes de confiance
+
+provenance:
+  version: "0.1.0"
+
+# Schéma PROV utilisé
+schema:
+  type: "PROV-JSON"
+  namespace: "filagent"
+  version: "1.3"
+
+# Horodatage
+timestamping:
+  enabled: true
+  format: "ISO8601"
+  timezone: "America/Toronto"
+  precision: "milliseconds"
+  monotonic: true  # S'assurer que timestamps sont monotones
+
+# Signatures
+signatures:
+  enabled: true
+  algorithm: "EdDSA"
+  key_location: "provenance/signatures/"
+  key_rotation_days: 90
+  sign_events:
+    - "decision_record"
+    - "tool_execution"
+    - "policy_change"
+  verify_on_read: false  # Coûteux, laisser à false sauf besoin
+
+# Snapshot et versioning
+versioning:
+  enabled: true
+  snapshot:
+    - "config"
+    - "model_weights"
+    - "policies"
+    - "prompt_templates"
+  hash_algorithm: "SHA256"
+  store_location: "provenance/snapshots/"
+
+# Chaine de confiance
+trust_chain:
+  enabled: true
+  merkle_tree_enabled: true
+  checkpoint_interval_hours: 24
+  merkle_algorithm: "SHA256"
+  verify_integrity: true
+  storage_location: "logs/digests/"
+
+# Métadonnées requises
+required_metadata:
+  - "actor"
+  - "timestamp"
+  - "task_id"
+  - "conversation_id"
+  - "policy_version"
+  - "model_fingerprint"
+
+# Génération de provenance
+generate_for:
+  activities:
+    - "generation"
+    - "tool_call"
+    - "decision"
+  entities:
+    - "conversation"
+    - "response"
+    - "file"
+    - "config"

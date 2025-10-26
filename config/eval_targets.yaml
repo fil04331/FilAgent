@@ -1,0 +1,94 @@
+# Seuils de parité/supériorité pour l'évaluation
+# HumanEval, MBPP, SWE-bench, tâches agentiques
+
+eval:
+  version: "0.1.0"
+
+# Objectif : ≥ Codex / ChatGPT-5 Agent
+
+benchmarks:
+  humaneval:
+    enabled: true
+    pass_at_1: 0.65  # Seuil minimum accepté (65%)
+    pass_at_10: 0.85
+    time_limit_seconds: 30
+    temperature: 0.2
+    max_tokens: 512
+    
+  mbpp:
+    enabled: true
+    pass_at_1: 0.60
+    pass_at_10: 0.80
+    time_limit_seconds: 30
+    temperature: 0.2
+    max_tokens: 512
+    
+  swe_bench_lite:
+    enabled: true
+    success_rate: 0.50  # 50% minimum (c'est un benchmark difficile)
+    tasks_to_run: 50  # Sous-ensemble de SWE-bench
+    time_limit_seconds: 300  # 5 minutes par tâche
+    
+  agent_tasks:
+    enabled: true
+    # Tâches agentiques locales
+    file_navigation:
+      success_rate: 0.80
+      time_limit_seconds: 60
+    code_editing:
+      success_rate: 0.75
+      time_limit_seconds: 90
+    planning:
+      success_rate: 0.70
+      time_limit_seconds: 120
+    tool_usage:
+      success_rate: 0.80
+      time_limit_seconds: 60
+
+# Critères d'acceptation globaux
+acceptance_criteria:
+  # Performance code
+  code_generation: "pass_at_1_humaneval >= 0.65 AND pass_at_1_mbpp >= 0.60"
+  
+  # Performance agentique
+  agent_capability: "success_rate_agent_tasks >= 0.75"
+  
+  # Conformité (0 violation critique sur 1000 tâches)
+  compliance: "critical_violations == 0 AND total_tasks >= 1000"
+  
+  # Traçabilité (100% des réponses actionnables avec DR + PROV)
+  traceability: "response_with_dr_coverage >= 0.95 AND prov_coverage >= 0.95"
+
+# Métriques à suivre
+metrics:
+  performance:
+    - "latency_p50_ms"
+    - "latency_p95_ms"
+    - "latency_p99_ms"
+    - "throughput_requests_per_sec"
+    
+  quality:
+    - "pass_at_k_rates"
+    - "bleu_score"
+    - "code_execution_success_rate"
+    - "hallucination_rate"
+    
+  compliance:
+    - "dr_coverage"
+    - "prov_coverage"
+    - "pii_detection_rate"
+    - "policy_violation_count"
+    
+  stability:
+    - "error_rate"
+    - "crash_rate"
+    - "timeout_rate"
+    - "retry_rate"
+
+# Configuration des runs d'évaluation
+runs:
+  schedule: "weekly"  # weekly, daily, manual
+  output_dir: "eval/runs/"
+  reports_dir: "eval/reports/"
+  keep_best_n: 10
+  compare_with_baseline: true

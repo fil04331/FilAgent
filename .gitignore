@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Fichiers de configuration sensibles
+.env
+*.key
+*.pem
+
+# Modèles (gros fichiers)
+models/weights/*.gguf
+models/weights/*.pt
+models/weights/*.pth
+models/hf_models/
+
+# Logs
+logs/events/*.jsonl
+logs/traces/*/
+logs/decisions/*.json
+logs/prompts/*.jsonl
+logs/digests/*
+
+# Bases de données
+memory/episodic.sqlite
+memory/semantic/*.faiss
+memory/semantic/*.parquet
+
+# Audit (ne pas ignorer complètement, juste les gros fichiers)
+audit/signed/*.tar.gz
+
+# Cache
+.cache/
+*.cache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Divers
+*.log
+temp/

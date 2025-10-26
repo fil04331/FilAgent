@@ -29,22 +29,71 @@ Le projet est structuré autour d'une arborescence claire, séparant la configur
 
 ## **🚀 Démarrage Rapide (Getting Started)**
 
-*(Cette section sera complétée au fur et à mesure du développement.)*
+### Prérequis
 
-1. **Prérequis :**  
-   * Python 3.10+  
-   * Git  
-   * ...  
-2. **Installation :**  
-   git clone https://...  
-   cd llmagenta  
-   pip install \-r requirements.txt
+- Python 3.10 ou supérieur
+- Git
+- 8+ GB de RAM (16GB recommandé)
+- Optionnel : GPU NVIDIA pour accélération
 
-3. **Configuration :**  
-   * Copier config/agent.yaml.example en config/agent.yaml et ajuster les paramètres.  
-   * Télécharger les poids du modèle dans le dossier models/weights/.  
-4. **Lancement :**  
-   python runtime/server.py
+### Installation
+
+```bash
+# 1. Cloner le dépôt
+git clone https://github.com/votre-org/FilAgent.git
+cd FilAgent
+
+# 2. Créer un environnement virtuel
+python -m venv venv
+source venv/bin/activate  # Sur Windows: venv\Scripts\activate
+
+# 3. Installer les dépendances
+pip install -r requirements.txt
+
+# 4. Télécharger un modèle
+# Voir models/weights/README.md pour les instructions détaillées
+mkdir -p models/weights
+# Exemple avec Llama 3 :
+cd models/weights
+wget https://huggingface.co/TheBloke/Llama-3-8B-Instruct-GGUF/resolve/main/llama-3-8b-instruct.Q4_K_M.gguf -O base.gguf
+cd ../..
+
+# 5. Initialiser la base de données
+python -c "from memory.episodic import create_tables; create_tables()"
+```
+
+### Configuration
+
+Les configurations par défaut sont dans `config/`. Vous pouvez les ajuster :
+
+- `config/agent.yaml` : Paramètres de génération, modèle, mémoire
+- `config/policies.yaml` : Règles d'usage, RBAC, guardrails
+- `config/retention.yaml` : Politiques de rétention des données
+- `config/provenance.yaml` : Configuration de traçabilité
+- `config/eval_targets.yaml` : Seuils d'évaluation
+
+### Lancement
+
+```bash
+# Lancer le serveur API
+python runtime/server.py
+
+# Le serveur sera accessible sur http://localhost:8000
+# Documentation API sur http://localhost:8000/docs
+```
+
+### Test rapide
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Bonjour !"}],
+    "conversation_id": "test-123"
+  }'
+```
+
+Pour plus de détails, voir [README_SETUP.md](README_SETUP.md)
 
 ## **⚖️ Conformité et Gouvernance**
 

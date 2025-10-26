@@ -1,0 +1,77 @@
+# Politiques d'usage et règles de gouvernance
+# RBAC, redaction PII, limites d'outils, politique réseau
+
+policies:
+  version: "0.1.0"
+
+# Rôles et permissions (RBAC)
+rbac:
+  roles:
+    - name: "admin"
+      permissions:
+        - "read_all_logs"
+        - "manage_config"
+        - "execute_all_tools"
+        - "view_audit"
+    - name: "user"
+      permissions:
+        - "execute_safe_tools"
+        - "read_own_logs"
+        - "manage_own_data"
+    - name: "viewer"
+      permissions:
+        - "read_own_logs"
+
+# Règles de redaction PII
+pii:
+  enabled: true
+  fields_to_mask:
+    - "email"
+    - "phone"
+    - "ssn"
+    - "credit_card"
+    - "ip_address"
+  replacement_pattern: "[REDACTED]"
+  scan_before_logging: true
+
+# Limites d'outils
+tools:
+  allowlist:
+    - "python_sandbox"
+    - "file_read"
+    - "math_calculator"
+  network_access:
+    enabled: false  # Par défaut, pas d'accès réseau
+    allowed_domains: []  # Liste vide par défaut
+  filesystem:
+    allowed_paths:
+      - "working_set/*"
+      - "temp/*"
+    readonly_by_default: true
+  resource_limits:
+    cpu_percent: 50
+    memory_mb: 512
+    max_file_size_kb: 1024
+
+# Politique réseau
+network:
+  outbound_enabled: false
+  allowed_ips: []
+  block_external: true
+
+# Guardrails
+guardrails:
+  enabled: true
+  max_prompt_length: 8000
+  max_response_length: 4000
+  blocklist_keywords:
+    - "password"
+    - "secret_key"
+    - "api_key"
+  required_schema_validation: true
+
+# Raisonnement
+reasoning:
+  max_steps: 10
+  require_validation: true
+  timeout_per_step: 30

@@ -1,0 +1,64 @@
+# Politiques de rétention des données
+# Durées de conservation, bases légales, minimisation
+
+retention:
+  version: "0.1.0"
+
+# Base légale (exemple pour Québec/France)
+legal_basis:
+  country: "CA-QC"  # Canada-Québec
+  primary_basis: "legitimate_interest"
+  supplementary:
+    - "consent"
+    - "contract_execution"
+
+# Durées de conservation par type de données
+durations:
+  events:
+    ttl_days: 90
+    purpose: "Troubleshooting and performance monitoring"
+  decisions:
+    ttl_days: 365
+    purpose: "Regulatory compliance and audit trail"
+  conversations:
+    ttl_days: 30
+    purpose: "User support and context"
+  audit_logs:
+    ttl_days: 2555  # 7 ans
+    purpose: "Legal compliance and forensics"
+  provenance:
+    ttl_days: 365
+    purpose: "Explanability and reproducibility"
+
+# Politique de minimisation
+minimization:
+  enabled: true
+  fields_to_exclude:
+    - "raw_user_input"  # Exclure les entrées brutes
+    - "full_model_output"  # Exclure les sorties complètes
+    - "internal_metadata"
+  keep_only:
+    - "action_taken"
+    - "reasoning_summary"
+    - "result_summary"
+    - "timestamp"
+    - "decision_id"
+
+# Politique de purge automatique
+auto_purge:
+  enabled: true
+  check_interval_days: 7
+  dry_run: false  # Mettre à true pour test
+  export_before_purge: true
+  export_location: "audit/samples/"
+
+# Export et portabilité
+data_export:
+  supported_formats:
+    - "json"
+    - "jsonl"
+    - "sqlite"
+  include_conversations: true
+  include_provenance: true
+  redact_pii: true
+  export_location: "audit/samples/exports/"

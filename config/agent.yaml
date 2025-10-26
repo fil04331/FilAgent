@@ -1,0 +1,53 @@
+# Configuration de l'agent LLM
+# Hyperparamètres, seeds, timeouts
+
+agent:
+  name: "llmagenta"
+  version: "0.1.0"
+
+# Paramètres de génération
+generation:
+  temperature: 0.2
+  top_p: 0.95
+  max_tokens: 800
+  seed: 42
+  top_k: 40
+  repetition_penalty: 1.1
+
+# Timeouts
+timeouts:
+  generation: 60  # secondes
+  tool_execution: 30  # secondes
+  total_request: 300  # secondes (5 minutes)
+
+# Modèle
+model:
+  name: "llama-3"  # Sera remplacé par le modèle réel
+  path: "models/weights/base.gguf"
+  backend: "llama.cpp"  # ou "vllm"
+  context_size: 4096
+  n_gpu_layers: 35  # Utiliser toutes les couches GPU si disponible
+
+# Mémoire
+memory:
+  episodic:
+    ttl_days: 30
+    max_conversations: 1000
+  semantic:
+    rebuild_days: 14
+    max_items: 10000
+    similarity_threshold: 0.7
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  rotate_daily: true
+  max_file_size_mb: 100
+  compress_old: true
+
+# Conformité
+compliance:
+  worm_enabled: true
+  dr_required_for: ["write_file", "delete_file", "execute_code", "network_request"]
+  pii_redaction: true
+  provenance_tracking: true
