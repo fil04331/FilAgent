@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 
 from .config import get_config
-from .model_interface import GenerationConfig
+from .model_interface import GenerationConfig, GenerationResult
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry
 from tools.base import BaseTool, ToolResult, ToolStatus
@@ -80,8 +80,8 @@ class Agent:
                     conversation_id=conversation_id,
                     task_id=task_id,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.start event: {e}")
 
         # Enregistrer le message utilisateur en mémoire persistante
         add_message(
@@ -145,7 +145,9 @@ class Agent:
                     if not tool_name:
                         continue
 
+                    tool_start_time = datetime.now().isoformat()
                     execution_result = self._execute_tool(tool_call)
+                    tool_end_time = datetime.now().isoformat()
                     tool_results.append(execution_result)
                     tools_used.append(tool_name)
 
@@ -159,8 +161,8 @@ class Agent:
                                 success=execution_result.is_success(),
                                 output=execution_result.output if execution_result.output else execution_result.error,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"⚠ Failed to log tool call: {e}")
 
                     if self.tracker:
                         try:
@@ -172,11 +174,11 @@ class Agent:
                                 tool_input_hash=input_hash,
                                 tool_output_hash=output_hash,
                                 task_id=task_id or conversation_id,
-                                start_time=datetime.now().isoformat(),
-                                end_time=datetime.now().isoformat(),
+                                start_time=tool_start_time,
+                                end_time=tool_end_time,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"⚠ Failed to track tool execution: {e}")
 
                 # Injecter les résultats des outils dans le contexte et relancer le modèle
                 formatted_results = self._format_tool_results(tool_results)
@@ -216,8 +218,8 @@ class Agent:
                     response_hash=response_hash,
                     tokens_used=usage["total_tokens"],
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to log generation: {e}")
 
         if self.tracker:
             try:
@@ -235,8 +237,8 @@ class Agent:
                         "usage": usage,
                     },
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to track generation: {e}")
 
         if self.dr_manager and (
             unique_tools
@@ -271,10 +273,10 @@ class Agent:
                             task_id=task_id,
                             metadata={"dr_id": dr.dr_id},
                         )
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as e:
+                        print(f"⚠ Failed to log DR created event: {e}")
+            except Exception as e:
+                print(f"⚠ Failed to create decision record: {e}")
 
         if self.logger:
             try:
@@ -286,8 +288,8 @@ class Agent:
                     task_id=task_id,
                     metadata={"iterations": iterations},
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.end event: {e}")
 
         return {
             "response": final_response,

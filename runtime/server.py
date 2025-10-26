@@ -81,9 +81,8 @@ async def health():
 
     # Vérifier la base SQLite
     try:
-        conn = get_connection()
-        conn.execute("SELECT 1")
-        conn.close()
+        with get_connection() as conn:
+            conn.execute("SELECT 1")
         components["database"] = True
     except Exception:
         components["database"] = False
@@ -94,9 +93,7 @@ async def health():
         worm_logger = get_worm_logger()
         log_dir = Path(logger.current_file).parent
         digest_dir = worm_logger.digest_dir
-        log_dir.mkdir(parents=True, exist_ok=True)
-        digest_dir.mkdir(parents=True, exist_ok=True)
-        components["logging"] = log_dir.exists() and digest_dir.exists()
+        components["logging"] = log_dir.is_dir() and digest_dir.is_dir()
     except Exception:
         components["logging"] = False
 
