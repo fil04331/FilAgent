@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
-# Ajouter le parent au path
+# Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
@@ -137,7 +137,7 @@ def test_health_check_no_directory_creation(tmp_path):
             # Verify directory was NOT created
             assert not non_existent_dir.exists()
             # Logging should be False since directories don't exist
-            assert result['components']['logging'] == False
+            assert result['components']['logging'] is False
 
 
 def test_database_connection_context_manager():
