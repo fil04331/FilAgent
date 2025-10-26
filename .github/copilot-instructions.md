@@ -116,7 +116,7 @@ FilAgent/
 - **Python version**: 3.10+
 - **Code formatting**: Use Black (line length 88)
 - **Type hints**: Use type hints where appropriate
-- **Docstrings**: French for documentation, English for code comments
+- **Docstrings and Comments**: Use English for inline code comments and docstrings (note: some existing documentation files are in French)
 - **Async patterns**: Use async/await for I/O operations (FastAPI, SQLite)
 
 ### Configuration
@@ -200,7 +200,7 @@ FilAgent/
 
 #### Server won't start
 - Check that dependencies are installed: `pip install -r requirements.txt`
-- Verify database is initialized: `python -c "from memory.episodic import create_tables; create_tables()"`
+- Verify database is initialized (see "Initial Setup" section above)
 - Check logs in `logs/` directory
 
 #### Tests failing
