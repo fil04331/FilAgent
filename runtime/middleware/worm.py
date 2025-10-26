@@ -1,11 +1,8 @@
-"""
-Middleware WORM (Write Once Read Many)
-Garantit l'immuabilité des logs avec hashage et vérification d'intégrité
-"""
+"""Middleware WORM (Write Once Read Many) pour les journaux append-only."""
+
 import json
 import os
 import hashlib
-import struct
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
@@ -67,11 +64,11 @@ class MerkleTree:
                 else:
                     left = level[i]
                     right = level[i]  # Dupliquer si impair
-            
-            # Créer le nœud parent
-            parent = MerkleNode(left=left, right=right)
-            parent.compute_hash()
-            next_level.append(parent)
+
+                # Créer le nœud parent
+                parent = MerkleNode(left=left, right=right)
+                parent.compute_hash()
+                next_level.append(parent)
             
             level = next_level
         

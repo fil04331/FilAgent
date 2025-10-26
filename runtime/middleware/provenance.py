@@ -193,6 +193,8 @@ class ProvenanceTracker:
         
         # Activité
         builder.add_activity(activity_id, start_time, end_time)
+        if metadata:
+            builder.activities[activity_id]["metadata"] = metadata
         
         # Agent
         builder.add_agent(agent_id, "softwareAgent", agent_version)

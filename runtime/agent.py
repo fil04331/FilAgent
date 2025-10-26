@@ -5,11 +5,12 @@ Gère les boucles de raisonnement et les appels d'outils
 import json
 import re
 import hashlib
+import textwrap
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
 from .config import get_config
-from .model_interface import get_model, GenerationConfig, GenerationResult
+from .model_interface import GenerationConfig
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry
 from tools.base import BaseTool, ToolResult, ToolStatus
@@ -67,194 +68,214 @@ class Agent:
         print("✓ Model initialized")
     
     def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Analyser un message et générer une réponse
-        Gère les appels d'outils de manière itérative
-        """
+        """Analyser un message utilisateur et orchestrer la réponse de l'agent."""
+
         # Logger le début de la conversation (avec fallback)
         if self.logger:
             try:
                 self.logger.log_event(
-            actor="agent.core",
-            event="conversation.start",
-            level="INFO",
-            conversation_id=conversation_id,
-            task_id=task_id
-        )
-        
-        # Enregistrer le message utilisateur
+                    actor="agent.core",
+                    event="conversation.start",
+                    level="INFO",
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                )
+            except Exception:
+                pass
+
+        # Enregistrer le message utilisateur en mémoire persistante
         add_message(
             conversation_id=conversation_id,
             role="user",
             content=message,
-            task_id=task_id
+            task_id=task_id,
         )
-        
-        # Hasher le prompt pour traçabilité
-        prompt_hash = hashlib.sha256(message.encode('utf-8')).hexdigest()
-        
-        # Récupérer l'historique
+
         history = get_messages(conversation_id)
-        
-        # Construire le contexte pour le modèle
         context = self._build_context(history, conversation_id, task_id)
-        
-        # Boucle de raisonnement (max 10 tours)
+
         max_iterations = 10
         iterations = 0
-        final_response = None
+        final_response: Optional[str] = None
+        final_prompt_hash: Optional[str] = None
         start_time = datetime.now().isoformat()
-        tools_used = []
-        
+        end_time = start_time
+        tools_used: List[str] = []
+        usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+
+        current_message = message
         while iterations < max_iterations:
             iterations += 1
-            
-            # Générer une réponse
             generation_config = GenerationConfig(
                 temperature=self.config.generation.temperature,
                 top_p=self.config.generation.top_p,
                 max_tokens=self.config.generation.max_tokens,
                 seed=self.config.generation.seed,
                 top_k=self.config.generation.top_k,
-                repetition_penalty=self.config.generation.repetition_penalty
+                repetition_penalty=self.config.generation.repetition_penalty,
             )
-            
-            result = self.model.generate(
-                prompt=message,
+
+            full_prompt = self._compose_prompt(context, current_message)
+            current_prompt_hash = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
+
+            generation_result = self.model.generate(
+                prompt=full_prompt,
                 config=generation_config,
-                system_prompt=self._get_system_prompt()
+                system_prompt=self._get_system_prompt(),
             )
-            
-            response_text = result.text
-            
-            # Parser pour détecter les appels d'outils
+            end_time = datetime.now().isoformat()
+
+            usage["prompt_tokens"] += generation_result.prompt_tokens
+            usage["completion_tokens"] += generation_result.tokens_generated
+            usage["total_tokens"] += generation_result.total_tokens
+
+            response_text = generation_result.text.strip()
+
             tool_calls = self._parse_tool_calls(response_text)
-            
             if tool_calls:
-                # Exécuter les outils
                 tool_results = []
                 for tool_call in tool_calls:
-                    tool_name = tool_call.get('tool')
-                    arguments = tool_call.get('arguments', {})
-                    
-                    # Logger l'appel d'outil (avec fallback)
+                    tool_name = tool_call.get("tool")
+                    arguments = tool_call.get("arguments", {})
+
+                    if not tool_name:
+                        continue
+
+                    execution_result = self._execute_tool(tool_call)
+                    tool_results.append(execution_result)
+                    tools_used.append(tool_name)
+
                     if self.logger:
                         try:
                             self.logger.log_tool_call(
                                 tool_name=tool_name,
                                 arguments=arguments,
                                 conversation_id=conversation_id,
-                                task_id=task_id
+                                task_id=task_id,
+                                success=execution_result.is_success(),
+                                output=execution_result.output if execution_result.output else execution_result.error,
                             )
                         except Exception:
-                            pass  # Silent fail for logging
-                    
-                    # Exécuter l'outil
-                    result = self._execute_tool(tool_call)
-                    tool_results.append(result)
-                    
-                    # Tracer provenance de l'outil (avec fallback)
+                            pass
+
                     if self.tracker:
                         try:
                             input_hash = hashlib.sha256(str(arguments).encode()).hexdigest()
-                            output_hash = hashlib.sha256(str(result.output).encode()).hexdigest()
-                            
+                            output_payload = execution_result.output if execution_result.is_success() else execution_result.error or ""
+                            output_hash = hashlib.sha256(str(output_payload).encode()).hexdigest()
                             self.tracker.track_tool_execution(
                                 tool_name=tool_name,
                                 tool_input_hash=input_hash,
                                 tool_output_hash=output_hash,
                                 task_id=task_id or conversation_id,
                                 start_time=datetime.now().isoformat(),
-                                end_time=datetime.now().isoformat()
+                                end_time=datetime.now().isoformat(),
                             )
                         except Exception:
-                            pass  # Silent fail for tracking
-                    
-                    tools_used.append(tool_name)
-                
-                # Ajouter les résultats au contexte et continuer
-                context += f"\n\n[Résultats des outils]\n{self._format_tool_results(tool_results)}"
-                message = f"Voici les résultats des outils exécutés :\n{self._format_tool_results(tool_results)}\n\nContinuez votre réponse en utilisant ces résultats."
-            else:
-                # Pas d'appels d'outils, réponse finale
-                final_response = response_text
-                break
-        
-        # Enregistrer la réponse
-        end_time = datetime.now().isoformat()
-        
-        if final_response:
-            add_message(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=final_response,
-                task_id=task_id
+                            pass
+
+                # Injecter les résultats des outils dans le contexte et relancer le modèle
+                formatted_results = self._format_tool_results(tool_results)
+                context = f"{context}\n\n[Résultats des outils]\n{formatted_results}".strip()
+                current_message = (
+                    "Voici les résultats des outils exécutés :\n"
+                    f"{formatted_results}\n\nContinuez votre réponse en utilisant ces résultats."
+                )
+                continue
+
+            final_response = response_text
+            final_prompt_hash = current_prompt_hash
+            break
+
+        if final_response is None:
+            final_response = "Erreur: boucle de raisonnement trop longue"
+            final_prompt_hash = final_prompt_hash or hashlib.sha256(
+                self._compose_prompt(context, current_message).encode("utf-8")
+            ).hexdigest()
+
+        add_message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=final_response,
+            task_id=task_id,
+        )
+
+        response_hash = hashlib.sha256(final_response.encode("utf-8")).hexdigest()
+        unique_tools = list(dict.fromkeys(tools_used))
+
+        if self.logger:
+            try:
+                self.logger.log_generation(
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                    prompt_hash=final_prompt_hash,
+                    response_hash=response_hash,
+                    tokens_used=usage["total_tokens"],
+                )
+            except Exception:
+                pass
+
+        if self.tracker:
+            try:
+                self.tracker.track_generation(
+                    agent_id="agent:llmagenta",
+                    agent_version=self.config.version,
+                    task_id=task_id or conversation_id,
+                    prompt_hash=final_prompt_hash,
+                    response_hash=response_hash,
+                    start_time=start_time,
+                    end_time=end_time,
+                    metadata={
+                        "iterations": iterations,
+                        "tools_used": unique_tools,
+                        "usage": usage,
+                    },
+                )
+            except Exception:
+                pass
+
+        if self.dr_manager and (
+            unique_tools
+            or any(
+                keyword in final_response.lower()
+                for keyword in ["execute", "write", "delete", "create"]
             )
-            
-            # Hasher la réponse
-            response_hash = hashlib.sha256(final_response.encode('utf-8')).hexdigest()
-            
-            # Logger la génération (avec fallback)
-            if self.logger:
-                try:
-                    self.logger.log_generation(
-                        conversation_id=conversation_id,
-                        task_id=task_id,
-                        prompt_hash=prompt_hash,
-                        response_hash=response_hash,
-                        tokens_used=len(final_response.split())  # Approximation
-                    )
-                except Exception:
-                    pass
-            
-            # Tracer la provenance (avec fallback)
-            if self.tracker:
-                try:
-                    self.tracker.track_generation(
-                agent_id="agent:llmagenta",
-                agent_version=self.config.version,
-                task_id=task_id or conversation_id,
-                prompt_hash=prompt_hash,
-                response_hash=response_hash,
-                start_time=start_time,
-                end_time=end_time
-            )
-            
-            # Créer un Decision Record si des outils ont été utilisés ou si décision significative (avec fallback)
-            if self.dr_manager and (tools_used or any(keyword in final_response.lower() for keyword in ['execute', 'write', 'delete', 'create'])):
-                try:
-                    dr = self.dr_manager.create_dr(
+        ):
+            try:
+                dr = self.dr_manager.create_dr(
                     actor="agent.core",
                     task_id=task_id or conversation_id,
-                    decision="generate_response_with_tools" if tools_used else "generate_response",
-                    prompt_hash=prompt_hash,
-                    tools_used=tools_used,
+                    decision="generate_response_with_tools" if unique_tools else "generate_response",
+                    prompt_hash=final_prompt_hash,
+                    tools_used=unique_tools,
                     reasoning_markers=[f"iterations:{iterations}"],
                     alternatives_considered=["do_nothing", "ask_clarification"],
                     constraints={
                         "max_tokens": self.config.generation.max_tokens,
-                        "temperature": self.config.generation.temperature
+                        "temperature": self.config.generation.temperature,
                     },
-                    expected_risk=["hallucination:medium", "tool_execution:low"]
+                    expected_risk=["hallucination:medium", "tool_execution:low"],
                 )
-                
-                    # Logger le DR créé
-                    if self.logger:
-                        try:
-                            self.logger.log_event(
-                                actor="agent.core",
-                                event="dr.created",
-                                level="INFO",
-                                conversation_id=conversation_id,
-                                task_id=task_id,
-                                metadata={"dr_id": dr.dr_id}
-                            )
-                        except Exception:
-                            pass
-                except Exception:
-                    pass  # Silent fail for DR
-        
-        # Logger la fin de la conversation (avec fallback)
+
+                if self.logger:
+                    try:
+                        self.logger.log_event(
+                            actor="agent.core",
+                            event="dr.created",
+                            level="INFO",
+                            conversation_id=conversation_id,
+                            task_id=task_id,
+                            metadata={"dr_id": dr.dr_id},
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         if self.logger:
             try:
                 self.logger.log_event(
@@ -263,18 +284,25 @@ class Agent:
                     level="INFO",
                     conversation_id=conversation_id,
                     task_id=task_id,
-                    metadata={"iterations": iterations}
+                    metadata={"iterations": iterations},
                 )
             except Exception:
                 pass
-        
+
         return {
-            "response": final_response or "Erreur: boucle de raisonnement trop longue",
+            "response": final_response,
             "iterations": iterations,
             "conversation_id": conversation_id,
             "task_id": task_id,
-            "tools_used": tools_used
+            "tools_used": unique_tools,
+            "usage": usage,
         }
+
+    def _compose_prompt(self, context: str, message: str) -> str:
+        """Assembler le contexte et le dernier message utilisateur pour le modèle."""
+        context = context.strip()
+        message = message.strip()
+        return f"{context}\n\nUtilisateur: {message}\nAssistant:"
     
     def _build_context(self, history: List[Dict], conversation_id: str, task_id: Optional[str]) -> str:
         """Construire le contexte pour le modèle"""
@@ -301,7 +329,7 @@ class Agent:
                 f"- {tool_name}: {schema['description']}\n  Paramètres: {json.dumps(schema['parameters'])}"
             )
         
-        system_prompt = f"""Tu es un assistant IA capable d'utiliser des outils.
+        raw_prompt = f"""Tu es un assistant IA capable d'utiliser des outils.
 
 Outils disponibles:
 {chr(10).join(tool_descriptions)}
@@ -320,8 +348,8 @@ Format pour appeler un outil:
 </tool_call>
 
 Réponds naturellement et utilise les outils quand c'est nécessaire."""
-        
-        return system_prompt
+
+        return textwrap.dedent(raw_prompt).strip()
     
     def _parse_tool_calls(self, text: str) -> List[Dict[str, Any]]:
         """

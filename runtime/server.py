@@ -6,11 +6,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-import os
+from pathlib import Path
 
 from .config import get_config
 from .agent import get_agent
-from memory.episodic import add_message, get_messages
+from memory.episodic import get_messages, get_connection
+from .middleware.logging import get_logger
+from .middleware.worm import get_worm_logger
 
 app = FastAPI(
     title="FilAgent API",
@@ -61,11 +63,49 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Vérification de santé"""
-    # TODO: Vérifier que le modèle est chargé, DB disponible, etc.
+    """Vérification de santé approfondie"""
+
+    components = {
+        "model": False,
+        "database": False,
+        "logging": False,
+    }
+
+    # Vérifier le modèle
+    try:
+        agent = get_agent()
+        model = getattr(agent, "model", None)
+        components["model"] = bool(model and getattr(model, "is_loaded", lambda: False)())
+    except Exception:
+        components["model"] = False
+
+    # Vérifier la base SQLite
+    try:
+        conn = get_connection()
+        conn.execute("SELECT 1")
+        conn.close()
+        components["database"] = True
+    except Exception:
+        components["database"] = False
+
+    # Vérifier la journalisation (fichier et WORM)
+    try:
+        logger = get_logger()
+        worm_logger = get_worm_logger()
+        log_dir = Path(logger.current_file).parent
+        digest_dir = worm_logger.digest_dir
+        log_dir.mkdir(parents=True, exist_ok=True)
+        digest_dir.mkdir(parents=True, exist_ok=True)
+        components["logging"] = log_dir.exists() and digest_dir.exists()
+    except Exception:
+        components["logging"] = False
+
+    healthy = all(components.values())
+
     return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
+        "status": "healthy" if healthy else "degraded",
+        "timestamp": datetime.now().isoformat(),
+        "components": components,
     }
 
 
@@ -101,7 +141,8 @@ async def chat(request: ChatRequest):
         )
         
         response_content = result["response"]
-        
+        usage = result.get("usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+
         return ChatResponse(
             id=f"chatcmpl-{int(datetime.now().timestamp())}",
             created=int(datetime.now().timestamp()),
@@ -115,9 +156,9 @@ async def chat(request: ChatRequest):
                 "finish_reason": "stop"
             }],
             usage={
-                "prompt_tokens": 0,  # TODO: Calculer réellement
-                "completion_tokens": 0,
-                "total_tokens": 0
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0)
             }
         )
     except Exception as e:

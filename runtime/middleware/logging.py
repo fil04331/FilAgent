@@ -1,7 +1,5 @@
-"""
-Middleware de journalisation JSONL
-Compatible OpenTelemetry pour traçabilité complète
-"""
+"""Middleware de journalisation JSONL compatible OpenTelemetry et WORM."""
+
 import json
 import os
 from datetime import datetime
@@ -9,6 +7,8 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 import threading
 import hashlib
+
+from .worm import get_worm_logger
 
 
 class EventLogger:
@@ -22,9 +22,14 @@ class EventLogger:
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        
+
         # Fichier du jour actuel
         self.current_file = self._get_today_log_file()
+        try:
+            self.worm_logger = get_worm_logger()
+        except Exception as exc:
+            print(f"⚠ Failed to initialize WORM logger: {exc}")
+            self.worm_logger = None
     
     def _get_today_log_file(self) -> Path:
         """Obtenir le fichier de log du jour actuel"""
@@ -38,11 +43,17 @@ class EventLogger:
             today_file = self._get_today_log_file()
             if today_file != self.current_file:
                 self.current_file = today_file
-            
-            # Écrire en mode append
+
+            # Essayer d'utiliser le logger WORM (append-only renforcé)
+            if getattr(self, "worm_logger", None):
+                if self.worm_logger.append(self.current_file, line):
+                    return
+
+            # Fallback en écriture standard si WORM indisponible
             with open(self.current_file, 'a', encoding='utf-8') as f:
                 f.write(line + '\n')
                 f.flush()  # Force l'écriture immédiate
+                os.fsync(f.fileno())
     
     def log_event(
         self,
