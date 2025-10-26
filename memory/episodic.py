@@ -1,12 +1,10 @@
-"""
-Mémoire épisodique : stockage des conversations et contexte à court terme
-Utilise SQLite pour la persistance
-"""
-import sqlite3
+"""Mémoire épisodique : stockage des conversations et contexte à court terme."""
+
 import json
+import sqlite3
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict
 from pathlib import Path
+from typing import Dict, List, Optional
 
 
 DB_PATH = Path("memory/episodic.sqlite")
