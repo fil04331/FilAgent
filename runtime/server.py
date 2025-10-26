@@ -93,9 +93,7 @@ async def health():
         worm_logger = get_worm_logger()
         log_dir = Path(logger.current_file).parent
         digest_dir = worm_logger.digest_dir
-        log_dir.mkdir(parents=True, exist_ok=True)
-        digest_dir.mkdir(parents=True, exist_ok=True)
-        components["logging"] = log_dir.exists() and digest_dir.exists()
+        components["logging"] = log_dir.is_dir() and digest_dir.is_dir()
     except Exception:
         components["logging"] = False
 
