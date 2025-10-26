@@ -227,7 +227,7 @@ Based on `config/eval_targets.yaml`:
 
 ## Notes for Copilot
 
-- **Language**: Code and comments in English, documentation in French
+- **Language**: Code, inline comments, and docstrings in English; high-level documentation files in French
 - **Minimal changes**: Make surgical, targeted changes only
 - **Test coverage**: Maintain or improve existing test coverage
 - **Governance first**: Security and compliance are top priorities
