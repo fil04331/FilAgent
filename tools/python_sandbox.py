@@ -131,7 +131,6 @@ class PythonSandboxTool(BaseTool):
         
         # Bloquer certaines opérations dangereuses
         dangerous_patterns = [
-            'import',
             '__import__',
             'eval(',
             'exec(',

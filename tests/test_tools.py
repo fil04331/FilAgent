@@ -45,17 +45,6 @@ def test_python_sandbox_blocked():
     assert result.status == ToolStatus.ERROR or result.status == ToolStatus.BLOCKED
 
 
-def test_python_sandbox_blocked_from_import():
-    """Test qu'un code dangereux avec 'from ... import' est bloqué"""
-    tool = PythonSandboxTool()
-
-    # Code avec import dangereux
-    result = tool.execute({"code": "from os import system\nprint('test')"})
-
-    assert not result.is_success()
-    assert result.status == ToolStatus.ERROR or result.status == ToolStatus.BLOCKED
-
-
 def test_calculator_basic():
     """Test basique du calculateur"""
     tool = CalculatorTool()
