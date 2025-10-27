@@ -23,7 +23,6 @@ faiss-cpu>=1.7.4  # Pour mémoire sémantique (Phase 3)
 sentence-transformers>=2.2.2  # Pour embeddings (Phase 3)
 
 # Sandboxing & Execution
-pyodide>=0.23.0  # Pour Python sandbox
 # Docker (optionnel, pour isolation avancée)
 
 # Logging & Observability
@@ -46,4 +45,4 @@ mypy>=1.7.0
 
 # Data handling
 pandas>=2.1.0
-parquet>=2023.10.0
+pyarrow>=14.0.0
