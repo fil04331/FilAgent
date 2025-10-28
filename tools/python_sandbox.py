@@ -7,7 +7,7 @@ import tempfile
 import os
 import signal
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from .base import BaseTool, ToolResult, ToolStatus
@@ -19,7 +19,7 @@ class PythonSandboxTool(BaseTool):
     Limites : CPU, mémoire, timeout
     """
     
-    def __init__(self):
+    def __init__(self, dangerous_patterns: Optional[List[str]] = None):
         super().__init__(
             name="python_sandbox",
             description="Exécuter du code Python de manière sécurisée dans un sandbox"
@@ -28,6 +28,21 @@ class PythonSandboxTool(BaseTool):
         self.max_memory_mb = 512
         self.max_cpu_time = 30  # secondes
         self.timeout = 30  # secondes total
+        
+        # Patterns dangereux configurables
+        if dangerous_patterns is None:
+            self.dangerous_patterns = [
+                '__import__',
+                'eval(',
+                'exec(',
+                'open(',
+                'file(',
+                'os.system',
+                'subprocess',
+                'pickle',
+            ]
+        else:
+            self.dangerous_patterns = dangerous_patterns
     
     def execute(self, arguments: Dict[str, Any]) -> ToolResult:
         """Exécuter le code Python"""
@@ -130,19 +145,8 @@ class PythonSandboxTool(BaseTool):
             return False, "Code too long (max 50000 characters)"
         
         # Bloquer certaines opérations dangereuses
-        dangerous_patterns = [
-            '__import__',
-            'eval(',
-            'exec(',
-            'open(',
-            'file(',
-            'os.system',
-            'subprocess',
-            'pickle',
-        ]
-        
         code_lower = arguments['code'].lower()
-        for pattern in dangerous_patterns:
+        for pattern in self.dangerous_patterns:
             if pattern in code_lower:
                 return False, f"Blocked dangerous operation: {pattern}"
         

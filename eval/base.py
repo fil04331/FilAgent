@@ -115,6 +115,7 @@ class BenchmarkHarness(ABC):
 
                 if result.passed:
                     task_passed = True
+                    break  # Exit early once we have a passing solution
             
             results.extend(task_results)
             
