@@ -141,37 +141,67 @@ class ProvenanceTracker:
     Enregistre la traçabilité complète des décisions
     """
     
-    def __init__(self, output_dir: str = "logs/traces/otlp"):
-        self.output_dir = Path(output_dir)
+    def __init__(self, storage_dir: str = "logs/traces/otlp"):
+        self.output_dir = Path(storage_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
     def track_generation(
         self,
-        agent_id: str,
-        agent_version: str,
-        task_id: str,
-        prompt_hash: str,
-        response_hash: str,
-        start_time: str,
-        end_time: str,
-        metadata: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        conversation_id: Optional[str] = None,
+        input_message: Optional[str] = None,
+        output_message: Optional[str] = None,
+        tool_calls: Optional[List[Dict]] = None,
+        metadata: Optional[Dict] = None,
+        # Legacy parameters for backward compatibility
+        agent_id: Optional[str] = None,
+        agent_version: Optional[str] = None,
+        task_id: Optional[str] = None,
+        prompt_hash: Optional[str] = None,
+        response_hash: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None
+    ) -> str:
         """
         Tracer une génération de texte
         
-        Args:
-            agent_id: ID de l'agent
-            agent_version: Version de l'agent
-            task_id: ID de la tâche
-            prompt_hash: Hash SHA256 du prompt
-            response_hash: Hash SHA256 de la réponse
-            start_time: Timestamp de début (ISO8601)
-            end_time: Timestamp de fin (ISO8601)
-            metadata: Métadonnées additionnelles
+        Supports two calling conventions:
+        1. New API: conversation_id, input_message, output_message, tool_calls, metadata
+        2. Legacy API: agent_id, agent_version, task_id, prompt_hash, response_hash, start_time, end_time, metadata
         
         Returns:
-            Dict PROV-JSON
+            Provenance ID (str)
         """
+        import uuid
+        
+        # Determine which API is being used
+        if conversation_id is not None:
+            # New API
+            prov_id = f"prov-{conversation_id}-{uuid.uuid4().hex[:8]}"
+            
+            # Calculate hashes
+            if input_message:
+                prompt_hash = hashlib.sha256(input_message.encode()).hexdigest()
+            else:
+                prompt_hash = "empty"
+            
+            if output_message:
+                response_hash = hashlib.sha256(output_message.encode()).hexdigest()
+            else:
+                response_hash = "empty"
+            
+            # Generate timestamps
+            now = datetime.now().isoformat()
+            start_time = now
+            end_time = now
+            
+            # Use conversation_id as task_id
+            task_id = conversation_id
+            agent_id = "filagent"
+            agent_version = "1.0.0"
+        else:
+            # Legacy API
+            prov_id = f"prov-{task_id}-{uuid.uuid4().hex[:8]}"
+        
         builder = ProvBuilder()
         
         # IDs uniques
@@ -209,13 +239,13 @@ class ProvenanceTracker:
         prov_json = builder.to_prov_json()
         
         # Sauvegarder
-        filename = f"prov-{task_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+        filename = f"prov_{prov_id}.json"
         filepath = self.output_dir / filename
         
         with open(filepath, 'w') as f:
             json.dump(prov_json, f, indent=2)
         
-        return prov_json
+        return prov_id
     
     def track_tool_execution(
         self,
@@ -281,8 +311,8 @@ def get_tracker() -> ProvenanceTracker:
     return _tracker
 
 
-def init_tracker(output_dir: str = "logs/traces/otlp") -> ProvenanceTracker:
+def init_tracker(storage_dir: str = "logs/traces/otlp") -> ProvenanceTracker:
     """Initialiser le tracker"""
     global _tracker
-    _tracker = ProvenanceTracker(output_dir)
+    _tracker = ProvenanceTracker(storage_dir)
     return _tracker

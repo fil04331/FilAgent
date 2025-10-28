@@ -46,7 +46,7 @@ class EventLogger:
 
             # Essayer d'utiliser le logger WORM (append-only renforcé)
             if getattr(self, "worm_logger", None):
-                if self.worm_logger.append(self.current_file, line):
+                if self.worm_logger.append(line, log_file=self.current_file):
                     return
 
             # Fallback en écriture standard si WORM indisponible

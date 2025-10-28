@@ -91,27 +91,35 @@ class WormLogger:
     Append-only avec vérification d'intégrité
     """
     
-    def __init__(self, log_dir: str = "logs"):
+    def __init__(self, log_dir: str = "logs", digest_dir: Optional[str] = None):
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         
         # Dossier pour les digestes
-        self.digest_dir = Path("logs/digests")
+        if digest_dir:
+            self.digest_dir = Path(digest_dir)
+        else:
+            self.digest_dir = Path("logs/digests")
         self.digest_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Fichier de log par défaut
+        self.default_log_file = self.log_dir / "events.jsonl"
     
-    def append(self, log_file: Path, data: str) -> bool:
+    def append(self, data: str, log_file: Optional[Path] = None) -> bool:
         """
         Ajouter une ligne à un fichier de log (WORM)
         
         Args:
-            log_file: Chemin du fichier de log
             data: Données à ajouter
+            log_file: Chemin du fichier de log (optionnel, utilise le fichier par défaut si non spécifié)
         
         Returns:
             True si succès
         """
-        if not isinstance(log_file, Path):
+        if log_file is None:
+            log_file = self.default_log_file
+        elif not isinstance(log_file, Path):
             log_file = Path(log_file)
         
         with self._lock:
@@ -127,17 +135,19 @@ class WormLogger:
                 print(f"Error appending to WORM log: {e}")
                 return False
     
-    def create_checkpoint(self, log_file: Path) -> Optional[str]:
+    def create_checkpoint(self, log_file: Optional[Path] = None) -> Optional[str]:
         """
         Créer un checkpoint Merkle pour un fichier de log
         
         Args:
-            log_file: Fichier de log à vérifier
+            log_file: Fichier de log à vérifier (optionnel, utilise le fichier par défaut si non spécifié)
         
         Returns:
             Hash du checkpoint ou None en cas d'erreur
         """
-        if not isinstance(log_file, Path):
+        if log_file is None:
+            log_file = self.default_log_file
+        elif not isinstance(log_file, Path):
             log_file = Path(log_file)
         
         if not log_file.exists():
@@ -159,11 +169,11 @@ class WormLogger:
                 checkpoint_data = {
                     "file": str(log_file),
                     "timestamp": datetime.now().isoformat(),
-                    "merkle_root": root_hash,
-                    "line_count": len(lines)
+                    "root_hash": root_hash,
+                    "num_entries": len(lines)
                 }
                 
-                checkpoint_file = self.digest_dir / f"{log_file.stem}-checkpoint.json"
+                checkpoint_file = self.digest_dir / f"{log_file.stem}-{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
                 with open(checkpoint_file, 'w') as f:
                     json.dump(checkpoint_data, f, indent=2)
                 
@@ -175,18 +185,20 @@ class WormLogger:
             print(f"Error creating checkpoint: {e}")
             return None
     
-    def verify_integrity(self, log_file: Path, expected_hash: Optional[str] = None) -> bool:
+    def verify_integrity(self, log_file: Optional[Path] = None, expected_hash: Optional[str] = None) -> bool:
         """
         Vérifier l'intégrité d'un fichier de log
         
         Args:
-            log_file: Fichier à vérifier
+            log_file: Fichier à vérifier (optionnel, utilise le fichier par défaut si non spécifié)
             expected_hash: Hash attendu (optionnel, charger depuis checkpoint)
         
         Returns:
             True si intégrité vérifiée
         """
-        if not isinstance(log_file, Path):
+        if log_file is None:
+            log_file = self.default_log_file
+        elif not isinstance(log_file, Path):
             log_file = Path(log_file)
         
         # Charger le hash attendu si non fourni
@@ -195,7 +207,7 @@ class WormLogger:
             if checkpoint_file.exists():
                 with open(checkpoint_file, 'r') as f:
                     checkpoint = json.load(f)
-                    expected_hash = checkpoint['merkle_root']
+                    expected_hash = checkpoint.get('root_hash') or checkpoint.get('merkle_root')
             else:
                 return False  # Pas de checkpoint
         
