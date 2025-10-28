@@ -13,30 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from memory.episodic import create_tables, add_message, get_messages, cleanup_old_conversations
 
 
-@pytest.fixture
-def temp_db():
-    """Créer une base de données temporaire pour les tests"""
-    # Sauvegarder le chemin original
-    original_path = Path("memory/episodic.sqlite")
-    
-    # Créer un fichier temporaire
-    tmpdir = tempfile.mkdtemp()
-    tmp_db = Path(tmpdir) / "test_episodic.sqlite"
-    
-    # Modifier temporairement le chemin
-    import memory.episodic
-    original_db_path = memory.episodic.DB_PATH
-    memory.episodic.DB_PATH = tmp_db
-    
-    # Créer les tables
-    create_tables()
-    
-    yield tmp_db
-    
-    # Restaurer
-    memory.episodic.DB_PATH = original_db_path
-    if tmp_db.exists():
-        tmp_db.unlink()
+# Note: temp_db fixture is now defined in conftest.py with proper DB_PATH patching
 
 
 def test_create_tables(temp_db):
