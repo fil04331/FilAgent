@@ -56,12 +56,39 @@ class RetentionManager:
                 purpose=settings.get('purpose', 'No specific purpose')
             )
     
+    def get_ttl(self, data_type: str) -> Optional[int]:
+        """Obtenir la TTL en jours pour un type de données"""
+        policy = self.policies.get(data_type)
+        if policy:
+            return policy.ttl_days
+        return None
+    
     def get_ttl_days(self, data_type: str) -> int:
         """Obtenir la TTL en jours pour un type de données"""
         policy = self.policies.get(data_type)
         if policy:
             return policy.ttl_days
         return 30  # Default
+    
+    def is_auto_purge_enabled(self) -> bool:
+        """Vérifier si la purge automatique est activée"""
+        if not self.config_path.exists():
+            return False
+        
+        with open(self.config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        return config.get('retention', {}).get('auto_purge', {}).get('enabled', False)
+    
+    def get_purge_check_interval(self) -> Optional[int]:
+        """Obtenir l'intervalle de vérification de purge en jours"""
+        if not self.config_path.exists():
+            return None
+        
+        with open(self.config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        return config.get('retention', {}).get('auto_purge', {}).get('check_interval_days')
     
     def cleanup_conversations(self) -> int:
         """Nettoyer les vieilles conversations (mémoire épisodique)"""
