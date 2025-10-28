@@ -112,8 +112,8 @@ class DecisionRecord:
 class DRManager:
     """Gestionnaire de Decision Records"""
     
-    def __init__(self, dr_dir: str = "logs/decisions"):
-        self.dr_dir = Path(dr_dir)
+    def __init__(self, output_dir: str = "logs/decisions"):
+        self.dr_dir = Path(output_dir)
         self.dr_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         
@@ -182,6 +182,71 @@ class DRManager:
         
         return dr
     
+    def create_record(
+        self,
+        conversation_id: str,
+        decision_type: str,
+        context: Dict[str, Any],
+        rationale: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Créer un Decision Record avec une API simplifiée pour les tests
+        
+        Args:
+            conversation_id: ID de conversation
+            decision_type: Type de décision (e.g., "tool_invocation")
+            context: Contexte de la décision
+            rationale: Justification de la décision
+            metadata: Métadonnées optionnelles
+        
+        Returns:
+            ID du Decision Record créé
+        """
+        import base64
+        
+        # Générer un ID unique
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        decision_id = f"DR-{conversation_id}-{timestamp}"
+        
+        # Construire le record
+        record = {
+            "decision_id": decision_id,
+            "timestamp": datetime.now().isoformat(),
+            "conversation_id": conversation_id,
+            "decision_type": decision_type,
+            "context": context,
+            "rationale": rationale
+        }
+        
+        if metadata:
+            record["metadata"] = metadata
+        
+        # Signer le record
+        record_bytes = json.dumps(record, sort_keys=True).encode('utf-8')
+        signature_bytes = self.private_key.sign(record_bytes)
+        public_key_bytes = self.public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
+        )
+        
+        # Ajouter la signature au record
+        record["signature"] = {
+            "algorithm": "EdDSA",
+            "signature": base64.b64encode(signature_bytes).decode('utf-8'),
+            "public_key": base64.b64encode(public_key_bytes).decode('utf-8')
+        }
+        
+        # Sauvegarder
+        with self._lock:
+            filename = f"{decision_id}.json"
+            filepath = self.dr_dir / filename
+            
+            with open(filepath, 'w') as f:
+                json.dump(record, f, indent=2)
+        
+        return decision_id
+    
     def save_dr(self, dr: DecisionRecord):
         """Sauvegarder un DR dans un fichier JSON"""
         with self._lock:
@@ -236,8 +301,8 @@ def get_dr_manager() -> DRManager:
     return _dr_manager
 
 
-def init_dr_manager(dr_dir: str = "logs/decisions") -> DRManager:
+def init_dr_manager(output_dir: str = "logs/decisions") -> DRManager:
     """Initialiser le DR manager"""
     global _dr_manager
-    _dr_manager = DRManager(dr_dir)
+    _dr_manager = DRManager(output_dir)
     return _dr_manager
