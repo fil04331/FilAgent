@@ -72,14 +72,13 @@ Fournit des fixtures sophistiqués pour les tests:
 - ✅ `test_worm_digest_creation`: Création de digests
 - ✅ `test_worm_digest_integrity_verification`: Vérification d'intégrité
 
-#### Tests Decision Records avec EdDSA (5 tests)
+#### Tests Decision Records avec EdDSA (4 tests)
 - ⚠️ `test_dr_signature_creation`: Création signature EdDSA (format signature différent)
 - ⚠️ `test_dr_signature_verification`: Vérification signature (format signature différent)
 - ⚠️ `test_dr_tampering_detection`: Détection de tampering (format signature différent)
 - ⚠️ `test_dr_complete_structure`: Structure complète DR (field names différents)
-- ⚠️ `test_dr_data_retention`: Intégrité sur la durée (format signature différent)
 
-#### Tests Provenance PROV-JSON (9 tests)
+#### Tests Provenance PROV-JSON (7 tests)
 - ✅ `test_provenance_prov_builder_entities`: Construction entités PROV
 - ✅ `test_provenance_prov_builder_activities`: Construction activités
 - ✅ `test_provenance_prov_builder_agents`: Construction agents
@@ -95,6 +94,10 @@ Fournit des fixtures sophistiqués pour les tests:
 
 **Total: 21 tests de conformité**
 - ✅ **15 tests passent** (71%)
+  - WORM: 7/7 ✅
+  - DR: 0/4 ❌
+  - Provenance: 7/7 ✅
+  - Intégrés: 1/3 ⚠️
 - ⚠️ **5 tests échouent** - Différences de format de données
 - ❌ **1 test en erreur** - Fixture manquante
 
@@ -104,7 +107,7 @@ Fournit des fixtures sophistiqués pour les tests:
 - Structure complète de fixtures avancés
 - Mock models sophistiqués  
 - **Tous les tests WORM passent (7/7)** ✨
-- **Tous les tests PROV passent (7/7)** ✨
+- **Tous les tests Provenance passent (7/7)** ✨
 - Tests E2E de base (avec fixtures à corriger)
 - Isolation complète des tests
 
