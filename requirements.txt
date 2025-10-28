@@ -47,3 +47,4 @@ mypy>=1.7.0
 pandas>=2.1.0
 pyarrow>=14.0.0
 datasets
+filelock>=3.13.0  # For atomic dataset downloading in benchmarks
