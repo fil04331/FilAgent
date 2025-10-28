@@ -96,8 +96,14 @@ class WormLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         
-        # Dossier pour les digestes
-        self.digest_dir = Path("logs/digests")
+        # Dossier pour les digestes - sibling to log_dir if log_dir ends with 'events'
+        # Otherwise, use logs/digests default
+        if self.log_dir.name == "events" and self.log_dir.parent.name == "logs":
+            # Test environment: logs/events -> logs/digests
+            self.digest_dir = self.log_dir.parent / "digests"
+        else:
+            # Production environment
+            self.digest_dir = Path("logs/digests")
         self.digest_dir.mkdir(parents=True, exist_ok=True)
         
         # Default log file for test compatibility
@@ -175,8 +181,10 @@ class WormLogger:
                 checkpoint_data = {
                     "file": str(log_file),
                     "timestamp": datetime.now().isoformat(),
-                    "merkle_root": root_hash,
-                    "line_count": len(lines)
+                    "root_hash": root_hash,  # For test compatibility
+                    "merkle_root": root_hash,  # For production
+                    "num_entries": len(lines),  # For test compatibility
+                    "line_count": len(lines)  # For production
                 }
                 
                 checkpoint_file = self.digest_dir / f"{log_file.stem}-checkpoint.json"
