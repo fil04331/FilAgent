@@ -297,8 +297,7 @@ def isolated_logging(isolated_fs):
     )
 
     worm_logger = WormLogger(
-        log_dir=str(isolated_fs['logs_events']),
-        digest_dir=str(isolated_fs['logs_digests'])
+        log_dir=str(isolated_fs['logs_events'])
     )
 
     return {
@@ -365,7 +364,7 @@ def patched_middlewares(isolated_fs, isolated_logging):
     # Patcher DR manager
     from runtime.middleware.audittrail import DRManager
     dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
+        dr_dir=str(isolated_fs['logs_decisions'])
     )
     dr_patch = patch(
         'runtime.middleware.audittrail.get_dr_manager',
@@ -377,7 +376,7 @@ def patched_middlewares(isolated_fs, isolated_logging):
     # Patcher Provenance tracker
     from runtime.middleware.provenance import ProvenanceTracker
     tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
+        output_dir=str(isolated_fs['logs'])
     )
     tracker_patch = patch(
         'runtime.middleware.provenance.get_tracker',

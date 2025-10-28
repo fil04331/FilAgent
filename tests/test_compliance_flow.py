@@ -232,7 +232,7 @@ def test_dr_signature_creation(isolated_fs):
     - Format correct
     """
     dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
+        dr_dir=str(isolated_fs['logs_decisions'])
     )
 
     # Créer un Decision Record
@@ -281,7 +281,7 @@ def test_dr_signature_verification(isolated_fs):
     import base64
 
     dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
+        dr_dir=str(isolated_fs['logs_decisions'])
     )
 
     # Créer un DR
@@ -332,7 +332,7 @@ def test_dr_tampering_detection(isolated_fs):
     import base64
 
     dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
+        dr_dir=str(isolated_fs['logs_decisions'])
     )
 
     # Créer un DR
@@ -379,7 +379,7 @@ def test_dr_complete_structure(isolated_fs):
     Vérifie tous les champs requis
     """
     dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
+        dr_dir=str(isolated_fs['logs_decisions'])
     )
 
     dr_id = dr_manager.create_record(
@@ -543,7 +543,7 @@ def test_provenance_complete_graph_structure(isolated_fs):
     - Conforme au standard W3C
     """
     tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
+        output_dir=str(isolated_fs['logs'])
     )
 
     # Tracer une génération complète
@@ -588,7 +588,7 @@ def test_provenance_json_schema_validation(isolated_fs):
     Vérifie que le JSON généré est bien formé
     """
     tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
+        output_dir=str(isolated_fs['logs'])
     )
 
     prov_id = tracker.track_generation(
@@ -624,7 +624,7 @@ def test_provenance_chain_traceability(isolated_fs):
     - Relations wasDerivedFrom présentes
     """
     tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
+        output_dir=str(isolated_fs['logs'])
     )
 
     # Tracer plusieurs générations successives
@@ -751,7 +751,7 @@ def test_compliance_non_repudiation(isolated_fs):
     - Les DR ne peuvent être niés
     """
     dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
+        dr_dir=str(isolated_fs['logs_decisions'])
     )
 
     # Créer un DR important
