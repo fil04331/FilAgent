@@ -99,18 +99,31 @@ class WormLogger:
         # Dossier pour les digestes
         self.digest_dir = Path("logs/digests")
         self.digest_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Default log file for test compatibility
+        self.default_log_file = self.log_dir / "events.jsonl"
     
-    def append(self, log_file: Path, data: str) -> bool:
+    def append(self, log_file_or_data: any, data: Optional[str] = None) -> bool:
         """
         Ajouter une ligne à un fichier de log (WORM)
         
         Args:
-            log_file: Chemin du fichier de log
-            data: Données à ajouter
+            log_file_or_data: Either Path to log file (if data provided) or data string (for default log)
+            data: Data to append (optional, if log_file_or_data is the log file path)
         
         Returns:
-            True si succès
+            True if successful
         """
+        # Handle both signatures: append(data) and append(log_file, data)
+        if data is None:
+            # Called as append(data) - use default log file
+            log_file = self.default_log_file
+            data_to_write = str(log_file_or_data)
+        else:
+            # Called as append(log_file, data) - use provided log file
+            log_file = log_file_or_data
+            data_to_write = data
+        
         if not isinstance(log_file, Path):
             log_file = Path(log_file)
         
@@ -118,7 +131,7 @@ class WormLogger:
             try:
                 # Mode append
                 with open(log_file, 'a') as f:
-                    f.write(data + '\n')
+                    f.write(data_to_write + '\n')
                     f.flush()  # Force l'écriture immédiate
                     os.fsync(f.fileno())  # Flush au système
                 
@@ -127,16 +140,19 @@ class WormLogger:
                 print(f"Error appending to WORM log: {e}")
                 return False
     
-    def create_checkpoint(self, log_file: Path) -> Optional[str]:
+    def create_checkpoint(self, log_file: Optional[Path] = None) -> Optional[str]:
         """
         Créer un checkpoint Merkle pour un fichier de log
         
         Args:
-            log_file: Fichier de log à vérifier
+            log_file: Fichier de log à vérifier (optional, uses default if not provided)
         
         Returns:
             Hash du checkpoint ou None en cas d'erreur
         """
+        if log_file is None:
+            log_file = self.default_log_file
+        
         if not isinstance(log_file, Path):
             log_file = Path(log_file)
         

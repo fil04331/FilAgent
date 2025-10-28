@@ -182,6 +182,50 @@ class DRManager:
         
         return dr
     
+    def create_record(
+        self,
+        conversation_id: str,
+        decision_type: str,
+        context: Dict[str, Any],
+        rationale: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Test compatibility method: create a decision record with simplified parameters
+        
+        Args:
+            conversation_id: ID of the conversation
+            decision_type: Type of decision being made
+            context: Context information for the decision
+            rationale: Rationale for the decision
+            metadata: Optional additional metadata
+        
+        Returns:
+            DR ID
+        """
+        # Map test parameters to actual DR parameters
+        import hashlib
+        prompt_str = json.dumps({"context": context, "rationale": rationale}, sort_keys=True)
+        prompt_hash = hashlib.sha256(prompt_str.encode()).hexdigest()
+        
+        # Extract tools from context if present
+        tools_used = []
+        if "tool" in context:
+            tools_used = [context["tool"]]
+        
+        # Create DR with mapped parameters
+        dr = self.create_dr(
+            actor=f"agent@{conversation_id}",
+            task_id=conversation_id,
+            decision=f"{decision_type}: {rationale}",
+            prompt_hash=prompt_hash,
+            tools_used=tools_used,
+            reasoning_markers=[decision_type],
+            constraints=metadata or {}
+        )
+        
+        return dr.dr_id
+    
     def save_dr(self, dr: DecisionRecord):
         """Sauvegarder un DR dans un fichier JSON"""
         with self._lock:
