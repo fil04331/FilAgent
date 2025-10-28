@@ -775,12 +775,65 @@ def assert_json_file_valid():
     return _assert_valid
 
 
+@pytest.fixture(scope="function")
+def performance_tracker():
+    """
+    Fixture to track test performance and timing
+    
+    Scope: function
+    
+    Returns:
+        Callable: Context manager for timing code blocks
+        
+    Example:
+        def test_performance(performance_tracker):
+            with performance_tracker("database_query") as timer:
+                # Code to measure
+                pass
+            assert timer.elapsed < 1.0  # Should complete in < 1 second
+    """
+    import time
+    from contextlib import contextmanager
+    
+    class Timer:
+        def __init__(self):
+            self.start_time = None
+            self.end_time = None
+            self.elapsed = None
+    
+    @contextmanager
+    def _track(label: str = ""):
+        """Track execution time of code block"""
+        timer = Timer()
+        timer.start_time = time.time()
+        
+        yield timer
+        
+        timer.end_time = time.time()
+        timer.elapsed = timer.end_time - timer.start_time
+        
+        # Optionally print timing info
+        if label:
+            print(f"\n⏱ {label}: {timer.elapsed:.4f}s")
+    
+    return _track
+
+
 # ============================================================================
 # FIXTURES: Markers & Configuration
 # ============================================================================
 
 def pytest_configure(config):
-    """Configuration pytest personnalisée"""
+    """
+    Configuration pytest personnalisée
+    
+    Registers custom markers for test categorization:
+    - e2e: End-to-end tests
+    - compliance: Compliance and validation tests
+    - resilience: Resilience and fallback tests
+    - slow: Slow tests (> 1 second)
+    - fixtures: Tests for fixture functionality
+    """
     config.addinivalue_line(
         "markers", "e2e: Tests end-to-end complets"
     )
@@ -792,6 +845,9 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "slow: Tests lents (> 1 seconde)"
+    )
+    config.addinivalue_line(
+        "markers", "fixtures: Tests validating fixture functionality"
     )
 
 
