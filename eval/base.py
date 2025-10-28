@@ -65,6 +65,7 @@ class BenchmarkHarness(ABC):
         self,
         agent_callback,  # Fonction qui prend un prompt et retourne une réponse
         num_tasks: Optional[int] = None,
+        k: int = 1,
         verbose: bool = False
     ) -> Dict[str, Any]:
         """
@@ -73,6 +74,7 @@ class BenchmarkHarness(ABC):
         Args:
             agent_callback: Fonction callback agent
             num_tasks: Nombre de tâches à exécuter (None = toutes)
+            k: Nombre de générations par tâche pour le calcul de pass@k
             verbose: Afficher les détails
         
         Returns:
@@ -84,39 +86,48 @@ class BenchmarkHarness(ABC):
             tasks = tasks[:num_tasks]
         
         results = []
-        passed = 0
+        passed_at_k = 0
         total = len(tasks)
         
-        print(f"Running {self.name} with {total} tasks...")
+        print(f"Running {self.name} with {total} tasks (pass@{k})...")
         
         for i, task in enumerate(tasks, 1):
             if verbose:
                 print(f"  [{i}/{total}] Task: {task.id}")
             
-            # Appeler l'agent
-            start_time = datetime.now()
-            try:
-                response = agent_callback(task.prompt)
-            except Exception as e:
-                response = f"ERROR: {str(e)}"
+            task_passed = False
+            task_results = []
             
-            latency_ms = (datetime.now() - start_time).total_seconds() * 1000
+            for _ in range(k):
+                # Appeler l'agent
+                start_time = datetime.now()
+                try:
+                    response = agent_callback(task.prompt)
+                except Exception as e:
+                    response = f"ERROR: {str(e)}"
+
+                latency_ms = (datetime.now() - start_time).total_seconds() * 1000
+
+                # Évaluer
+                result = self.evaluate(task, response)
+                result.latency_ms = latency_ms
+                task_results.append(result)
+
+                if result.passed:
+                    task_passed = True
             
-            # Évaluer
-            result = self.evaluate(task, response)
-            result.latency_ms = latency_ms
-            results.append(result)
+            results.extend(task_results)
             
-            if result.passed:
-                passed += 1
+            if task_passed:
+                passed_at_k += 1
             
-            if verbose and result.passed:
-                print(f"    ✓ PASS")
-            elif verbose and not result.passed:
-                print(f"    ✗ FAIL: {result.error}")
+            if verbose and task_passed:
+                print(f"    ✓ PASS (at least one of {k})")
+            elif verbose and not task_passed:
+                print(f"    ✗ FAIL (none of {k} passed)")
         
         # Calculer les métriques
-        pass_rate = passed / total if total > 0 else 0
+        pass_at_k_rate = passed_at_k / total if total > 0 else 0
         avg_latency = sum(r.latency_ms for r in results if r.latency_ms) / len(results) if results else 0
         
         # Report
@@ -124,9 +135,10 @@ class BenchmarkHarness(ABC):
             "benchmark": self.name,
             "timestamp": datetime.now().isoformat(),
             "total_tasks": total,
-            "passed": passed,
-            "failed": total - passed,
-            "pass_rate": pass_rate,
+            "k": k,
+            "passed_at_k": passed_at_k,
+            "failed": total - passed_at_k,
+            f"pass_at_{k}": pass_at_k_rate,
             "avg_latency_ms": avg_latency,
             "results": [
                 {
@@ -140,7 +152,7 @@ class BenchmarkHarness(ABC):
         }
         
         print(f"\n✓ {self.name} complete:")
-        print(f"  Pass: {passed}/{total} ({pass_rate*100:.1f}%)")
+        print(f"  Pass@{k}: {passed_at_k}/{total} ({pass_at_k_rate*100:.1f}%)")
         print(f"  Avg Latency: {avg_latency:.0f}ms")
         
         return report

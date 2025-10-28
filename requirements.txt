@@ -46,3 +46,4 @@ mypy>=1.7.0
 # Data handling
 pandas>=2.1.0
 pyarrow>=14.0.0
+datasets
