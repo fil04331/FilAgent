@@ -720,9 +720,10 @@ def conversation_factory(temp_db):
         # Créer la conversation (respect du schéma réel)
         now_iso = datetime.utcnow().isoformat()
         cursor.execute("""
-            INSERT INTO conversations (conversation_id, created_at, updated_at, metadata)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO conversations (id, conversation_id, created_at, updated_at, metadata)
+            VALUES (?, ?, ?, ?, ?)
         """, (
+            conversation_id,
             conversation_id,
             now_iso,
             now_iso,

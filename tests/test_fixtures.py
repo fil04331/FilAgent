@@ -28,8 +28,8 @@ class TestFixtureIsolation:
         conn = sqlite3.connect(str(temp_db))
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO conversations (id, task_id, created_at, updated_at)
-            VALUES ('test-1', 'task-1', '2024-01-01', '2024-01-01')
+            INSERT INTO conversations (id, conversation_id, task_id, created_at, updated_at)
+            VALUES ('test-1', 'test-1', 'task-1', '2024-01-01', '2024-01-01')
         """)
         conn.commit()
         conn.close()
