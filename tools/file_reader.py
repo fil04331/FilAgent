@@ -98,12 +98,24 @@ class FileReaderTool(BaseTool):
     
     def _is_path_allowed(self, path: Path) -> bool:
         """Vérifier si un chemin est dans la liste autorisée"""
+        # Normaliser le chemin résolu (supprime les symlinks et normalise)
+        resolved_path = path.resolve()
+        
         # Vérifier chaque chemin autorisé
         for allowed in self.allowed_paths:
-            allowed_path = Path(allowed).resolve()
+            # Résoudre le chemin autorisé depuis le répertoire de travail actuel
+            # Utiliser Path.cwd() pour garantir une résolution cohérente
+            if Path(allowed).is_absolute():
+                allowed_path = Path(allowed).resolve()
+            else:
+                # Pour les chemins relatifs, résoudre depuis le répertoire racine du projet
+                # Utiliser le répertoire parent du fichier actuel comme base
+                base_dir = Path(__file__).parent.parent.parent
+                allowed_path = (base_dir / allowed).resolve()
+            
             try:
-                # Vérifier si le chemin est sous le chemin autorisé
-                path.relative_to(allowed_path)
+                # Vérifier si le chemin résolu est sous le chemin autorisé résolu
+                resolved_path.relative_to(allowed_path)
                 return True
             except ValueError:
                 continue
@@ -121,8 +133,16 @@ class FileReaderTool(BaseTool):
             return False, "Argument 'file_path' must be a string"
         
         # Vérifier qu'il n'y a pas de path traversal
-        if '..' in arguments['file_path']:
-            return False, "Path traversal detected (..)"
+        # Vérifier les variantes: .., ../, ..\\, %2e%2e, etc.
+        file_path_lower = arguments['file_path'].lower()
+        if '..' in file_path_lower or '%2e%2e' in file_path_lower or '%2e.' in file_path_lower:
+            return False, "Path traversal detected"
+        
+        # Normaliser et vérifier que le chemin ne commence pas par des séparateurs multiples
+        # (protection contre les chemins absolus mal formés)
+        normalized = arguments['file_path'].replace('\\', '/').strip('/')
+        if normalized.startswith('../'):
+            return False, "Path traversal detected"
         
         return True, None
     
