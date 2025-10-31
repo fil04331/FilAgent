@@ -94,13 +94,43 @@ class AgentConfig(BaseModel):
         logging_data = raw_config.get('logging', {})
         compliance_data = raw_config.get('compliance', {})
         
+        # Adapter la configuration mémoire pour supporter les structures imbriquées
+        memory_kwargs: Dict[str, Any] = {}
+
+        # Support des anciens formats à clés aplaties (aliases pydantic)
+        for field_name, field in MemoryConfig.model_fields.items():
+            alias = field.alias
+            if field_name in memory_data:
+                memory_kwargs[field_name] = memory_data[field_name]
+            elif alias and alias in memory_data:
+                memory_kwargs[field_name] = memory_data[alias]
+
+        # Support du format YAML imbriqué actuel
+        episodic_cfg = memory_data.get('episodic', {})
+        if isinstance(episodic_cfg, dict):
+            if 'ttl_days' in episodic_cfg:
+                memory_kwargs.setdefault('episodic_ttl_days', episodic_cfg['ttl_days'])
+            if 'max_conversations' in episodic_cfg:
+                memory_kwargs.setdefault('episodic_max_conversations', episodic_cfg['max_conversations'])
+
+        semantic_cfg = memory_data.get('semantic', {})
+        if isinstance(semantic_cfg, dict):
+            if 'rebuild_days' in semantic_cfg:
+                memory_kwargs.setdefault('semantic_rebuild_days', semantic_cfg['rebuild_days'])
+            if 'max_items' in semantic_cfg:
+                memory_kwargs.setdefault('semantic_max_items', semantic_cfg['max_items'])
+            if 'similarity_threshold' in semantic_cfg:
+                memory_kwargs.setdefault('semantic_similarity_threshold', semantic_cfg['similarity_threshold'])
+
+        memory_config = MemoryConfig(**memory_kwargs)
+
         return cls(
             name=agent_data.get('name', 'llmagenta'),
             version=agent_data.get('version', '0.1.0'),
             generation=GenerationConfig(**generation_data),
             timeouts=TimeoutConfig(**timeouts_data),
             model=ModelConfig(**model_data),
-            memory=MemoryConfig(**memory_data),
+            memory=memory_config,
             logging=LoggingConfig(**logging_data),
             compliance=ComplianceConfig(**compliance_data),
         )

@@ -166,15 +166,22 @@ class WormLogger:
             
             if root_hash:
                 # Sauvegarder le checkpoint
+                timestamp = datetime.now()
                 checkpoint_data = {
                     "file": str(log_file),
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": timestamp.isoformat(),
                     "root_hash": root_hash,
                     "num_entries": len(lines)
                 }
-                
-                checkpoint_file = self.digest_dir / f"{log_file.stem}-{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
-                with open(checkpoint_file, 'w') as f:
+
+                # Sauvegarder un snapshot horodaté pour historisation
+                checkpoint_file = self.digest_dir / f"{log_file.stem}-{timestamp.strftime('%Y%m%d%H%M%S')}.json"
+                with open(checkpoint_file, 'w', encoding='utf-8') as f:
+                    json.dump(checkpoint_data, f, indent=2)
+
+                # Mettre à jour le checkpoint courant utilisé par verify_integrity
+                latest_checkpoint = self.digest_dir / f"{log_file.stem}-checkpoint.json"
+                with open(latest_checkpoint, 'w', encoding='utf-8') as f:
                     json.dump(checkpoint_data, f, indent=2)
                 
                 return root_hash
@@ -205,7 +212,7 @@ class WormLogger:
         if expected_hash is None:
             checkpoint_file = self.digest_dir / f"{log_file.stem}-checkpoint.json"
             if checkpoint_file.exists():
-                with open(checkpoint_file, 'r') as f:
+                with open(checkpoint_file, 'r', encoding='utf-8') as f:
                     checkpoint = json.load(f)
                     expected_hash = checkpoint.get('root_hash') or checkpoint.get('merkle_root')
             else:
@@ -216,7 +223,7 @@ class WormLogger:
             return False
         
         try:
-            with open(log_file, 'r') as f:
+            with open(log_file, 'r', encoding='utf-8') as f:
                 lines = [line.rstrip('\n') for line in f.readlines()]
             
             tree = MerkleTree()

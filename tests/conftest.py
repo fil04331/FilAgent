@@ -683,15 +683,16 @@ def conversation_factory(temp_db):
         conn = sqlite3.connect(str(temp_db))
         cursor = conn.cursor()
 
-        # Créer la conversation
+        # Créer la conversation (respect du schéma réel)
+        now_iso = datetime.utcnow().isoformat()
         cursor.execute("""
-            INSERT INTO conversations (id, task_id, created_at, updated_at)
+            INSERT INTO conversations (conversation_id, created_at, updated_at, metadata)
             VALUES (?, ?, ?, ?)
         """, (
             conversation_id,
-            task_id,
-            datetime.utcnow().isoformat(),
-            datetime.utcnow().isoformat()
+            now_iso,
+            now_iso,
+            None
         ))
 
         # Ajouter les messages
