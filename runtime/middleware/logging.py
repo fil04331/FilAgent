@@ -82,6 +82,7 @@ class EventLogger:
         # Construire l'événement
         event_data = {
             "ts": datetime.now().isoformat(),
+            "timestamp": None,  # placeholder, will be set below
             "trace_id": trace_id,
             "span_id": span_id,
             "level": level,
@@ -91,6 +92,9 @@ class EventLogger:
             "task_id": task_id,
             "metadata": metadata or {}
         }
+
+        # Alias pour compatibilité avec certains consommateurs
+        event_data["timestamp"] = event_data["ts"]
         
         # Ajouter les références de hash si applicable
         if "input_ref" in (metadata or {}):

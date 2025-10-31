@@ -34,6 +34,10 @@ class ToolRegistry:
     def get(self, tool_name: str) -> Optional[BaseTool]:
         """Récupérer un outil par son nom"""
         return self._tools.get(tool_name)
+
+    def get_tool(self, tool_name: str) -> Optional[BaseTool]:
+        """Alias pour compatibilité avec anciens tests."""
+        return self.get(tool_name)
     
     def list_all(self) -> Dict[str, BaseTool]:
         """Lister tous les outils disponibles"""

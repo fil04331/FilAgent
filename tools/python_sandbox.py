@@ -38,6 +38,7 @@ class PythonSandboxTool(BaseTool):
                 'open(',
                 'file(',
                 'os.system',
+                'import os',
                 'subprocess',
                 'pickle',
             ]

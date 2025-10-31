@@ -99,7 +99,7 @@ async def root():
     return {
         "service": "FilAgent",
         "version": config.version,
-        "status": "running"
+        "status": "healthy"
     }
 
 
@@ -184,7 +184,7 @@ async def chat(request: ChatRequest):
             usage = {"prompt_tokens": 0, "completion_tokens": 1, "total_tokens": 1}
 
         response = {
-            "id": f"chatcmpl-{int(datetime.now().timestamp())}",
+            "id": conversation_id,
             "object": "chat.completion",
             "created": int(datetime.now().timestamp()),
             "model": getattr(getattr(config, "model", None), "name", "unknown"),
@@ -200,7 +200,8 @@ async def chat(request: ChatRequest):
                 "prompt_tokens": usage.get("prompt_tokens", 0),
                 "completion_tokens": usage.get("completion_tokens", 0),
                 "total_tokens": usage.get("total_tokens", 0)
-            }
+            },
+            "conversation_id": conversation_id
         }
         # Ajouter un header X-Trace-ID si disponible via logger
         headers = {}
@@ -216,7 +217,7 @@ async def chat(request: ChatRequest):
     except Exception as e:
         # Dernier repli : renvoyer une réponse minimale conforme pour éviter 500 en smoke tests
         fallback = {
-            "id": f"chatcmpl-{int(datetime.now().timestamp())}",
+            "id": conversation_id,
             "object": "chat.completion",
             "created": int(datetime.now().timestamp()),
             "model": getattr(getattr(config, "model", None), "name", "unknown"),
@@ -225,7 +226,8 @@ async def chat(request: ChatRequest):
                 "message": {"role": "assistant", "content": f"[stub-error] {str(e)}"},
                 "finish_reason": "error"
             }],
-            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            "conversation_id": conversation_id
         }
         return JSONResponse(status_code=200, content=fallback)
 
