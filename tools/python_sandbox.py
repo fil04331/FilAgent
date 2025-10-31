@@ -56,6 +56,7 @@ class PythonSandboxTool(BaseTool):
             )
         
         code = arguments['code']
+        temp_file = None
         
         try:
             # Créer un fichier temporaire
@@ -63,72 +64,67 @@ class PythonSandboxTool(BaseTool):
                 f.write(code)
                 temp_file = f.name
             
-            try:
-                # Exécuter avec timeout
-                start_time = time.time()
-                result = subprocess.run(
-                    ['python3', temp_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                    cwd=os.path.dirname(temp_file),
-                    # Limites basiques (sur macOS/Linux)
-                    env=os.environ.copy()
-                )
-                elapsed_time = time.time() - start_time
+            # Exécuter avec timeout
+            start_time = time.time()
+            result = subprocess.run(
+                ['python3', temp_file],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+                cwd=os.path.dirname(temp_file),
+                # Limites basiques (sur macOS/Linux)
+                env=os.environ.copy()
+            )
+            elapsed_time = time.time() - start_time
+            
+            # Vérifier le résultat
+            if result.returncode == 0:
+                output = result.stdout
+                if not output:
+                    output = "[Code exécuté avec succès, pas de sortie]"
                 
-                # Vérifier le résultat
-                if result.returncode == 0:
-                    output = result.stdout
-                    if not output:
-                        output = "[Code exécuté avec succès, pas de sortie]"
-                    
-                    return ToolResult(
-                        status=ToolStatus.SUCCESS,
-                        output=output,
-                        metadata={
-                            "returncode": result.returncode,
-                            "elapsed_time": elapsed_time,
-                            "timeout": False
-                        }
-                    )
-                else:
-                    return ToolResult(
-                        status=ToolStatus.ERROR,
-                        output="",
-                        error=f"Execution failed: {result.stderr}",
-                        metadata={
-                            "returncode": result.returncode,
-                            "stderr": result.stderr
-                        }
-                    )
-                    
-            except subprocess.TimeoutExpired:
                 return ToolResult(
-                    status=ToolStatus.TIMEOUT,
-                    output="",
-                    error=f"Execution timeout after {self.timeout}s",
-                    metadata={"timeout": True}
+                    status=ToolStatus.SUCCESS,
+                    output=output,
+                    metadata={
+                        "returncode": result.returncode,
+                        "elapsed_time": elapsed_time,
+                        "timeout": False
+                    }
                 )
-            except Exception as e:
+            else:
                 return ToolResult(
                     status=ToolStatus.ERROR,
                     output="",
-                    error=f"Execution error: {str(e)}"
+                    error=f"Execution failed: {result.stderr}",
+                    metadata={
+                        "returncode": result.returncode,
+                        "stderr": result.stderr
+                    }
                 )
-            finally:
-                # Nettoyer le fichier temporaire
-                try:
-                    os.unlink(temp_file)
-                except:
-                    pass
-                    
+                
+        except subprocess.TimeoutExpired:
+            return ToolResult(
+                status=ToolStatus.TIMEOUT,
+                output="",
+                error=f"Execution timeout after {self.timeout}s",
+                metadata={"timeout": True}
+            )
         except Exception as e:
             return ToolResult(
                 status=ToolStatus.ERROR,
                 output="",
                 error=f"Failed to execute Python code: {str(e)}"
             )
+        finally:
+            # Nettoyer le fichier temporaire dans tous les cas
+            if temp_file:
+                try:
+                    if os.path.exists(temp_file):
+                        os.unlink(temp_file)
+                except Exception:
+                    # Ignorer les erreurs de nettoyage pour éviter de masquer l'erreur originale
+                    pass
     
     def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""

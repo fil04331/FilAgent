@@ -106,6 +106,9 @@ class Agent:
             "completion_tokens": 0,
             "total_tokens": 0,
         }
+        # Limite pour éviter la croissance illimitée du contexte (environ 100K caractères)
+        max_context_length = 100000
+        tool_results_history: List[str] = []
 
         current_message = message
         while iterations < max_iterations:
@@ -182,10 +185,31 @@ class Agent:
 
                 # Injecter les résultats des outils dans le contexte et relancer le modèle
                 formatted_results = self._format_tool_results(tool_results)
-                context = f"{context}\n\n[Résultats des outils]\n{formatted_results}".strip()
+                tool_results_history.append(formatted_results)
+                
+                # Limiter la taille du contexte pour éviter la croissance illimitée
+                # Garder seulement les 3 derniers résultats d'outils pour éviter la croissance exponentielle
+                if len(tool_results_history) > 3:
+                    tool_results_history = tool_results_history[-3:]
+                
+                recent_tool_results = "\n\n---\n\n".join(tool_results_history)
+                context_with_tools = f"{context}\n\n[Résultats des outils]\n{recent_tool_results}".strip()
+                
+                # Si le contexte devient trop grand, tronquer en gardant le début et la fin
+                if len(context_with_tools) > max_context_length:
+                    # Garder les 70% premiers et 30% derniers caractères
+                    keep_start = int(max_context_length * 0.7)
+                    keep_end = max_context_length - keep_start
+                    context_with_tools = (
+                        context_with_tools[:keep_start] + 
+                        "\n\n[... contexte tronqué pour raison de taille ...]\n\n" + 
+                        context_with_tools[-keep_end:]
+                    )
+                
+                context = context_with_tools
                 current_message = (
                     "Voici les résultats des outils exécutés :\n"
-                    f"{formatted_results}\n\nContinuez votre réponse en utilisant ces résultats."
+                    f"{recent_tool_results}\n\nContinuez votre réponse en utilisant ces résultats."
                 )
                 continue
 
