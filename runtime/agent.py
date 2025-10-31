@@ -92,10 +92,14 @@ class Agent:
         )
 
         history = get_messages(conversation_id)
-        context = self._build_context(history, conversation_id, task_id)
+        base_context = self._build_context(history, conversation_id, task_id)
 
         max_iterations = 10
         iterations = 0
+        # Garder une trace des résultats d'outils récents (limiter à 3 dernières exécutions)
+        recent_tool_results: List[str] = []
+        MAX_TOOL_RESULTS_IN_CONTEXT = 3
+        MAX_CONTEXT_LENGTH = 8000  # Limiter la taille du contexte en caractères
         final_response: Optional[str] = None
         final_prompt_hash: Optional[str] = None
         start_time = datetime.now().isoformat()
@@ -118,6 +122,26 @@ class Agent:
                 top_k=self.config.generation.top_k,
                 repetition_penalty=self.config.generation.repetition_penalty,
             )
+            
+            # Construire le contexte avec les résultats d'outils récents seulement
+            tool_results_context = ""
+            if recent_tool_results:
+                tool_results_context = "\n\n[Résultats des outils récents]\n" + "\n---\n".join(recent_tool_results[-MAX_TOOL_RESULTS_IN_CONTEXT:])
+            
+            context = base_context + tool_results_context
+            # Limiter la taille du contexte pour éviter l'explosion de tokens
+            if len(context) > MAX_CONTEXT_LENGTH:
+                # Tronquer le contexte en gardant le début (historique) et la fin (résultats récents)
+                excess = len(context) - MAX_CONTEXT_LENGTH
+                # Créer une copie de base_context pour la tronquer (ne pas modifier l'original)
+                truncated_base = base_context
+                if len(base_context) > excess:
+                    cutoff = len(base_context) - excess
+                    truncated_base = base_context[:cutoff] + "...[tronqué]"
+                context = truncated_base + tool_results_context
+                if len(context) > MAX_CONTEXT_LENGTH:
+                    # Tronquer les résultats d'outils si nécessaire
+                    context = context[:MAX_CONTEXT_LENGTH] + "...[contexte tronqué]"
 
             full_prompt = self._compose_prompt(context, current_message)
             current_prompt_hash = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
@@ -180,9 +204,13 @@ class Agent:
                         except Exception as e:
                             print(f"⚠ Failed to track tool execution for '{tool_name}': {e}")
 
-                # Injecter les résultats des outils dans le contexte et relancer le modèle
+                # Ajouter les résultats à la liste récente (remplacer au lieu d'accumuler)
                 formatted_results = self._format_tool_results(tool_results)
-                context = f"{context}\n\n[Résultats des outils]\n{formatted_results}".strip()
+                recent_tool_results.append(formatted_results)
+                # Limiter la liste pour éviter la croissance infinie
+                if len(recent_tool_results) > MAX_TOOL_RESULTS_IN_CONTEXT:
+                    recent_tool_results.pop(0)
+                
                 current_message = (
                     "Voici les résultats des outils exécutés :\n"
                     f"{formatted_results}\n\nContinuez votre réponse en utilisant ces résultats."
