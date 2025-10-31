@@ -24,8 +24,9 @@ def create_tables():
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS conversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id TEXT UNIQUE NOT NULL,
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT UNIQUE,
+            task_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             metadata TEXT
@@ -65,9 +66,9 @@ def add_message(conversation_id: str, role: str, content: str,
     
     # Créer la conversation si elle n'existe pas
     cursor.execute("""
-        INSERT OR IGNORE INTO conversations (conversation_id, updated_at)
-        VALUES (?, CURRENT_TIMESTAMP)
-    """, (conversation_id,))
+        INSERT OR IGNORE INTO conversations (id, conversation_id, task_id, metadata)
+        VALUES (?, ?, ?, NULL)
+    """, (conversation_id, conversation_id, task_id))
     
     # Ajouter le message
     metadata_json = json.dumps(metadata) if metadata else None
@@ -79,9 +80,10 @@ def add_message(conversation_id: str, role: str, content: str,
     # Mettre à jour le timestamp de la conversation
     cursor.execute("""
         UPDATE conversations
-        SET updated_at = CURRENT_TIMESTAMP
+        SET updated_at = CURRENT_TIMESTAMP,
+            task_id = COALESCE(?, task_id)
         WHERE conversation_id = ?
-    """, (conversation_id,))
+    """, (task_id, conversation_id))
     
     conn.commit()
     conn.close()

@@ -23,6 +23,14 @@ class ToolResult:
     output: str  # Sortie de l'outil
     error: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+
+    def __post_init__(self):
+        # Harmoniser les alias error / error_message
+        if self.error_message is not None and self.error is None:
+            self.error = self.error_message
+        elif self.error is not None and self.error_message is None:
+            self.error_message = self.error
     
     def is_success(self) -> bool:
         """Vérifier si l'exécution a réussi"""

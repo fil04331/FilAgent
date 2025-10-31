@@ -24,6 +24,8 @@ import json
 import shutil
 import sqlite3
 import tempfile
+import threading
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Generator
 from datetime import datetime
@@ -32,6 +34,38 @@ from dataclasses import dataclass
 
 import pytest
 from fastapi.testclient import TestClient
+# =========================================================================
+# TEST SERVER BOOTSTRAP (utile pour les tests de contrat HTTP)
+# =========================================================================
+
+
+@pytest.fixture(scope="session", autouse=True)
+def start_fastapi_server() -> Generator[None, None, None]:
+    """Démarrer l'API FastAPI dans un thread pour les tests de contrat."""
+    import uvicorn
+    from runtime.server import app
+
+    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="warning")
+    server = uvicorn.Server(config)
+    server.install_signal_handlers = lambda: None
+
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+
+    start = time.time()
+    while not server.started:
+        if not thread.is_alive():
+            raise RuntimeError("Failed to start FastAPI server for tests")
+        if time.time() - start > 10:
+            raise RuntimeError("Timed out starting FastAPI server for tests")
+        time.sleep(0.1)
+
+    try:
+        yield
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
 
 # Ajouter le répertoire parent au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -683,15 +717,16 @@ def conversation_factory(temp_db):
         conn = sqlite3.connect(str(temp_db))
         cursor = conn.cursor()
 
-        # Créer la conversation
+        # Créer la conversation (respect du schéma réel)
+        now_iso = datetime.utcnow().isoformat()
         cursor.execute("""
-            INSERT INTO conversations (id, task_id, created_at, updated_at)
+            INSERT INTO conversations (conversation_id, created_at, updated_at, metadata)
             VALUES (?, ?, ?, ?)
         """, (
             conversation_id,
-            task_id,
-            datetime.utcnow().isoformat(),
-            datetime.utcnow().isoformat()
+            now_iso,
+            now_iso,
+            None
         ))
 
         # Ajouter les messages
