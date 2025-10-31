@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 
 from .config import get_config
-from .model_interface import GenerationConfig, GenerationResult
+from .model_interface import GenerationConfig, GenerationResult, init_model as _init_model
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry
 from tools.base import BaseTool, ToolResult, ToolStatus
@@ -431,3 +431,8 @@ _agent_manager = AgentManager()
 def get_agent() -> Agent:
     """Récupérer l'instance de l'agent"""
     return _agent_manager.get_agent()
+
+
+def init_model(backend: str, model_path: str, config: Dict[str, Any]):
+    """Proxy vers runtime.model_interface.init_model pour compatibilité tests"""
+    return _init_model(backend=backend, model_path=model_path, config=config)

@@ -63,6 +63,12 @@ class ComplianceConfig(BaseModel):
     provenance_tracking: bool = True
 
 
+class AgentRuntimeSettings(BaseModel):
+    """Configuration opérationnelle de l'agent"""
+    max_iterations: int = 10
+    timeout: int = 300
+
+
 class AgentConfig(BaseModel):
     """Configuration principale de l'agent"""
     name: str = "llmagenta"
@@ -73,6 +79,7 @@ class AgentConfig(BaseModel):
     memory: MemoryConfig = MemoryConfig()
     logging: LoggingConfig = LoggingConfig()
     compliance: ComplianceConfig = ComplianceConfig()
+    runtime_settings: AgentRuntimeSettings = AgentRuntimeSettings()
 
     @classmethod
     def load(cls, config_dir: str = "config") -> "AgentConfig":
@@ -124,6 +131,12 @@ class AgentConfig(BaseModel):
 
         memory_config = MemoryConfig(**memory_kwargs)
 
+        runtime_settings = AgentRuntimeSettings()
+        if 'max_iterations' in agent_data:
+            runtime_settings.max_iterations = agent_data['max_iterations']
+        if 'timeout' in agent_data:
+            runtime_settings.timeout = agent_data['timeout']
+
         return cls(
             name=agent_data.get('name', 'llmagenta'),
             version=agent_data.get('version', '0.1.0'),
@@ -133,7 +146,13 @@ class AgentConfig(BaseModel):
             memory=memory_config,
             logging=LoggingConfig(**logging_data),
             compliance=ComplianceConfig(**compliance_data),
+            runtime_settings=runtime_settings,
         )
+
+    @property
+    def agent(self) -> AgentRuntimeSettings:
+        """Compatibilité historique: expose les paramètres runtime via config.agent"""
+        return self.runtime_settings
 
     def save(self, config_path: str = "config/agent.yaml"):
         """Sauvegarder la configuration actuelle"""
