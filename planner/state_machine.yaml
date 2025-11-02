@@ -1,0 +1,398 @@
+# HTN State Machine Configuration
+# Définit les états, transitions et critères d'arrêt pour l'exécution de plans
+
+# Conformité:
+# - Loi 25 (QC): Transparence des états et transitions
+# - RGPD: Traçabilité des décisions d'état
+# - AI Act: Explicabilité des arrêts et échecs
+
+version: "1.0.0"
+updated_at: "2025-11-01"
+
+# ============================================================================
+# ÉTATS DE TÂCHE
+# ============================================================================
+
+task_states:
+  pending:
+    description: "Tâche en attente d'exécution"
+    color: "gray"
+    icon: "⏳"
+    transitions:
+      - ready        # Dépendances satisfaites
+      - cancelled    # Annulation utilisateur
+      - skipped      # Dépendance échouée
+  
+  ready:
+    description: "Tâche prête à être exécutée"
+    color: "blue"
+    icon: "🔵"
+    transitions:
+      - running      # Début d'exécution
+      - cancelled    # Annulation utilisateur
+      - skipped      # Dépendance échouée
+  
+  running:
+    description: "Tâche en cours d'exécution"
+    color: "yellow"
+    icon: "▶️"
+    transitions:
+      - completed    # Succès
+      - failed       # Échec
+      - cancelled    # Annulation utilisateur
+  
+  completed:
+    description: "Tâche terminée avec succès"
+    color: "green"
+    icon: "✅"
+    transitions: []  # État terminal
+  
+  failed:
+    description: "Tâche échouée"
+    color: "red"
+    icon: "❌"
+    transitions: []  # État terminal
+  
+  skipped:
+    description: "Tâche sautée (dépendance échouée)"
+    color: "orange"
+    icon: "⏭️"
+    transitions: []  # État terminal
+  
+  cancelled:
+    description: "Tâche annulée par l'utilisateur"
+    color: "purple"
+    icon: "🚫"
+    transitions: []  # État terminal
+
+
+# ============================================================================
+# RÈGLES DE TRANSITION
+# ============================================================================
+
+transition_rules:
+  
+  # Transition: pending -> ready
+  pending_to_ready:
+    from: pending
+    to: ready
+    conditions:
+      - all_dependencies_completed: true
+      - no_blocking_errors: true
+    trigger: automatic  # Déclenché automatiquement par l'exécuteur
+  
+  # Transition: ready -> running
+  ready_to_running:
+    from: ready
+    to: running
+    conditions:
+      - action_available: true
+      - resources_available: true
+    trigger: executor   # Déclenché par l'exécuteur
+  
+  # Transition: running -> completed
+  running_to_completed:
+    from: running
+    to: completed
+    conditions:
+      - action_succeeded: true
+      - result_not_null: true
+    trigger: automatic
+    actions:
+      - log_success
+      - update_dependents
+      - record_metrics
+  
+  # Transition: running -> failed
+  running_to_failed:
+    from: running
+    to: failed
+    conditions:
+      - action_failed: true
+    trigger: automatic
+    actions:
+      - log_error
+      - propagate_failure_to_dependents
+      - record_failure_metrics
+      - generate_decision_record  # Conformité Loi 25
+  
+  # Transition: * -> skipped
+  any_to_skipped:
+    from: [pending, ready]
+    to: skipped
+    conditions:
+      - dependency_failed: true
+    trigger: automatic
+    actions:
+      - log_skip_reason
+      - mark_as_skipped
+  
+  # Transition: * -> cancelled
+  any_to_cancelled:
+    from: [pending, ready, running]
+    to: cancelled
+    conditions:
+      - user_requested_cancellation: true
+    trigger: user
+    actions:
+      - cleanup_resources
+      - log_cancellation
+      - notify_user
+
+
+# ============================================================================
+# CRITÈRES D'ARRÊT
+# ============================================================================
+
+stopping_criteria:
+  
+  # Arrêt normal: toutes les tâches terminées
+  normal_completion:
+    name: "Normal Completion"
+    priority: 1
+    conditions:
+      - all_tasks_in_terminal_state: true
+      - terminal_states: [completed, failed, skipped, cancelled]
+    action: return_success
+    log_level: info
+  
+  # Arrêt critique: tâche critique échouée
+  critical_failure:
+    name: "Critical Task Failed"
+    priority: 2  # Priorité haute
+    conditions:
+      - any_task_failed_with_priority: critical
+      - priority_threshold: 5  # CRITICAL = 5
+    action: abort_execution
+    log_level: error
+    recovery:
+      enabled: true
+      max_retries: 2
+      backoff_seconds: 5
+  
+  # Arrêt partiel: tâche haute priorité échouée
+  high_priority_failure:
+    name: "High Priority Task Failed"
+    priority: 3
+    conditions:
+      - any_task_failed_with_priority: high
+      - priority_threshold: 4  # HIGH = 4
+    action: continue_with_warnings
+    log_level: warning
+    recovery:
+      enabled: true
+      max_retries: 1
+  
+  # Arrêt timeout: temps d'exécution dépassé
+  execution_timeout:
+    name: "Execution Timeout"
+    priority: 2
+    conditions:
+      - execution_time_exceeded: true
+      - max_execution_time_seconds: 300  # 5 minutes
+    action: abort_execution
+    log_level: error
+  
+  # Arrêt utilisateur: annulation manuelle
+  user_cancellation:
+    name: "User Cancellation"
+    priority: 1
+    conditions:
+      - user_requested_stop: true
+    action: graceful_shutdown
+    log_level: info
+  
+  # Arrêt erreur: erreur système non récupérable
+  system_error:
+    name: "System Error"
+    priority: 2
+    conditions:
+      - unrecoverable_error_occurred: true
+    action: emergency_stop
+    log_level: critical
+    notify:
+      - admin
+      - monitoring_system
+
+
+# ============================================================================
+# STRATÉGIES DE RECOVERY
+# ============================================================================
+
+recovery_strategies:
+  
+  # Retry simple: réessayer la tâche
+  simple_retry:
+    name: "Simple Retry"
+    applicable_to: [failed]
+    max_attempts: 3
+    backoff_strategy: exponential  # 1s, 2s, 4s
+    backoff_base_seconds: 1
+    conditions:
+      - error_is_transient: true
+      - retry_count_not_exceeded: true
+  
+  # Fallback: utiliser action alternative
+  fallback_action:
+    name: "Fallback Action"
+    applicable_to: [failed]
+    conditions:
+      - fallback_available: true
+      - priority_allows_fallback: true
+    actions:
+      - mark_original_as_failed
+      - create_fallback_task
+      - execute_fallback
+  
+  # Skip non-critical: continuer malgré échec
+  skip_non_critical:
+    name: "Skip Non-Critical Task"
+    applicable_to: [failed]
+    conditions:
+      - task_priority_low_or_optional: true
+      - no_critical_dependents: true
+    actions:
+      - mark_as_skipped
+      - log_skip_decision
+      - continue_execution
+  
+  # Circuit breaker: arrêter si trop d'échecs
+  circuit_breaker:
+    name: "Circuit Breaker"
+    threshold_failures: 3
+    time_window_seconds: 60
+    action: abort_execution
+    log_level: error
+
+
+# ============================================================================
+# MÉTADONNÉES DE TRAÇABILITÉ
+# ============================================================================
+
+traceability:
+  
+  # Logs obligatoires pour conformité
+  mandatory_logs:
+    - event: state_transition
+      level: info
+      fields:
+        - task_id
+        - from_state
+        - to_state
+        - timestamp
+        - trigger
+        - conditions_met
+    
+    - event: task_execution_start
+      level: info
+      fields:
+        - task_id
+        - task_name
+        - action
+        - params
+        - dependencies
+        - timestamp
+    
+    - event: task_execution_end
+      level: info
+      fields:
+        - task_id
+        - status
+        - result
+        - duration_ms
+        - timestamp
+    
+    - event: task_failure
+      level: error
+      fields:
+        - task_id
+        - error_message
+        - stack_trace
+        - recovery_attempted
+        - timestamp
+      compliance:
+        - generate_decision_record  # Loi 25
+        - notify_user              # RGPD
+  
+  # Decision Records pour gouvernance
+  decision_records:
+    enabled: true
+    trigger_events:
+      - critical_task_failure
+      - user_cancellation
+      - timeout_exceeded
+      - recovery_strategy_applied
+    format: json
+    storage: logs/decisions/
+    retention_days: 2555  # 7 ans (Loi 25)
+
+
+# ============================================================================
+# MONITORING ET ALERTES
+# ============================================================================
+
+monitoring:
+  
+  metrics:
+    - name: tasks_completed_total
+      type: counter
+      labels: [priority, action]
+    
+    - name: tasks_failed_total
+      type: counter
+      labels: [priority, action, error_type]
+    
+    - name: task_execution_duration_seconds
+      type: histogram
+      labels: [action]
+      buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    
+    - name: tasks_in_progress
+      type: gauge
+      labels: [action]
+  
+  alerts:
+    - name: high_failure_rate
+      condition: "tasks_failed_total / tasks_completed_total > 0.1"
+      severity: warning
+      notify: [admin, monitoring]
+    
+    - name: critical_task_failed
+      condition: "task_failed AND priority == critical"
+      severity: critical
+      notify: [admin, user, monitoring]
+    
+    - name: execution_timeout
+      condition: "execution_duration > max_execution_time"
+      severity: error
+      notify: [admin, monitoring]
+
+
+# ============================================================================
+# CONFIGURATION PAR ENVIRONNEMENT
+# ============================================================================
+
+environments:
+  
+  development:
+    max_execution_time_seconds: 60
+    retry_enabled: true
+    max_retries: 1
+    verbose_logging: true
+    circuit_breaker_threshold: 5
+  
+  staging:
+    max_execution_time_seconds: 180
+    retry_enabled: true
+    max_retries: 2
+    verbose_logging: true
+    circuit_breaker_threshold: 3
+  
+  production:
+    max_execution_time_seconds: 300
+    retry_enabled: true
+    max_retries: 3
+    verbose_logging: false  # Performance
+    circuit_breaker_threshold: 3
+    monitoring_enabled: true
+    alerts_enabled: true
