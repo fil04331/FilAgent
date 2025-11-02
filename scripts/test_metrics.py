@@ -8,8 +8,18 @@ Usage:
 
 import sys
 import os
-import requests
 from pathlib import Path
+
+# Import requests (optionnel, avec message d'erreur clair)
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    print("❌ Module 'requests' non disponible.")
+    print("   Installez avec: pip install requests")
+    print("   Ou: pip install -r requirements.txt")
+    sys.exit(1)
 
 # Ajouter le répertoire racine au path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
