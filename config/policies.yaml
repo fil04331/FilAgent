@@ -75,3 +75,25 @@ reasoning:
   max_steps: 10
   require_validation: true
   timeout_per_step: 30
+
+# Politiques HTN
+htn_policies:
+  max_tasks_per_plan: 50
+  max_execution_time_sec: 300
+  
+  allowed_actions:
+    - read_file
+    - write_file
+    - analyze_data
+    - generate_report
+    - calculate
+    - search
+  
+  blocked_actions:
+    - delete_system_file
+    - execute_system_command
+  
+  retry_policies:
+    max_retries: 3
+    backoff_strategy: exponential
+    backoff_base_sec: 1

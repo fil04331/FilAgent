@@ -51,3 +51,18 @@ compliance:
   dr_required_for: ["write_file", "delete_file", "execute_code", "network_request"]
   pii_redaction: true
   provenance_tracking: true
+
+# Configuration HTN (Hierarchical Task Network)
+htn_planning:
+  enabled: true
+  default_strategy: hybrid  # rule_based, llm_based, hybrid
+  max_decomposition_depth: 3
+  
+htn_execution:
+  default_strategy: adaptive  # sequential, parallel, adaptive
+  max_parallel_workers: 4
+  task_timeout_sec: 60
+  
+htn_verification:
+  default_level: strict  # basic, strict, paranoid
+  custom_verifiers: []

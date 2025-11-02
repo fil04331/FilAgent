@@ -22,6 +22,8 @@ import json
 import re
 
 from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError
+from .metrics import get_metrics
+import time
 
 
 class PlanningStrategy(str, Enum):
@@ -153,6 +155,11 @@ class HierarchicalPlanner:
         Raises:
             TaskDecompositionError: Si la décomposition échoue
         """
+        # Métriques: début de planification
+        metrics = get_metrics()
+        start_time = time.time()
+        planning_success = False
+        
         # Traçabilité: enregistrer le début de planification
         planning_metadata = {
             "query": query,
@@ -173,8 +180,19 @@ class HierarchicalPlanner:
             self._validate_plan(result.graph)
             
             # Traçabilité: succès
+            planning_success = True
             result.metadata["completed_at"] = datetime.utcnow().isoformat()
             result.metadata["validation_passed"] = True
+            
+            # Métriques: enregistrer succès
+            duration_seconds = time.time() - start_time
+            metrics.record_planning(
+                strategy=strategy.value,
+                success=True,
+                duration_seconds=duration_seconds,
+                confidence=result.confidence,
+                tasks_count=len(result.graph.tasks),
+            )
             
             return result
             
@@ -183,6 +201,16 @@ class HierarchicalPlanner:
             planning_metadata["completed_at"] = datetime.utcnow().isoformat()
             planning_metadata["error"] = str(e)
             planning_metadata["validation_passed"] = False
+            
+            # Métriques: enregistrer échec
+            duration_seconds = time.time() - start_time
+            metrics.record_planning(
+                strategy=strategy.value,
+                success=False,
+                duration_seconds=duration_seconds,
+                confidence=0.0,
+                tasks_count=0,
+            )
             
             raise TaskDecompositionError(
                 f"Planning failed for query '{query[:50]}...': {str(e)}"

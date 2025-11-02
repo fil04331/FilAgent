@@ -1,0 +1,265 @@
+{
+  "dashboard": {
+    "title": "FilAgent HTN Monitoring",
+    "description": "Dashboard de monitoring pour les métriques HTN de FilAgent",
+    "version": "1.0.0",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Adoption HTN",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "htn_usage_rate",
+            "legendFormat": "Usage Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 0.30,
+                  "color": "yellow"
+                },
+                {
+                  "value": 0.40,
+                  "color": "green"
+                }
+              ]
+            },
+            "unit": "percentunit"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Taux de Succès",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "htn_success_rate",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 0.95,
+                  "color": "yellow"
+                },
+                {
+                  "value": 0.98,
+                  "color": "green"
+                }
+              ]
+            },
+            "unit": "percentunit"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Parallélisation",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "htn_parallelization_factor",
+            "legendFormat": "Parallelization"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 0.40,
+                  "color": "yellow"
+                },
+                {
+                  "value": 0.50,
+                  "color": "green"
+                }
+              ]
+            },
+            "unit": "percentunit"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Performance (Durée d'exécution)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(htn_execution_duration_seconds_sum[5m]) / rate(htn_execution_duration_seconds_count[5m])",
+            "legendFormat": "Avg Duration"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 5,
+                  "color": "yellow"
+                },
+                {
+                  "value": 10,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Tâches par Priorité",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "rate(htn_tasks_completed_total[5m])",
+            "legendFormat": "{{priority}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "Erreurs par Type",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "rate(htn_tasks_failed_total[5m])",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 8
+        }
+      },
+      {
+        "id": 7,
+        "title": "Requêtes HTN par Stratégie",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(htn_requests_total[5m])",
+            "legendFormat": "{{strategy}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops"
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 8,
+        "title": "Taux de Vérification",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(htn_verifications_total{status=\"passed\"}[5m]) / rate(htn_verifications_total[5m])",
+            "legendFormat": "Pass Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+    }
+  }
+}
+

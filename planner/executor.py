@@ -24,8 +24,10 @@ from typing import List, Dict, Optional, Any, Callable
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 import traceback
+import time
 
 from .task_graph import Task, TaskGraph, TaskStatus, TaskPriority
+from .metrics import get_metrics
 
 
 class ExecutionStrategy(str, Enum):
@@ -158,12 +160,17 @@ class TaskExecutor:
             ExecutionError: Si l'exécution échoue de manière critique
         """
         start_time = datetime.utcnow()
+        execution_start_time = time.time()
         metadata = {
             "started_at": start_time.isoformat(),
             "strategy": self.strategy.value,
             "total_tasks": len(graph.tasks),
             "context": context or {},
         }
+        
+        # Métriques: mettre à jour tâches en cours
+        metrics = get_metrics()
+        metrics.update_task_in_progress(self.strategy.value, len(graph.tasks))
         
         try:
             # Choisir la stratégie d'exécution
@@ -177,10 +184,19 @@ class TaskExecutor:
             # Calculer statistiques finales
             end_time = datetime.utcnow()
             duration_ms = (end_time - start_time).total_seconds() * 1000
+            duration_seconds = time.time() - execution_start_time
             
             completed = sum(1 for t in graph.tasks.values() if t.status == TaskStatus.COMPLETED)
             failed = sum(1 for t in graph.tasks.values() if t.status == TaskStatus.FAILED)
             skipped = sum(1 for t in graph.tasks.values() if t.status == TaskStatus.SKIPPED)
+            
+            # Compter tâches parallèles (approximation)
+            parallel_tasks = 0
+            if self.strategy in [ExecutionStrategy.PARALLEL, ExecutionStrategy.ADAPTIVE]:
+                levels = graph.get_parallelizable_tasks()
+                for level in levels:
+                    if len(level) > 1:
+                        parallel_tasks += len(level)
             
             # Déterminer le succès global
             # Succès si toutes les tâches CRITICAL/HIGH sont complétées
@@ -204,6 +220,43 @@ class TaskExecutor:
                 errors=results["errors"],
                 metadata=metadata,
             )
+            
+            # Métriques: enregistrer exécution
+            metrics.record_execution(
+                strategy=self.strategy.value,
+                success=success,
+                duration_seconds=duration_seconds,
+                completed_tasks=completed,
+                failed_tasks=failed,
+                skipped_tasks=skipped,
+                parallel_tasks=parallel_tasks,
+            )
+            
+            # Métriques: enregistrer chaque tâche
+            for task in graph.tasks.values():
+                if task.status == TaskStatus.COMPLETED:
+                    metrics.record_task(
+                        priority=task.priority.name.lower(),
+                        action=task.action,
+                        status="completed",
+                    )
+                elif task.status == TaskStatus.FAILED:
+                    error_type = type(task.error).__name__ if task.error else "unknown"
+                    metrics.record_task(
+                        priority=task.priority.name.lower(),
+                        action=task.action,
+                        status="failed",
+                        error_type=error_type,
+                    )
+                elif task.status == TaskStatus.SKIPPED:
+                    metrics.record_task(
+                        priority=task.priority.name.lower(),
+                        action=task.action,
+                        status="skipped",
+                    )
+            
+            # Métriques: remettre à zéro tâches en cours
+            metrics.update_task_in_progress(self.strategy.value, 0)
             
             # Mettre à jour les statistiques
             self._execution_stats["total_executions"] += 1

@@ -1,0 +1,176 @@
+# Règles d'alertes Prometheus pour FilAgent HTN
+#
+# Ces règles définissent les conditions d'alerte basées sur les métriques HTN
+# 
+# Seuils basés sur les KPIs définis dans CLAUDE.md:
+# - Usage rate: > 30%
+# - Performance: < 5000ms
+# - Parallélisation: > 40%
+# - Fiabilité: > 95%
+# - Vérification: > 90%
+
+groups:
+  - name: htn_planning_alerts
+    interval: 30s
+    rules:
+      # Alerte: Taux d'usage HTN trop bas
+      - alert: HTNUsageRateLow
+        expr: htn_usage_rate < 0.30
+        for: 5m
+        labels:
+          severity: warning
+          component: htn
+          type: adoption
+        annotations:
+          summary: "Taux d'usage HTN trop bas"
+          description: "Le taux d'usage HTN est {{ $value | humanizePercentage }} (seuil: 30%). Considérer d'améliorer la détection de requêtes complexes."
+
+      # Alerte: Performance dégradée (durée > 5s)
+      - alert: HTNPerformanceDegraded
+        expr: |
+          rate(htn_execution_duration_seconds_sum[5m]) / rate(htn_execution_duration_seconds_count[5m]) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          component: htn
+          type: performance
+        annotations:
+          summary: "Performance HTN dégradée"
+          description: "La durée moyenne d'exécution HTN est {{ $value }}s (seuil: 5s). Vérifier les goulots d'étranglement."
+
+      # Alerte: Taux de succès trop bas (< 95%)
+      - alert: HTNSuccessRateLow
+        expr: htn_success_rate < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          component: htn
+          type: reliability
+        annotations:
+          summary: "Taux de succès HTN trop bas"
+          description: "Le taux de succès HTN est {{ $value | humanizePercentage }} (seuil: 95%). Investigation nécessaire."
+
+      # Alerte: Taux de succès critique (< 90%)
+      - alert: HTNSuccessRateCritical
+        expr: htn_success_rate < 0.90
+        for: 2m
+        labels:
+          severity: critical
+          component: htn
+          type: reliability
+        annotations:
+          summary: "Taux de succès HTN critique"
+          description: "Le taux de succès HTN est {{ $value | humanizePercentage }} (seuil critique: 90%). Action immédiate requise."
+
+  - name: htn_execution_alerts
+    interval: 30s
+    rules:
+      # Alerte: Tâche critique échouée
+      - alert: HTNCriticalTaskFailed
+        expr: increase(htn_tasks_failed_total{priority="critical"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: htn
+          type: task_failure
+        annotations:
+          summary: "Tâche critique HTN échouée"
+          description: "{{ $value }} tâche(s) critique(s) ont échoué dans les 5 dernières minutes."
+
+      # Alerte: Taux d'échec élevé (> 10%)
+      - alert: HTNFailureRateHigh
+        expr: |
+          rate(htn_tasks_failed_total[5m]) / 
+          (rate(htn_tasks_completed_total[5m]) + rate(htn_tasks_failed_total[5m])) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: htn
+          type: reliability
+        annotations:
+          summary: "Taux d'échec HTN élevé"
+          description: "Le taux d'échec HTN est {{ $value | humanizePercentage }} (seuil: 10%)."
+
+      # Alerte: Parallélisation trop basse (< 40%)
+      - alert: HTNParallelizationLow
+        expr: htn_parallelization_factor < 0.40
+        for: 10m
+        labels:
+          severity: info
+          component: htn
+          type: performance
+        annotations:
+          summary: "Parallélisation HTN faible"
+          description: "Le facteur de parallélisation HTN est {{ $value | humanizePercentage }} (cible: 40%). Optimisation possible."
+
+      # Alerte: Timeout d'exécution
+      - alert: HTNExecutionTimeout
+        expr: htn_execution_duration_seconds > 300  # 5 minutes
+        for: 1m
+        labels:
+          severity: warning
+          component: htn
+          type: performance
+        annotations:
+          summary: "Timeout d'exécution HTN"
+          description: "Une exécution HTN dépasse 5 minutes ({{ $value }}s). Investigation nécessaire."
+
+  - name: htn_verification_alerts
+    interval: 30s
+    rules:
+      # Alerte: Taux de validation trop bas (< 90%)
+      - alert: HTNVerificationPassRateLow
+        expr: |
+          rate(htn_verifications_total{status="passed"}[5m]) / 
+          rate(htn_verifications_total[5m]) < 0.90
+        for: 5m
+        labels:
+          severity: warning
+          component: htn
+          type: verification
+        annotations:
+          summary: "Taux de validation HTN trop bas"
+          description: "Le taux de réussite des vérifications est {{ $value | humanizePercentage }} (seuil: 90%)."
+
+      # Alerte: Vérifications échouées critiques
+      - alert: HTNVerificationCriticalFailures
+        expr: |
+          increase(htn_verifications_total{status="failed", level="strict"}[5m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+          component: htn
+          type: verification
+        annotations:
+          summary: "Plusieurs vérifications strictes échouées"
+          description: "{{ $value }} vérification(s) stricte(s) ont échoué dans les 5 dernières minutes."
+
+  - name: htn_planning_alerts
+    interval: 30s
+    rules:
+      # Alerte: Planification échoue fréquemment
+      - alert: HTNPlanningFailures
+        expr: |
+          rate(htn_requests_total{status="failure"}[5m]) / 
+          rate(htn_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: htn
+          type: planning
+        annotations:
+          summary: "Taux d'échec de planification élevé"
+          description: "{{ $value | humanizePercentage }} des planifications échouent (seuil: 5%)."
+
+      # Alerte: Confiance de planification trop basse
+      - alert: HTNPlanningConfidenceLow
+        expr: htn_planning_confidence < 0.60
+        for: 5m
+        labels:
+          severity: info
+          component: htn
+          type: planning
+        annotations:
+          summary: "Confiance de planification HTN faible"
+          description: "La confiance moyenne de planification est {{ $value }} (seuil: 60%)."
+

@@ -1,0 +1,49 @@
+# Configuration Prometheus pour FilAgent HTN Monitoring
+# 
+# Usage:
+#   prometheus --config.file=config/prometheus.yml
+#
+# Métriques exposées sur: http://localhost:9090/metrics
+
+global:
+  scrape_interval: 15s      # Récupère les métriques toutes les 15 secondes
+  evaluation_interval: 15s  # Évalue les règles d'alertes toutes les 15 secondes
+  external_labels:
+    cluster: 'filagent'
+    environment: 'production'
+
+# Configuration d'alerte (Alertmanager)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093  # Décommenter si Alertmanager configuré
+
+# Règles d'alertes
+rule_files:
+  - "config/prometheus_alerts.yml"
+
+# Configuration des scrapes (endpoints à monitorer)
+scrape_configs:
+  # Scrape FilAgent HTN Metrics
+  - job_name: 'filagent-htn'
+    static_configs:
+      - targets: ['localhost:8000']  # Adapter selon votre configuration
+        labels:
+          service: 'filagent'
+          component: 'htn'
+    
+    # Path pour récupérer les métriques
+    metrics_path: '/metrics'
+    
+    # Intervalle spécifique pour ce job
+    scrape_interval: 10s
+    
+    # Timeout
+    scrape_timeout: 5s
+
+  # Scrape Prometheus lui-même (optionnel)
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+

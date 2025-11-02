@@ -17,6 +17,13 @@ from memory.episodic import get_messages, get_connection
 from .middleware.logging import get_logger
 from .middleware.worm import get_worm_logger
 
+# Import Prometheus metrics (optionnel)
+try:
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+
 app = FastAPI(
     title="FilAgent API",
     version="0.1.0",
@@ -244,6 +251,28 @@ async def get_conversation(conversation_id: str):
         "conversation_id": conversation_id,
         "messages": messages
     }
+
+
+@app.get("/metrics")
+async def metrics():
+    """
+    Endpoint Prometheus pour exposer les métriques HTN
+    
+    Returns:
+        Métriques au format Prometheus
+    """
+    if not PROMETHEUS_AVAILABLE:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(
+            content="# Prometheus client not available. Install with: pip install prometheus-client\n",
+            status_code=200
+        )
+    
+    from fastapi.responses import Response
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
 
 
 if __name__ == "__main__":

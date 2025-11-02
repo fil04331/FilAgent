@@ -25,7 +25,7 @@ from planner import (
     ExecutionStrategy,
     VerificationLevel,
 )
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 
@@ -324,7 +324,7 @@ def example_traceability(result, exec_result, graph):
     # 1. Planning Result (Decision Record)
     planning_record = {
         "event_type": "planning_decision",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "query": "Example query",
         "strategy": result.strategy_used.value,
         "confidence": result.confidence,
@@ -339,7 +339,7 @@ def example_traceability(result, exec_result, graph):
     # 2. Execution Result
     execution_record = {
         "event_type": "execution_completed",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "success": exec_result.success,
         "completed": exec_result.completed_tasks,
         "failed": exec_result.failed_tasks,

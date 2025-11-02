@@ -36,6 +36,7 @@ from .executor import (
     TaskExecutor,
     ExecutionResult,
     ExecutionError,
+    ExecutionStrategy,
 )
 
 from .verifier import (
@@ -61,6 +62,7 @@ __all__ = [
     "TaskExecutor",
     "ExecutionResult",
     "ExecutionError",
+    "ExecutionStrategy",
     
     # Verifier
     "TaskVerifier",

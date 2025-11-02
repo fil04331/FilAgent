@@ -20,6 +20,17 @@ from .middleware.logging import get_logger
 from .middleware.audittrail import get_dr_manager
 from .middleware.provenance import get_tracker
 
+# Import du planificateur HTN
+from planner import (
+    HierarchicalPlanner,
+    TaskExecutor,
+    TaskVerifier,
+    PlanningStrategy,
+    ExecutionStrategy,
+    VerificationLevel,
+)
+from planner.task_graph import TaskStatus
+
 
 class Agent:
     """
@@ -53,6 +64,11 @@ class Agent:
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
+        
+        # Initialiser le planificateur HTN (sera configuré après initialisation du modèle)
+        self.planner = None
+        self.executor = None
+        self.verifier = None
     
     @staticmethod
     def _is_mock(obj: Any) -> bool:
@@ -101,10 +117,184 @@ class Agent:
             config=model_config
         )
         print("✓ Model initialized")
+        
+        # Initialiser le planificateur HTN après l'initialisation du modèle
+        self._initialize_htn()
     
+    def _initialize_htn(self):
+        """Initialiser le système HTN (planificateur, exécuteur, vérificateur)"""
+        # Récupérer la configuration HTN depuis config
+        htn_config = getattr(self.config, 'htn_planning', None)
+        exec_config = getattr(self.config, 'htn_execution', None)
+        verif_config = getattr(self.config, 'htn_verification', None)
+        
+        # Valeurs par défaut si configuration non présente
+        max_depth = htn_config.max_decomposition_depth if htn_config else 3
+        max_workers = exec_config.max_parallel_workers if exec_config else 4
+        task_timeout = exec_config.task_timeout_sec if exec_config else 60
+        verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
+        
+        # Ajouter le planificateur HTN
+        self.planner = HierarchicalPlanner(
+            model_interface=self.model,
+            tools_registry=self.tool_registry,
+            max_decomposition_depth=max_depth,
+            enable_tracing=True,
+        )
+        
+        # Ajouter l'exécuteur
+        self.executor = TaskExecutor(
+            action_registry=self._build_action_registry(),
+            strategy=ExecutionStrategy.ADAPTIVE,
+            max_workers=max_workers,
+            timeout_per_task_sec=task_timeout,
+            enable_tracing=True,
+        )
+        
+        # Ajouter le vérificateur
+        self.verifier = TaskVerifier(
+            default_level=verif_level,
+            enable_tracing=True,
+        )
+        print("✓ HTN system initialized")
+
     def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Analyser un message utilisateur et orchestrer la réponse de l'agent."""
+        
+        # Métriques: compter requête totale
+        from planner.metrics import get_metrics
+        metrics = get_metrics()
+        
+        # NOUVEAU: Détecter si la requête nécessite HTN
+        requires_htn = self._requires_planning(message)
+        
+        if requires_htn:
+            # Métriques: requête HTN
+            metrics.htn_requests_total.labels(strategy="auto", status="requested").inc()
+            return self._run_with_htn(message, conversation_id, task_id)
+        else:
+            # Mode simple (pas de métriques HTN pour les requêtes simples)
+            return self._run_simple(message, conversation_id, task_id)  # Ancien comportement
 
+    def _requires_planning(self, query: str) -> bool:
+        """
+        Détermine si HTN est nécessaire
+        
+        Critères:
+        - Mots-clés multi-étapes: "puis", "ensuite", "après"
+        - Requêtes complexes: "analyse... génère... crée..."
+        - Nombre de verbes d'action > 2
+        """
+        # Vérifier si HTN est activé
+        htn_config = getattr(self.config, 'htn_planning', None)
+        if htn_config and not getattr(htn_config, 'enabled', True):
+            return False
+        
+        # Si le planificateur n'est pas initialisé, ne pas utiliser HTN
+        if self.planner is None:
+            return False
+        
+        keywords = ["puis", "ensuite", "après", "finalement", "et"]
+        action_verbs = ["lis", "analyse", "génère", "crée", "calcule", "read", "analyze", "generate", "create", "calculate"]
+        
+        has_multi_step = any(kw in query.lower() for kw in keywords)
+        num_actions = sum(1 for verb in action_verbs if verb in query.lower())
+        
+        return has_multi_step or num_actions >= 2
+
+    def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+        """Exécution avec planification HTN"""
+        
+        # Rafraîchir les middlewares patchables
+        self._refresh_middlewares()
+        
+        # Métriques: enregistrer requête HTN
+        from planner.metrics import get_metrics
+        metrics = get_metrics()
+        
+        # Logger le début de la conversation HTN
+        if self.logger:
+            try:
+                self.logger.log_event(
+                    actor="agent.core",
+                    event="conversation.start.htn",
+                    level="INFO",
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                )
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.start.htn event: {e}")
+        
+        # 1. Planifier
+        htn_config = getattr(self.config, 'htn_planning', None)
+        strategy_str = htn_config.default_strategy if htn_config else "hybrid"
+        strategy = PlanningStrategy.HYBRID
+        if strategy_str == "rule_based":
+            strategy = PlanningStrategy.RULE_BASED
+        elif strategy_str == "llm_based":
+            strategy = PlanningStrategy.LLM_BASED
+        
+        plan_result = self.planner.plan(
+            query=user_query,
+            strategy=strategy,
+            context={"conversation_id": conversation_id, "task_id": task_id},
+        )
+        
+        # Log decision record (conformité Loi 25)
+        if self.dr_manager:
+            try:
+                prompt_hash = hashlib.sha256(user_query.encode("utf-8")).hexdigest()
+                self.dr_manager.create_dr(
+                    actor="agent.core",
+                    task_id=task_id or conversation_id,
+                    decision="planning",
+                    prompt_hash=prompt_hash,
+                    tools_used=[],
+                    alternatives_considered=["simple_execution"],
+                    constraints={
+                        "strategy": strategy.value,
+                        "max_depth": self.planner.max_depth,
+                    },
+                    expected_risk=["planning_error:low", "execution_error:medium"],
+                    reasoning_markers=[f"plan_confidence:{plan_result.confidence}"],
+                )
+            except Exception as e:
+                print(f"⚠ Failed to create decision record for planning: {e}")
+        
+        # 2. Exécuter
+        exec_result = self.executor.execute(
+            graph=plan_result.graph,
+            context={"conversation_id": conversation_id, "task_id": task_id},
+        )
+        
+        # 3. Vérifier
+        verif_config = getattr(self.config, 'htn_verification', None)
+        verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
+        verifications = self.verifier.verify_graph_results(
+            graph=plan_result.graph,
+            level=verif_level,
+        )
+        
+        # 4. Construire la réponse
+        if exec_result.success:
+            # Toutes les tâches critiques réussies
+            response = self._format_htn_response(
+                plan_result, exec_result, verifications, conversation_id, task_id
+            )
+        else:
+            # Échec critique: fallback sur mode simple
+            print("⚠ HTN execution failed, falling back to simple mode")
+            response = self._run_simple(user_query, conversation_id, task_id)
+        
+        # Métriques: calculer et mettre à jour métriques agrégées
+        # (calculées périodiquement, pas à chaque requête pour performance)
+        # Ces métriques peuvent être calculées via PromQL ou dans un job séparé
+        
+        return response
+
+    def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+        """Exécution en mode simple (ancien comportement sans HTN)"""
+        
         # Rafraîchir les middlewares patchables (important pour les tests)
         self._refresh_middlewares()
 
@@ -455,6 +645,146 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
             else:
                 formatted.append(f"Outil {i}: ERROR\n{result.error}")
         return "\n---\n".join(formatted)
+    
+    def _build_action_registry(self) -> Dict[str, Any]:
+        """
+        Mappe les actions HTN aux outils FilAgent
+        
+        Returns:
+            Dict[action_name, fonction_executable]
+        """
+        from typing import Callable
+        registry: Dict[str, Callable] = {}
+        
+        # Mapper chaque outil du registre
+        tools = self.tool_registry.list_all()
+        for tool_name, tool in tools.items():
+            # Wrapper pour adapter l'interface (avec closure corrigée)
+            def make_tool_wrapper(t):
+                def wrapper(params: Dict):
+                    return t.execute(params)
+                return wrapper
+            
+            registry[tool_name] = make_tool_wrapper(tool)
+        
+        # Actions génériques
+        registry["generic_execute"] = self._generic_execute
+        
+        return registry
+
+    def _generic_execute(self, params: Dict) -> Any:
+        """Action générique pour tâches non-mappées"""
+        query = params.get("query", "")
+        # Utiliser le mode simple pour exécuter la requête
+        conversation_id = params.get("conversation_id", "default")
+        task_id = params.get("task_id")
+        result = self._run_simple(query, conversation_id, task_id)
+        return result.get("response", "")
+
+    def _format_htn_response(
+        self,
+        plan_result,
+        exec_result,
+        verifications: Dict[str, Any],
+        conversation_id: str,
+        task_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Formate la réponse finale"""
+        
+        # Agréger les résultats
+        results = []
+        sorted_tasks = plan_result.graph.topological_sort()
+        for task in sorted_tasks:
+            if task.status == TaskStatus.COMPLETED:
+                verification = verifications.get(task.task_id, None) if isinstance(verifications, dict) else None
+                results.append({
+                    "task": task.name,
+                    "result": task.result,
+                    "verified": verification.to_dict() if verification and hasattr(verification, 'to_dict') else None,
+                })
+        
+        # Générer le texte de réponse
+        response_text = self._generate_response_from_results(results)
+        
+        # Enregistrer la réponse dans la mémoire
+        try:
+            add_message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=response_text,
+                task_id=task_id,
+            )
+        except Exception as e:
+            print(f"⚠ Failed to persist assistant message: {e}")
+        
+        # Logger la fin de la conversation HTN
+        if self.logger:
+            try:
+                self.logger.log_event(
+                    actor="agent.core",
+                    event="conversation.end.htn",
+                    level="INFO",
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                    metadata={
+                        "planning_strategy": plan_result.strategy_used.value,
+                        "completed_tasks": exec_result.completed_tasks,
+                        "failed_tasks": exec_result.failed_tasks,
+                    },
+                )
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.end.htn event: {e}")
+        
+        return {
+            "response": response_text,
+            "plan": plan_result.to_dict(),
+            "execution": exec_result.to_dict(),
+            "verifications": {
+                k: v.to_dict() for k, v in verifications.items()
+            },
+            "metadata": {
+                "planning_strategy": plan_result.strategy_used.value,
+                "execution_strategy": ExecutionStrategy.ADAPTIVE.value,
+                "total_duration_ms": exec_result.total_duration_ms,
+                "success": exec_result.success,
+            },
+            "conversation_id": conversation_id,
+            "task_id": task_id,
+            "tools_used": [],  # Les outils sont gérés par le planificateur
+            "usage": {
+                "prompt_tokens": 0,  # À implémenter si nécessaire
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+        }
+
+    def _generate_response_from_results(self, results: List[Dict[str, Any]]) -> str:
+        """Génère un texte de réponse à partir des résultats des tâches"""
+        if not results:
+            return "Aucun résultat disponible."
+        
+        response_parts = []
+        response_parts.append("J'ai complété les tâches suivantes:\n")
+        
+        for i, result in enumerate(results, 1):
+            task_name = result.get("task", "Tâche inconnue")
+            task_result = result.get("result", "")
+            verified = result.get("verified", None)
+            
+            response_parts.append(f"{i}. {task_name}")
+            if verified and verified.get("passed", False):
+                response_parts.append("   ✓ Vérifié")
+            elif verified:
+                response_parts.append(f"   ⚠ Vérification: {verified.get('reason', 'Échec')}")
+            
+            if task_result:
+                # Tronquer si trop long
+                result_str = str(task_result)
+                if len(result_str) > 200:
+                    result_str = result_str[:200] + "..."
+                response_parts.append(f"   Résultat: {result_str}")
+        
+        return "\n".join(response_parts)
 
 
 # Classe helper pour l'intégration avec le serveur

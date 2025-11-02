@@ -5,7 +5,7 @@ Loads and validates configuration from YAML files
 import yaml
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 
@@ -69,6 +69,26 @@ class AgentRuntimeSettings(BaseModel):
     timeout: int = 300
 
 
+class HTNPlanningConfig(BaseModel):
+    """Configuration de planification HTN"""
+    enabled: bool = True
+    default_strategy: str = "hybrid"  # rule_based, llm_based, hybrid
+    max_decomposition_depth: int = 3
+
+
+class HTNExecutionConfig(BaseModel):
+    """Configuration d'exécution HTN"""
+    default_strategy: str = "adaptive"  # sequential, parallel, adaptive
+    max_parallel_workers: int = 4
+    task_timeout_sec: int = 60
+
+
+class HTNVerificationConfig(BaseModel):
+    """Configuration de vérification HTN"""
+    default_level: str = "strict"  # basic, strict, paranoid
+    custom_verifiers: list[str] = Field(default_factory=list)
+
+
 class AgentConfig(BaseModel):
     """Configuration principale de l'agent"""
     name: str = "llmagenta"
@@ -80,6 +100,9 @@ class AgentConfig(BaseModel):
     logging: LoggingConfig = LoggingConfig()
     compliance: ComplianceConfig = ComplianceConfig()
     runtime_settings: AgentRuntimeSettings = AgentRuntimeSettings()
+    htn_planning: Optional[HTNPlanningConfig] = None
+    htn_execution: Optional[HTNExecutionConfig] = None
+    htn_verification: Optional[HTNVerificationConfig] = None
 
     @classmethod
     def load(cls, config_dir: str = "config") -> "AgentConfig":
@@ -100,6 +123,9 @@ class AgentConfig(BaseModel):
         memory_data = raw_config.get('memory', {})
         logging_data = raw_config.get('logging', {})
         compliance_data = raw_config.get('compliance', {})
+        htn_planning_data = raw_config.get('htn_planning', {})
+        htn_execution_data = raw_config.get('htn_execution', {})
+        htn_verification_data = raw_config.get('htn_verification', {})
         
         # Adapter la configuration mémoire pour supporter les structures imbriquées
         memory_kwargs: Dict[str, Any] = {}
@@ -137,6 +163,11 @@ class AgentConfig(BaseModel):
         if 'timeout' in agent_data:
             runtime_settings.timeout = agent_data['timeout']
 
+        # Configurations HTN optionnelles
+        htn_planning_config = HTNPlanningConfig(**htn_planning_data) if htn_planning_data else None
+        htn_execution_config = HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
+        htn_verification_config = HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
+        
         return cls(
             name=agent_data.get('name', 'llmagenta'),
             version=agent_data.get('version', '0.1.0'),
@@ -147,6 +178,9 @@ class AgentConfig(BaseModel):
             logging=LoggingConfig(**logging_data),
             compliance=ComplianceConfig(**compliance_data),
             runtime_settings=runtime_settings,
+            htn_planning=htn_planning_config,
+            htn_execution=htn_execution_config,
+            htn_verification=htn_verification_config,
         )
 
     @property

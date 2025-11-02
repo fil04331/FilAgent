@@ -23,6 +23,7 @@ from enum import Enum
 from typing import List, Dict, Optional, Any, Callable
 from datetime import datetime
 import json
+from .metrics import get_metrics
 
 
 class VerificationLevel(str, Enum):
@@ -217,6 +218,14 @@ class TaskVerifier:
                 self._stats["passed"] += 1
             else:
                 self._stats["failed"] += 1
+            
+            # Métriques: enregistrer vérification
+            metrics = get_metrics()
+            metrics.record_verification(
+                level=level.value,
+                passed=passed,
+                confidence_score=confidence_score,
+            )
             
             # Construire résultat
             metadata["completed_at"] = datetime.utcnow().isoformat()

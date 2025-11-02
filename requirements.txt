@@ -27,6 +27,7 @@ sentence-transformers>=2.2.2  # Pour embeddings (Phase 3)
 
 # Logging & Observability
 structlog>=23.2.0
+prometheus-client>=0.19.0  # Pour métriques Prometheus
 
 # Security
 cryptography>=41.0.0  # Pour signatures EdDSA
