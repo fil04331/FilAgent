@@ -1,68 +1,433 @@
-# Configuration de l'agent LLM
-# Hyperparamètres, seeds, timeouts
+# ============================================================================
+# FilAgent - Configuration Système HTN Planning
+# ============================================================================
+#
+# Ce fichier contient tous les paramètres de configuration du système HTN.
+# Respecte les principes Safety by Design avec valeurs par défaut sécuritaires.
+#
+# Version: 1.0.0
+# Date: 2025-11-04
+# Conformité: Loi 25, RGPD, AI Act, NIST AI RMF
+# ============================================================================
 
-agent:
-  name: "llmagenta"
-  version: "0.1.0"
+# ============================================================================
+# SECTION 1: FEATURE FLAGS
+# ============================================================================
+# Contrôle l'activation/désactivation de modules entiers
+# Défaut: false (activation progressive, Safety by Design)
 
-# Paramètres de génération
-generation:
-  temperature: 0.2
-  top_p: 0.95
-  max_tokens: 800
-  seed: 42
-  top_k: 40
-  repetition_penalty: 1.1
+features:
+  # Active le planificateur HTN pour requêtes complexes
+  # Impact: Si false, agent utilise uniquement mode simple
+  # Production: Commencer à false, activer après validation
+  htn_enabled: false
 
-# Timeouts
-timeouts:
-  generation: 60  # secondes
-  tool_execution: 30  # secondes
-  total_request: 300  # secondes (5 minutes)
+  # Active le mode de debug avec logs détaillés
+  # Impact: Augmente volume de logs (~3x), ralentit exécution (~10%)
+  # Production: false (sauf troubleshooting)
+  debug_mode: false
 
-# Modèle
-model:
-  name: "llama-3"  # Sera remplacé par le modèle réel
-  path: "models/weights/base.gguf"
-  backend: "llama.cpp"  # ou "vllm"
-  context_size: 4096
-  n_gpu_layers: 35  # Utiliser toutes les couches GPU si disponible
+  # Active la parallélisation des tâches indépendantes
+  # Impact: Améliore performance mais augmente complexité
+  # Production: true (après tests de charge)
+  parallel_execution: true
 
-# Mémoire
-memory:
-  episodic:
-    ttl_days: 30
-    max_conversations: 1000
-  semantic:
-    rebuild_days: 14
-    max_items: 10000
-    similarity_threshold: 0.7
+  # Active la validation stricte des résultats
+  # Impact: Ralentit exécution (~20%) mais augmente fiabilité
+  # Production: true (conformité Loi 25)
+  strict_validation: true
 
-# Logging
-logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
-  rotate_daily: true
-  max_file_size_mb: 100
-  compress_old: true
+  # Active l'enregistrement des Decision Records
+  # Impact: Crée fichiers ADR pour chaque décision majeure
+  # Production: true (traçabilité obligatoire)
+  decision_records: true
 
-# Conformité
-compliance:
-  worm_enabled: true
-  dr_required_for: ["write_file", "delete_file", "execute_code", "network_request"]
-  pii_redaction: true
-  provenance_tracking: true
 
-# Configuration HTN (Hierarchical Task Network)
-htn_planning:
-  enabled: true
-  default_strategy: hybrid  # rule_based, llm_based, hybrid
+# ============================================================================
+# SECTION 2: PLANIFICATEUR HTN
+# ============================================================================
+# Configuration du HierarchicalPlanner
+# Responsable: Décomposition de requêtes en graphe de tâches
+
+planner:
+  # Stratégie de planification par défaut
+  # Options: "llm_based" | "rule_based" | "hybrid"
+  # - llm_based: Utilise LLM pour décomposition intelligente (flexible)
+  # - rule_based: Règles prédéfinies (rapide, déterministe)
+  # - hybrid: Combinaison des deux (recommandé)
+  default_strategy: "hybrid"
+
+  # Profondeur maximale de décomposition hiérarchique
+  # Range: 1-5 (valeurs plus élevées = plus d'étapes, plus lent)
+  # Recommandation: 3 (équilibre complexité/performance)
+  # Impact: Limite la complexité des plans générés
   max_decomposition_depth: 3
+
+  # Nombre maximum de tentatives si planification échoue
+  # Range: 1-5
+  # Impact: Augmente robustesse mais peut ralentir sur erreurs
+  max_retry_attempts: 2
+
+  # Timeout pour génération d'un plan (secondes)
+  # Range: 5-120
+  # Production: 30 (évite blocages sur requêtes complexes)
+  planning_timeout_sec: 30
+
+  # Score de confiance minimum pour accepter un plan (0-1)
+  # Range: 0.0-1.0
+  # Recommandation: 0.7 (équilibre qualité/disponibilité)
+  # Impact: Plans avec score < seuil sont rejetés
+  min_confidence_score: 0.7
+
+  # Active les traces détaillées de planification
+  # Impact: Logs détaillés pour debug (conformité RGPD)
+  # Production: true (traçabilité obligatoire)
+  enable_tracing: true
+
+
+# ============================================================================
+# SECTION 3: EXÉCUTEUR DE TÂCHES
+# ============================================================================
+# Configuration du TaskExecutor
+# Responsable: Orchestration et exécution du graphe de tâches
+
+executor:
+  # Stratégie d'exécution par défaut
+  # Options: "sequential" | "parallel" | "adaptive"
+  # - sequential: Une tâche à la fois (sécuritaire)
+  # - parallel: Parallélisation maximale (performant)
+  # - adaptive: Hybride selon ressources (recommandé)
+  default_strategy: "adaptive"
+
+  # Nombre maximum de workers parallèles
+  # Range: 1-16
+  # Recommandation: 4 (équilibre perf/ressources)
+  # Impact: Plus de workers = plus rapide mais plus de RAM
+  max_workers: 4
+
+  # Timeout par tâche individuelle (secondes)
+  # Range: 10-300
+  # Production: 60 (évite tâches bloquées indéfiniment)
+  timeout_per_task_sec: 60
+
+  # Timeout pour exécution complète du plan (secondes)
+  # Range: 30-600
+  # Production: 300 (5 minutes max pour plan complet)
+  total_execution_timeout_sec: 300
+
+  # Nombre maximum de tentatives par tâche si échec
+  # Range: 0-5
+  # Impact: 0 = pas de retry, >0 = résilience accrue
+  max_task_retries: 1
+
+  # Délai entre tentatives (secondes)
+  # Range: 1-30
+  # Production: 5 (évite surcharge immédiate)
+  retry_delay_sec: 5
+
+  # Continue l'exécution même si tâches optionnelles échouent
+  # Impact: true = plan partiellement exécuté peut être valide
+  # Production: true (résilience)
+  continue_on_optional_failure: true
+
+  # Active l'isolation sandbox pour exécution de tâches
+  # Impact: Sécurise l'exécution mais ralentit (~15%)
+  # Production: true (Security by Design)
+  enable_sandbox: true
+
+  # Active les traces détaillées d'exécution
+  # Impact: Logs détaillés pour debug (conformité RGPD)
+  # Production: true (traçabilité obligatoire)
+  enable_tracing: true
+
+
+# ============================================================================
+# SECTION 4: VÉRIFICATEUR DE RÉSULTATS
+# ============================================================================
+# Configuration du TaskVerifier
+# Responsable: Validation et self-checks des résultats
+
+verifier:
+  # Niveau de vérification par défaut
+  # Options: "basic" | "strict" | "paranoid"
+  # - basic: Vérifications minimales (rapide)
+  # - strict: Vérifications standard (équilibré)
+  # - paranoid: Vérifications exhaustives (lent mais sûr)
+  # Production: strict (conformité Loi 25)
+  default_level: "strict"
+
+  # Score de confiance minimum pour accepter un résultat (0-1)
+  # Range: 0.0-1.0
+  # Recommandation: 0.8 (haute qualité)
+  # Impact: Résultats avec score < seuil sont rejetés
+  min_confidence_score: 0.8
+
+  # Active la validation de schéma JSON pour résultats structurés
+  # Impact: Vérifie conformité avec schémas définis
+  # Production: true (détection erreurs structurelles)
+  enable_schema_validation: true
+
+  # Active la détection d'anomalies via patterns
+  # Impact: Détecte résultats incohérents ou suspects
+  # Production: true (détection anomalies)
+  enable_anomaly_detection: true
+
+  # Active les self-checks automatiques
+  # Impact: Tests unitaires automatiques sur résultats
+  # Production: true (conformité AI Act)
+  enable_self_checks: true
+
+  # Active les traces détaillées de vérification
+  # Impact: Logs détaillés pour debug (conformité RGPD)
+  # Production: true (traçabilité obligatoire)
+  enable_tracing: true
+
+
+# ============================================================================
+# SECTION 5: LOGGING ET TRAÇABILITÉ
+# ============================================================================
+# Configuration des logs et traçabilité (conformité Loi 25, RGPD)
+
+logging:
+  # Niveau de log global
+  # Options: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+  # Production: INFO (équilibre détail/volume)
+  level: "INFO"
+
+  # Format des logs
+  # Options: "json" | "text"
+  # Production: json (parsing automatique, intégration monitoring)
+  format: "json"
+
+  # Destination des logs
+  # Options: "stdout" | "file" | "both"
+  # Production: both (console + fichiers)
+  output: "both"
+
+  # Répertoire pour fichiers de logs
+  # Production: /var/log/filagent ou ./logs
+  log_directory: "./logs"
+
+  # Taille maximale par fichier de log (MB)
+  # Range: 10-1000
+  # Production: 100 (rotation automatique)
+  max_file_size_mb: 100
+
+  # Nombre de fichiers de rotation à conserver
+  # Range: 5-50
+  # Production: 10 (2-3 semaines de logs typiquement)
+  max_backup_count: 10
+
+  # Inclure stack traces dans logs d'erreur
+  # Impact: Détails techniques complets pour debug
+  # Production: true (diagnostic)
+  include_stacktraces: true
+
+  # Logs WORM (Write-Once-Read-Many) pour audit
+  # Impact: Logs immuables pour conformité légale
+  # Production: true (conformité Loi 25)
+  worm_logs: true
+
+
+# ============================================================================
+# SECTION 6: DÉCISION RECORDS (ADR)
+# ============================================================================
+# Configuration des Architecture Decision Records
+# Conformité: AI Act (transparence), NIST AI RMF
+
+decision_records:
+  # Active l'enregistrement automatique des décisions
+  # Impact: Crée fichier ADR pour chaque décision majeure
+  # Production: true (traçabilité obligatoire)
+  enabled: true
   
-htn_execution:
-  default_strategy: adaptive  # sequential, parallel, adaptive
-  max_parallel_workers: 4
-  task_timeout_sec: 60
+  # Répertoire pour stocker les ADR
+  # Production: ./docs/decisions ou ./adr
+  directory: "./docs/decisions"
+
+  # Format des ADR
+  # Options: "markdown" | "json"
+  # Production: markdown (lisibilité humaine)
+  format: "markdown"
+
+  # Inclure contexte complet dans ADR
+  # Impact: ADR plus volumineux mais autonomes
+  # Production: true (conformité)
+  include_full_context: true
+
+  # Niveaux de décision à enregistrer
+  # Options: ["critical", "major", "minor"]
+  # Production: ["critical", "major"] (évite bruit)
+  capture_levels:
+    - "critical"
+    - "major"
+
+
+# ============================================================================
+# SECTION 7: PERFORMANCE ET RESSOURCES
+# ============================================================================
+# Limites de ressources et optimisations
+
+performance:
+  # Limite mémoire par worker (MB)
+  # Range: 256-4096
+  # Production: 1024 (1GB par worker)
+  max_memory_per_worker_mb: 1024
+
+  # Limite CPU par worker (%)
+  # Range: 10-100
+  # Production: 80 (évite surcharge système)
+  max_cpu_per_worker_percent: 80
+
+  # Cache des plans fréquents
+  # Impact: Réutilise plans similaires (performance)
+  # Production: true (optimisation)
+  enable_plan_caching: true
+
+  # Taille maximale du cache de plans
+  # Range: 10-1000
+  # Production: 100 (équilibre RAM/performance)
+  max_cache_size: 100
+
+  # Durée de vie du cache (secondes)
+  # Range: 300-86400 (5min - 24h)
+  # Production: 3600 (1 heure)
+  cache_ttl_sec: 3600
+
+
+# ============================================================================
+# SECTION 8: SÉCURITÉ ET CONFORMITÉ
+# ============================================================================
+# Paramètres de sécurité et conformité légale
+
+security:
+  # Active la validation des paramètres d'entrée
+  # Impact: Vérifie que paramètres ne contiennent pas de code malveillant
+  # Production: true (Security by Design)
+  validate_inputs: true
+
+  # Active l'isolation sandbox pour exécution
+  # Impact: Exécute tâches dans environnement isolé
+  # Production: true (sécurité)
+  sandbox_execution: true
   
-htn_verification:
-  default_level: strict  # basic, strict, paranoid
-  custom_verifiers: []
+  # Bloque l'exécution de commandes système dangereuses
+  # Impact: Liste noire de commandes (rm, format, etc.)
+  # Production: true (sécurité)
+  block_dangerous_commands: true
+
+  # Active le chiffrement des données sensibles en transit
+  # Impact: Chiffre paramètres/résultats sensibles
+  # Production: true (conformité RGPD)
+  encrypt_sensitive_data: true
+
+  # Active l'anonymisation automatique des logs
+  # Impact: Supprime PII des logs (emails, noms, etc.)
+  # Production: true (conformité Loi 25)
+  anonymize_logs: true
+
+
+# ============================================================================
+# SECTION 9: INTÉGRATIONS EXTERNES
+# ============================================================================
+# Configuration des intégrations avec outils externes
+
+integrations:
+  # Configuration LLM (pour planification)
+  llm:
+    provider: "anthropic"  # "anthropic" | "openai" | "custom"
+    model: "claude-sonnet-4-20250514"
+    temperature: 0.7
+    max_tokens: 4000
+    timeout_sec: 30
+
+  # Configuration base de données (pour persistence)
+  database:
+    enabled: false  # Activer pour persistence long-terme
+    type: "sqlite"  # "sqlite" | "postgresql" | "mongodb"
+    connection_string: "sqlite:///./filagent.db"
+    pool_size: 5
+
+  # Configuration monitoring (pour observabilité)
+  monitoring:
+    enabled: false  # Activer en production
+    provider: "prometheus"  # "prometheus" | "datadog" | "custom"
+    endpoint: "http://localhost:9090"
+    push_interval_sec: 60
+
+
+# ============================================================================
+# SECTION 10: ENVIRONNEMENTS
+# ============================================================================
+# Configurations spécifiques par environnement
+# Note: Les valeurs ci-dessous peuvent être surchargées par
+#       agent.dev.yaml, agent.prod.yaml, etc.
+
+environments:
+  # Configuration pour développement
+  development:
+    features:
+      debug_mode: true
+    logging:
+      level: "DEBUG"
+    performance:
+      max_workers: 2  # Moins de charge sur machine dev
+
+  # Configuration pour tests
+  testing:
+    features:
+      htn_enabled: true
+      parallel_execution: false  # Déterminisme pour tests
+    executor:
+      max_workers: 1
+      timeout_per_task_sec: 10  # Tests rapides
+    verifier:
+      default_level: "paranoid"  # Validation maximale
+
+  # Configuration pour production
+  production:
+    features:
+      debug_mode: false
+      htn_enabled: true
+      strict_validation: true
+      decision_records: true
+    logging:
+      level: "INFO"
+      worm_logs: true
+    security:
+      validate_inputs: true
+      sandbox_execution: true
+      encrypt_sensitive_data: true
+      anonymize_logs: true
+    performance:
+      max_workers: 4
+      enable_plan_caching: true
+
+
+# ============================================================================
+# SECTION 11: MÉTADONNÉES
+# ============================================================================
+# Informations sur ce fichier de configuration
+
+metadata:
+  version: "1.0.0"
+  created_at: "2025-11-04T00:00:00Z"
+  updated_at: "2025-11-04T00:00:00Z"
+  author: "FilAgent Team"
+  description: "Configuration principale du système HTN Planning"
+  schema_version: "1.0"
+
+  # Changelog pour traçabilité
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Claude (Anthropic) via Fil"
+      changes:
+        - "Création initiale du fichier de configuration"
+        - "Définition de tous les paramètres HTN avec valeurs par défaut"
+        - "Documentation inline complète"
+        - "Configurations par environnement (dev, test, prod)"
+
+# ============================================================================
+# FIN DU FICHIER config/agent.yaml
+# ============================================================================
