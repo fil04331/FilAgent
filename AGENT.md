@@ -1,755 +1,835 @@
-# ðŸŽ¯ TASK CARD: IntÃ©gration HTN dans Agent Principal
+# 🎯 TASK CARD: Configuration HTN Planning
 
-**ID Task**: HTN-INT-001  
-**Titre**: IntÃ©grer le module HTN Planning dans runtime/agent.py  
-**Phase**: Phase 1 - IntÃ©gration Minimale  
-**PrioritÃ©**: ðŸ”´ P0 - CRITIQUE  
-**Estimation**: 4-6 heures  
-**DÃ©pendances**: Aucune (premier task)  
-**AssignÃ© Ã **: Agent/DÃ©veloppeur  
+**ID Task**: HTN-INT-002  
+**Titre**: Créer fichier de configuration config/agent.yaml  
+**Phase**: Phase 1 - Configuration Infrastructure  
+**Priorité**: 🟠 P1 - HAUTE  
+**Estimation**: 30-60 minutes  
+**Dépendances**: Aucune (peut être exécuté en parallèle de HTN-INT-001)  
+**Assigné à**: Agent/Développeur  
 
 ---
 
-## ðŸ“‹ CONTEXTE DU PROJET
+## 📋 CONTEXTE DU PROJET
 
 ### Situation Actuelle
-FilAgent fonctionne actuellement avec une **boucle simple** (max 10 itÃ©rations) qui ne peut pas gÃ©rer efficacement les requÃªtes multi-Ã©tapes complexes.
+FilAgent nécessite un fichier de configuration structuré pour gérer les paramètres du système HTN Planning. La configuration doit être:
+- **Externalisée** - Séparation code/config (12-factor app)
+- **Versionnée** - Traçabilité des changements de config
+- **Validable** - Schema YAML pour éviter erreurs de typage
+- **Documentée** - Commentaires inline pour chaque paramètre
 
 ### Objectif Global
-IntÃ©grer un systÃ¨me de **Planification HiÃ©rarchique (HTN)** permettant de dÃ©composer automatiquement des requÃªtes complexes en graphes de tÃ¢ches exÃ©cutables avec parallÃ©lisation.
+Créer un fichier `config/agent.yaml` contenant tous les paramètres de configuration du système HTN avec:
+- Valeurs par défaut sécuritaires (Safety by Design)
+- Feature flags pour activation progressive
+- Paramètres de performance ajustables
+- Niveaux de validation configurables
 
 ### Valeurs Fondamentales du Projet
-1. **Safety by Design** - SÃ©curitÃ© et conformitÃ© avant tout
-2. **Fallback Gracieux** - Ne jamais casser l'existant
-3. **Feature Flag** - Activation progressive et contrÃ´lÃ©e
-4. **TraÃ§abilitÃ©** - Logs et Decision Records systÃ©matiques
+1. **Safety by Design** - Valeurs par défaut sécuritaires
+2. **Separation of Concerns** - Config séparée du code
+3. **Documentation** - Chaque paramètre expliqué
+4. **Traçabilité** - Versioning et changelog
 
 ---
 
-## ðŸŽ¯ OBJECTIF DE CE TASK
+## 🎯 OBJECTIF DE CE TASK
 
 ### Mission
-Modifier le fichier `runtime/agent.py` pour intÃ©grer les composants HTN (HierarchicalPlanner, TaskExecutor, TaskVerifier) avec:
-- âœ… Feature flag pour activation/dÃ©sactivation
-- âœ… DÃ©tection automatique de requÃªtes complexes
-- âœ… Fallback vers mode simple en cas d'erreur
-- âœ… Registre d'actions pour mapper outils FilAgent
+Créer le fichier `config/agent.yaml` contenant la configuration complète du système HTN avec:
+- ✅ Feature flags (activation/désactivation modules)
+- ✅ Paramètres planificateur (stratégies, profondeur)
+- ✅ Paramètres exécuteur (workers, timeouts)
+- ✅ Paramètres vérificateur (niveaux validation)
+- ✅ Paramètres logging et traçabilité
+- ✅ Configurations par environnement (dev, prod)
 
-### RÃ©sultat Attendu
-AprÃ¨s ce task:
-- Agent peut utiliser HTN pour requÃªtes complexes
-- Mode simple continue de fonctionner pour requÃªtes simples
-- Aucune rÃ©gression sur fonctionnalitÃ©s existantes
-- Code bien documentÃ© et conforme aux standards FilAgent
+### Résultat Attendu
+Après ce task:
+- Fichier config/agent.yaml créé et documenté
+- Tous les paramètres HTN définis avec valeurs par défaut
+- Documentation inline complète
+- Exemples de configurations pour différents cas d'usage
+- Validable via schema YAML (optionnel)
 
 ---
 
-## ðŸ“‚ FICHIERS Ã€ MODIFIER
+## 📂 FICHIERS À CRÉER
 
 ### Fichier Principal
 ```
-ðŸ“ /Volumes/DevSSD/FilAgent/
-â””â”€â”€ runtime/
-    â””â”€â”€ agent.py  â† MODIFIER CE FICHIER
+📁 /Volumes/DevSSD/FilAgent/
+└── config/
+    └── agent.yaml  ← CRÉER CE FICHIER
 ```
 
-### Fichiers Ã  Consulter (RÃ©fÃ©rence)
+### Structure Recommandée
 ```
-ðŸ“ /Volumes/DevSSD/FilAgent/
-â”œâ”€â”€ planner/
-â”‚   â”œâ”€â”€ __init__.py         â† Imports disponibles
-â”‚   â”œâ”€â”€ task_graph.py       â† Structures Task, TaskGraph
-â”‚   â”œâ”€â”€ planner.py          â† HierarchicalPlanner
-â”‚   â”œâ”€â”€ executor.py         â† TaskExecutor
-â”‚   â””â”€â”€ verifier.py         â† TaskVerifier
-â”œâ”€â”€ config/
-â”‚   â””â”€â”€ agent.yaml          â† Configuration HTN (Ã  crÃ©er aprÃ¨s)
-â””â”€â”€ tools/
-    â””â”€â”€ registry.py         â† ToolsRegistry existant
+📁 /Volumes/DevSSD/FilAgent/
+├── config/
+│   ├── agent.yaml           ← Configuration principale
+│   ├── agent.dev.yaml       ← Overrides pour dev (optionnel)
+│   ├── agent.prod.yaml      ← Overrides pour prod (optionnel)
+│   └── schema.yaml          ← Schema de validation (optionnel)
+└── runtime/
+    └── agent.py             ← Charge cette config
 ```
 
 ---
 
-## ðŸ”§ MODIFICATIONS Ã€ EFFECTUER
+## 🔧 CONTENU DU FICHIER À CRÉER
 
-### 1. Ajouter les Imports HTN
+### Structure Complète config/agent.yaml
 
-**Emplacement**: DÃ©but du fichier `runtime/agent.py`, section imports
+```yaml
+# ============================================================================
+# FilAgent - Configuration Système HTN Planning
+# ============================================================================
+# 
+# Ce fichier contient tous les paramètres de configuration du système HTN.
+# Respecte les principes Safety by Design avec valeurs par défaut sécuritaires.
+#
+# Version: 1.0.0
+# Date: 2025-11-04
+# Conformité: Loi 25, RGPD, AI Act, NIST AI RMF
+# ============================================================================
 
-**Code Ã  ajouter**:
-```python
-# === AJOUT HTN ===
-from planner import (
-    HierarchicalPlanner,
-    TaskExecutor,
-    TaskVerifier,
-    PlanningStrategy,
-    ExecutionStrategy,
-    VerificationLevel,
-    TaskPriority,
-)
-# === FIN AJOUT HTN ===
+# ============================================================================
+# SECTION 1: FEATURE FLAGS
+# ============================================================================
+# Contrôle l'activation/désactivation de modules entiers
+# Défaut: false (activation progressive, Safety by Design)
+
+features:
+  # Active le planificateur HTN pour requêtes complexes
+  # Impact: Si false, agent utilise uniquement mode simple
+  # Production: Commencer à false, activer après validation
+  htn_enabled: false
+  
+  # Active le mode de debug avec logs détaillés
+  # Impact: Augmente volume de logs (~3x), ralentit exécution (~10%)
+  # Production: false (sauf troubleshooting)
+  debug_mode: false
+  
+  # Active la parallélisation des tâches indépendantes
+  # Impact: Améliore performance mais augmente complexité
+  # Production: true (après tests de charge)
+  parallel_execution: true
+  
+  # Active la validation stricte des résultats
+  # Impact: Ralentit exécution (~20%) mais augmente fiabilité
+  # Production: true (conformité Loi 25)
+  strict_validation: true
+  
+  # Active l'enregistrement des Decision Records
+  # Impact: Crée fichiers ADR pour chaque décision majeure
+  # Production: true (traçabilité obligatoire)
+  decision_records: true
+
+
+# ============================================================================
+# SECTION 2: PLANIFICATEUR HTN
+# ============================================================================
+# Configuration du HierarchicalPlanner
+# Responsable: Décomposition de requêtes en graphe de tâches
+
+planner:
+  # Stratégie de planification par défaut
+  # Options: "llm_based" | "rule_based" | "hybrid"
+  # - llm_based: Utilise LLM pour décomposition intelligente (flexible)
+  # - rule_based: Règles prédéfinies (rapide, déterministe)
+  # - hybrid: Combinaison des deux (recommandé)
+  default_strategy: "hybrid"
+  
+  # Profondeur maximale de décomposition hiérarchique
+  # Range: 1-5 (valeurs plus élevées = plus d'étapes, plus lent)
+  # Recommandation: 3 (équilibre complexité/performance)
+  # Impact: Limite la complexité des plans générés
+  max_decomposition_depth: 3
+  
+  # Nombre maximum de tentatives si planification échoue
+  # Range: 1-5
+  # Impact: Augmente robustesse mais peut ralentir sur erreurs
+  max_retry_attempts: 2
+  
+  # Timeout pour génération d'un plan (secondes)
+  # Range: 5-120
+  # Production: 30 (évite blocages sur requêtes complexes)
+  planning_timeout_sec: 30
+  
+  # Score de confiance minimum pour accepter un plan (0-1)
+  # Range: 0.0-1.0
+  # Recommandation: 0.7 (équilibre qualité/disponibilité)
+  # Impact: Plans avec score < seuil sont rejetés
+  min_confidence_score: 0.7
+  
+  # Active les traces détaillées de planification
+  # Impact: Logs détaillés pour debug (conformité RGPD)
+  # Production: true (traçabilité obligatoire)
+  enable_tracing: true
+
+
+# ============================================================================
+# SECTION 3: EXÉCUTEUR DE TÂCHES
+# ============================================================================
+# Configuration du TaskExecutor
+# Responsable: Orchestration et exécution du graphe de tâches
+
+executor:
+  # Stratégie d'exécution par défaut
+  # Options: "sequential" | "parallel" | "adaptive"
+  # - sequential: Une tâche à la fois (sécuritaire)
+  # - parallel: Parallélisation maximale (performant)
+  # - adaptive: Hybride selon ressources (recommandé)
+  default_strategy: "adaptive"
+  
+  # Nombre maximum de workers parallèles
+  # Range: 1-16
+  # Recommandation: 4 (équilibre perf/ressources)
+  # Impact: Plus de workers = plus rapide mais plus de RAM
+  max_workers: 4
+  
+  # Timeout par tâche individuelle (secondes)
+  # Range: 10-300
+  # Production: 60 (évite tâches bloquées indéfiniment)
+  timeout_per_task_sec: 60
+  
+  # Timeout pour exécution complète du plan (secondes)
+  # Range: 30-600
+  # Production: 300 (5 minutes max pour plan complet)
+  total_execution_timeout_sec: 300
+  
+  # Nombre maximum de tentatives par tâche si échec
+  # Range: 0-5
+  # Impact: 0 = pas de retry, >0 = résilience accrue
+  max_task_retries: 1
+  
+  # Délai entre tentatives (secondes)
+  # Range: 1-30
+  # Production: 5 (évite surcharge immédiate)
+  retry_delay_sec: 5
+  
+  # Continue l'exécution même si tâches optionnelles échouent
+  # Impact: true = plan partiellement exécuté peut être valide
+  # Production: true (résilience)
+  continue_on_optional_failure: true
+  
+  # Active l'isolation sandbox pour exécution de tâches
+  # Impact: Sécurise l'exécution mais ralentit (~15%)
+  # Production: true (Security by Design)
+  enable_sandbox: true
+  
+  # Active les traces détaillées d'exécution
+  # Impact: Logs détaillés pour debug (conformité RGPD)
+  # Production: true (traçabilité obligatoire)
+  enable_tracing: true
+
+
+# ============================================================================
+# SECTION 4: VÉRIFICATEUR DE RÉSULTATS
+# ============================================================================
+# Configuration du TaskVerifier
+# Responsable: Validation et self-checks des résultats
+
+verifier:
+  # Niveau de vérification par défaut
+  # Options: "basic" | "strict" | "paranoid"
+  # - basic: Vérifications minimales (rapide)
+  # - strict: Vérifications standard (équilibré)
+  # - paranoid: Vérifications exhaustives (lent mais sûr)
+  # Production: strict (conformité Loi 25)
+  default_level: "strict"
+  
+  # Score de confiance minimum pour accepter un résultat (0-1)
+  # Range: 0.0-1.0
+  # Recommandation: 0.8 (haute qualité)
+  # Impact: Résultats avec score < seuil sont rejetés
+  min_confidence_score: 0.8
+  
+  # Active la validation de schéma JSON pour résultats structurés
+  # Impact: Vérifie conformité avec schémas définis
+  # Production: true (détection erreurs structurelles)
+  enable_schema_validation: true
+  
+  # Active la détection d'anomalies via patterns
+  # Impact: Détecte résultats incohérents ou suspects
+  # Production: true (détection anomalies)
+  enable_anomaly_detection: true
+  
+  # Active les self-checks automatiques
+  # Impact: Tests unitaires automatiques sur résultats
+  # Production: true (conformité AI Act)
+  enable_self_checks: true
+  
+  # Active les traces détaillées de vérification
+  # Impact: Logs détaillés pour debug (conformité RGPD)
+  # Production: true (traçabilité obligatoire)
+  enable_tracing: true
+
+
+# ============================================================================
+# SECTION 5: LOGGING ET TRAÇABILITÉ
+# ============================================================================
+# Configuration des logs et traçabilité (conformité Loi 25, RGPD)
+
+logging:
+  # Niveau de log global
+  # Options: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+  # Production: INFO (équilibre détail/volume)
+  level: "INFO"
+  
+  # Format des logs
+  # Options: "json" | "text"
+  # Production: json (parsing automatique, intégration monitoring)
+  format: "json"
+  
+  # Destination des logs
+  # Options: "stdout" | "file" | "both"
+  # Production: both (console + fichiers)
+  output: "both"
+  
+  # Répertoire pour fichiers de logs
+  # Production: /var/log/filagent ou ./logs
+  log_directory: "./logs"
+  
+  # Taille maximale par fichier de log (MB)
+  # Range: 10-1000
+  # Production: 100 (rotation automatique)
+  max_file_size_mb: 100
+  
+  # Nombre de fichiers de rotation à conserver
+  # Range: 5-50
+  # Production: 10 (2-3 semaines de logs typiquement)
+  max_backup_count: 10
+  
+  # Inclure stack traces dans logs d'erreur
+  # Impact: Détails techniques complets pour debug
+  # Production: true (diagnostic)
+  include_stacktraces: true
+  
+  # Logs WORM (Write-Once-Read-Many) pour audit
+  # Impact: Logs immuables pour conformité légale
+  # Production: true (conformité Loi 25)
+  worm_logs: true
+
+
+# ============================================================================
+# SECTION 6: DÉCISION RECORDS (ADR)
+# ============================================================================
+# Configuration des Architecture Decision Records
+# Conformité: AI Act (transparence), NIST AI RMF
+
+decision_records:
+  # Active l'enregistrement automatique des décisions
+  # Impact: Crée fichier ADR pour chaque décision majeure
+  # Production: true (traçabilité obligatoire)
+  enabled: true
+  
+  # Répertoire pour stocker les ADR
+  # Production: ./docs/decisions ou ./adr
+  directory: "./docs/decisions"
+  
+  # Format des ADR
+  # Options: "markdown" | "json"
+  # Production: markdown (lisibilité humaine)
+  format: "markdown"
+  
+  # Inclure contexte complet dans ADR
+  # Impact: ADR plus volumineux mais autonomes
+  # Production: true (conformité)
+  include_full_context: true
+  
+  # Niveaux de décision à enregistrer
+  # Options: ["critical", "major", "minor"]
+  # Production: ["critical", "major"] (évite bruit)
+  capture_levels:
+    - "critical"
+    - "major"
+
+
+# ============================================================================
+# SECTION 7: PERFORMANCE ET RESSOURCES
+# ============================================================================
+# Limites de ressources et optimisations
+
+performance:
+  # Limite mémoire par worker (MB)
+  # Range: 256-4096
+  # Production: 1024 (1GB par worker)
+  max_memory_per_worker_mb: 1024
+  
+  # Limite CPU par worker (%)
+  # Range: 10-100
+  # Production: 80 (évite surcharge système)
+  max_cpu_per_worker_percent: 80
+  
+  # Cache des plans fréquents
+  # Impact: Réutilise plans similaires (performance)
+  # Production: true (optimisation)
+  enable_plan_caching: true
+  
+  # Taille maximale du cache de plans
+  # Range: 10-1000
+  # Production: 100 (équilibre RAM/performance)
+  max_cache_size: 100
+  
+  # Durée de vie du cache (secondes)
+  # Range: 300-86400 (5min - 24h)
+  # Production: 3600 (1 heure)
+  cache_ttl_sec: 3600
+
+
+# ============================================================================
+# SECTION 8: SÉCURITÉ ET CONFORMITÉ
+# ============================================================================
+# Paramètres de sécurité et conformité légale
+
+security:
+  # Active la validation des paramètres d'entrée
+  # Impact: Vérifie que paramètres ne contiennent pas de code malveillant
+  # Production: true (Security by Design)
+  validate_inputs: true
+  
+  # Active l'isolation sandbox pour exécution
+  # Impact: Exécute tâches dans environnement isolé
+  # Production: true (sécurité)
+  sandbox_execution: true
+  
+  # Bloque l'exécution de commandes système dangereuses
+  # Impact: Liste noire de commandes (rm, format, etc.)
+  # Production: true (sécurité)
+  block_dangerous_commands: true
+  
+  # Active le chiffrement des données sensibles en transit
+  # Impact: Chiffre paramètres/résultats sensibles
+  # Production: true (conformité RGPD)
+  encrypt_sensitive_data: true
+  
+  # Active l'anonymisation automatique des logs
+  # Impact: Supprime PII des logs (emails, noms, etc.)
+  # Production: true (conformité Loi 25)
+  anonymize_logs: true
+
+
+# ============================================================================
+# SECTION 9: INTÉGRATIONS EXTERNES
+# ============================================================================
+# Configuration des intégrations avec outils externes
+
+integrations:
+  # Configuration LLM (pour planification)
+  llm:
+    provider: "anthropic"  # "anthropic" | "openai" | "custom"
+    model: "claude-sonnet-4-20250514"
+    temperature: 0.7
+    max_tokens: 4000
+    timeout_sec: 30
+  
+  # Configuration base de données (pour persistence)
+  database:
+    enabled: false  # Activer pour persistence long-terme
+    type: "sqlite"  # "sqlite" | "postgresql" | "mongodb"
+    connection_string: "sqlite:///./filagent.db"
+    pool_size: 5
+  
+  # Configuration monitoring (pour observabilité)
+  monitoring:
+    enabled: false  # Activer en production
+    provider: "prometheus"  # "prometheus" | "datadog" | "custom"
+    endpoint: "http://localhost:9090"
+    push_interval_sec: 60
+
+
+# ============================================================================
+# SECTION 10: ENVIRONNEMENTS
+# ============================================================================
+# Configurations spécifiques par environnement
+# Note: Les valeurs ci-dessous peuvent être surchargées par
+#       agent.dev.yaml, agent.prod.yaml, etc.
+
+environments:
+  # Configuration pour développement
+  development:
+    features:
+      debug_mode: true
+    logging:
+      level: "DEBUG"
+    performance:
+      max_workers: 2  # Moins de charge sur machine dev
+  
+  # Configuration pour tests
+  testing:
+    features:
+      htn_enabled: true
+      parallel_execution: false  # Déterminisme pour tests
+    executor:
+      max_workers: 1
+      timeout_per_task_sec: 10  # Tests rapides
+    verifier:
+      default_level: "paranoid"  # Validation maximale
+  
+  # Configuration pour production
+  production:
+    features:
+      debug_mode: false
+      htn_enabled: true
+      strict_validation: true
+      decision_records: true
+    logging:
+      level: "INFO"
+      worm_logs: true
+    security:
+      validate_inputs: true
+      sandbox_execution: true
+      encrypt_sensitive_data: true
+      anonymize_logs: true
+    performance:
+      max_workers: 4
+      enable_plan_caching: true
+
+
+# ============================================================================
+# SECTION 11: MÉTADONNÉES
+# ============================================================================
+# Informations sur ce fichier de configuration
+
+metadata:
+  version: "1.0.0"
+  created_at: "2025-11-04T00:00:00Z"
+  updated_at: "2025-11-04T00:00:00Z"
+  author: "FilAgent Team"
+  description: "Configuration principale du système HTN Planning"
+  schema_version: "1.0"
+  
+  # Changelog pour traçabilité
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-04"
+      author: "Claude (Anthropic) via Fil"
+      changes:
+        - "Création initiale du fichier de configuration"
+        - "Définition de tous les paramètres HTN avec valeurs par défaut"
+        - "Documentation inline complète"
+        - "Configurations par environnement (dev, test, prod)"
+
+# ============================================================================
+# FIN DU FICHIER config/agent.yaml
+# ============================================================================
 ```
-
-**âš ï¸ Important**: Placer aprÃ¨s les imports existants de FilAgent, avant la classe Agent.
 
 ---
 
-### 2. Modifier Agent.__init__
-
-**Emplacement**: Dans la mÃ©thode `__init__` de la classe `Agent`
-
-**Code Ã  ajouter** (Ã  la fin de `__init__`, aprÃ¨s initialisation des composants existants):
-```python
-def __init__(self, config: AgentConfig):
-    # ... code existant (ne pas toucher) ...
-    
-    # === AJOUT HTN: Initialisation des composants ===
-    # Feature flag pour activation progressive
-    self.htn_enabled = config.get("htn_enabled", False)
-    
-    if self.htn_enabled:
-        logger.info("ðŸš€ HTN Planning activÃ© - Mode avancÃ© disponible")
-        
-        # 1. Planificateur HTN
-        self.planner = HierarchicalPlanner(
-            model_interface=self.model,
-            tools_registry=self.tools_registry,
-            max_decomposition_depth=config.get("htn_max_depth", 3),
-            enable_tracing=True,  # ConformitÃ© Loi 25
-        )
-        
-        # 2. ExÃ©cuteur de tÃ¢ches
-        self.executor = TaskExecutor(
-            action_registry=self._build_action_registry(),
-            strategy=ExecutionStrategy.ADAPTIVE,
-            max_workers=config.get("htn_max_workers", 4),
-            timeout_per_task_sec=config.get("htn_task_timeout", 60),
-            enable_tracing=True,
-        )
-        
-        # 3. VÃ©rificateur de rÃ©sultats
-        self.verifier = TaskVerifier(
-            default_level=VerificationLevel.STRICT,
-            enable_tracing=True,
-        )
-        
-        logger.info("âœ… Composants HTN initialisÃ©s avec succÃ¨s")
-    else:
-        logger.info("â„¹ï¸  HTN Planning dÃ©sactivÃ© - Mode simple uniquement")
-        self.planner = None
-        self.executor = None
-        self.verifier = None
-    # === FIN AJOUT HTN ===
-```
-
----
-
-### 3. CrÃ©er la MÃ©thode de DÃ©tection HTN
-
-**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
-
-**Code Ã  ajouter** (aprÃ¨s les mÃ©thodes existantes, avant `run()`):
-```python
-def _requires_htn(self, query: str) -> bool:
-    """
-    DÃ©termine si une requÃªte nÃ©cessite le planificateur HTN
-    
-    CritÃ¨res de dÃ©tection:
-    - PrÃ©sence de mots-clÃ©s multi-Ã©tapes ("puis", "ensuite", "aprÃ¨s")
-    - Nombre de verbes d'action >= 2 ("lis", "analyse", "gÃ©nÃ¨re")
-    - RequÃªtes explicitement complexes
-    
-    Args:
-        query: RequÃªte utilisateur Ã  analyser
-        
-    Returns:
-        True si HTN recommandÃ©, False pour mode simple
-        
-    Exemples:
-        >>> self._requires_htn("Lis data.csv")
-        False  # RequÃªte simple
-        
-        >>> self._requires_htn("Lis data.csv, analyse les donnÃ©es, gÃ©nÃ¨re rapport")
-        True  # Multi-Ã©tapes
-    """
-    query_lower = query.lower()
-    
-    # Mots-clÃ©s indiquant plusieurs Ã©tapes
-    multi_step_keywords = [
-        "puis", "ensuite", "aprÃ¨s", "finalement", 
-        "et ensuite", "et puis", "suivi de"
-    ]
-    
-    # Verbes d'action courants
-    action_verbs = [
-        "lis", "lit", "lire", "analyse", "analyser",
-        "gÃ©nÃ¨re", "gÃ©nÃ©rer", "crÃ©e", "crÃ©er", "calcule", "calculer",
-        "transforme", "transformer", "extrait", "extraire"
-    ]
-    
-    # DÃ©tection multi-Ã©tapes
-    has_multi_step_keywords = any(kw in query_lower for kw in multi_step_keywords)
-    
-    # Comptage des actions
-    num_actions = sum(1 for verb in action_verbs if verb in query_lower)
-    
-    # DÃ©cision
-    requires_htn = has_multi_step_keywords or num_actions >= 2
-    
-    if requires_htn:
-        logger.debug(f"ðŸŽ¯ HTN recommandÃ©: multi_step={has_multi_step_keywords}, actions={num_actions}")
-    
-    return requires_htn
-```
-
----
-
-### 4. CrÃ©er le Registre d'Actions
-
-**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
-
-**Code Ã  ajouter**:
-```python
-def _build_action_registry(self) -> Dict[str, Callable]:
-    """
-    Construit le registre d'actions pour l'exÃ©cuteur HTN
-    
-    Mappe chaque outil FilAgent Ã  une action exÃ©cutable par le TaskExecutor.
-    Les actions sont des wrappers qui adaptent l'interface des outils.
-    
-    Returns:
-        Dict[action_name, fonction_exÃ©cutable]
-        
-    Exemple de registre:
-        {
-            "read_file": <fonction wrapper>,
-            "analyze_data": <fonction wrapper>,
-            "generate_report": <fonction wrapper>,
-            ...
-        }
-    """
-    registry = {}
-    
-    # Mapper chaque outil du registre FilAgent
-    for tool in self.tools_registry.get_all():
-        # CrÃ©er un wrapper pour adapter l'interface
-        def create_tool_wrapper(tool_instance):
-            """Factory pour crÃ©er des wrappers avec closure correcte"""
-            def tool_wrapper(params: Dict[str, Any]) -> Any:
-                """
-                Wrapper qui exÃ©cute l'outil avec les paramÃ¨tres HTN
-                
-                Args:
-                    params: ParamÃ¨tres de la tÃ¢che HTN
-                    
-                Returns:
-                    RÃ©sultat de l'exÃ©cution de l'outil
-                """
-                try:
-                    return tool_instance.execute(**params)
-                except Exception as e:
-                    logger.error(f"Erreur outil {tool_instance.name}: {e}")
-                    raise
-            return tool_wrapper
-        
-        registry[tool.name] = create_tool_wrapper(tool)
-    
-    # Action gÃ©nÃ©rique pour tÃ¢ches non mappÃ©es
-    registry["generic_execute"] = self._generic_execute
-    
-    logger.info(f"ðŸ“ Registre d'actions HTN: {len(registry)} actions disponibles")
-    return registry
-
-def _generic_execute(self, params: Dict[str, Any]) -> Any:
-    """
-    Action gÃ©nÃ©rique pour tÃ¢ches non mappÃ©es Ã  un outil spÃ©cifique
-    
-    UtilisÃ©e comme fallback quand le planificateur gÃ©nÃ¨re une action
-    qui n'a pas de correspondance directe dans le registre d'outils.
-    
-    Args:
-        params: ParamÃ¨tres avec clÃ© "query" contenant la sous-requÃªte
-        
-    Returns:
-        RÃ©sultat de l'exÃ©cution en mode simple
-    """
-    query = params.get("query", "")
-    logger.warning(f"âš ï¸  Action gÃ©nÃ©rique pour: {query}")
-    return self._run_simple(query)
-```
-
----
-
-### 5. CrÃ©er la MÃ©thode d'ExÃ©cution HTN
-
-**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
-
-**Code Ã  ajouter**:
-```python
-def _run_with_htn(self, user_query: str) -> Dict[str, Any]:
-    """
-    ExÃ©cute une requÃªte en utilisant le planificateur HTN
-    
-    Workflow:
-    1. Planification: DÃ©compose requÃªte en graphe de tÃ¢ches
-    2. ExÃ©cution: ExÃ©cute le plan avec parallÃ©lisation
-    3. VÃ©rification: Valide les rÃ©sultats
-    4. TraÃ§abilitÃ©: Enregistre Decision Record
-    5. Formatage: Construit la rÃ©ponse finale
-    
-    Args:
-        user_query: RequÃªte utilisateur complexe
-        
-    Returns:
-        Dict contenant:
-        - response: Texte de rÃ©ponse formatÃ©
-        - plan: DÃ©tails du plan HTN
-        - execution: RÃ©sultats d'exÃ©cution
-        - metadata: MÃ©tadonnÃ©es de traÃ§abilitÃ©
-        
-    Raises:
-        Exception: En cas d'erreur critique (propagÃ©e au caller)
-    """
-    logger.info(f"ðŸš€ ExÃ©cution HTN pour: {user_query}")
-    
-    # === 1. PLANIFICATION ===
-    plan_result = self.planner.plan(
-        query=user_query,
-        strategy=PlanningStrategy.HYBRID,  # Rule-based + LLM
-        context={
-            "conversation_id": self.conversation_id,
-            "user_id": getattr(self, "user_id", "unknown"),
-        },
-    )
-    
-    logger.info(f"ðŸ“‹ Plan crÃ©Ã©: {len(plan_result.graph.tasks)} tÃ¢ches, "
-                f"confiance={plan_result.confidence:.0%}")
-    
-    # === 2. ENREGISTREMENT DÃ‰CISION (ConformitÃ© Loi 25) ===
-    if hasattr(self, 'decision_manager'):
-        self.decision_manager.record_decision(
-            decision_type="htn_planning",
-            input_data={"query": user_query},
-            output_data={
-                "plan": plan_result.to_dict(),
-                "num_tasks": len(plan_result.graph.tasks),
-                "strategy": plan_result.strategy_used.value,
-            },
-            reasoning=plan_result.reasoning,
-            metadata={
-                "confidence": plan_result.confidence,
-                "htn_version": "1.0.0",
-            }
-        )
-    
-    # === 3. EXÃ‰CUTION ===
-    exec_result = self.executor.execute(
-        graph=plan_result.graph,
-        context={
-            "conversation_id": self.conversation_id,
-            "user_query": user_query,
-        },
-    )
-    
-    logger.info(f"âœ… ExÃ©cution terminÃ©e: {exec_result.completed_tasks}/{len(plan_result.graph.tasks)} "
-                f"rÃ©ussies en {exec_result.total_duration_ms:.0f}ms")
-    
-    # === 4. VÃ‰RIFICATION ===
-    verifications = self.verifier.verify_graph_results(
-        graph=plan_result.graph,
-        level=VerificationLevel.STRICT,
-    )
-    
-    failed_verifications = [
-        task_id for task_id, verif in verifications.items()
-        if not verif.passed
-    ]
-    
-    if failed_verifications:
-        logger.warning(f"âš ï¸  {len(failed_verifications)} vÃ©rifications Ã©chouÃ©es")
-    
-    # === 5. FORMATAGE RÃ‰PONSE ===
-    response = self._format_htn_response(
-        plan_result, exec_result, verifications
-    )
-    
-    return response
-```
-
----
-
-### 6. CrÃ©er la MÃ©thode de Formatage
-
-**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
-
-**Code Ã  ajouter**:
-```python
-def _format_htn_response(
-    self,
-    plan_result: "PlanningResult",
-    exec_result: "ExecutionResult",
-    verifications: Dict[str, "VerificationResult"],
-) -> Dict[str, Any]:
-    """
-    Formate la rÃ©ponse finale aprÃ¨s exÃ©cution HTN
-    
-    AgrÃ¨ge les rÃ©sultats de toutes les tÃ¢ches et gÃ©nÃ¨re une rÃ©ponse
-    cohÃ©rente pour l'utilisateur.
-    
-    Args:
-        plan_result: RÃ©sultat de la planification
-        exec_result: RÃ©sultat de l'exÃ©cution
-        verifications: RÃ©sultats des vÃ©rifications par task_id
-        
-    Returns:
-        Dict formatÃ© selon l'interface Agent standard
-    """
-    # AgrÃ©ger les rÃ©sultats des tÃ¢ches complÃ©tÃ©es
-    completed_tasks = []
-    for task in plan_result.graph.topological_sort():
-        if task.status.value == "completed":
-            completed_tasks.append({
-                "task_id": task.task_id,
-                "name": task.name,
-                "action": task.action,
-                "result": task.result,
-                "verified": verifications.get(task.task_id, None),
-            })
-    
-    # GÃ©nÃ©rer le texte de rÃ©ponse (simpliste pour l'instant)
-    if exec_result.success:
-        response_text = self._generate_success_message(completed_tasks)
-    else:
-        response_text = self._generate_failure_message(
-            exec_result.errors, 
-            exec_result.completed_tasks,
-            len(plan_result.graph.tasks)
-        )
-    
-    # Construire la rÃ©ponse complÃ¨te
-    return {
-        "response": response_text,
-        "plan": plan_result.to_dict(),
-        "execution": exec_result.to_dict(),
-        "verifications": {
-            k: v.to_dict() for k, v in verifications.items()
-        },
-        "metadata": {
-            "mode": "htn",
-            "planning_strategy": plan_result.strategy_used.value,
-            "execution_strategy": "adaptive",
-            "total_duration_ms": exec_result.total_duration_ms,
-            "success": exec_result.success,
-            "completed_tasks": exec_result.completed_tasks,
-            "failed_tasks": exec_result.failed_tasks,
-        },
-    }
-
-def _generate_success_message(self, completed_tasks: List[Dict]) -> str:
-    """GÃ©nÃ¨re message de succÃ¨s (version simple)"""
-    return f"âœ… Traitement terminÃ© avec succÃ¨s! {len(completed_tasks)} tÃ¢ches complÃ©tÃ©es."
-
-def _generate_failure_message(self, errors: Dict, completed: int, total: int) -> str:
-    """GÃ©nÃ¨re message d'erreur (version simple)"""
-    return f"âš ï¸  Traitement partiellement Ã©chouÃ©: {completed}/{total} tÃ¢ches rÃ©ussies."
-```
-
----
-
-### 7. Modifier la MÃ©thode run() Principale
-
-**Emplacement**: MÃ©thode `run()` existante de la classe `Agent`
-
-**Modification Ã  effectuer**:
-```python
-def run(self, user_query: str) -> Dict[str, Any]:
-    """
-    Point d'entrÃ©e principal de l'agent
-    
-    COMPORTEMENT MODIFIÃ‰:
-    - Si HTN activÃ© ET requÃªte complexe â†’ Mode HTN
-    - Sinon â†’ Mode simple (comportement original)
-    - Fallback automatique si HTN Ã©choue
-    
-    Args:
-        user_query: RequÃªte utilisateur
-        
-    Returns:
-        RÃ©ponse formatÃ©e selon l'interface Agent
-    """
-    # === AJOUT: DÃ©tection et routage HTN ===
-    if self.htn_enabled and self._requires_htn(user_query):
-        logger.info("ðŸŽ¯ RequÃªte complexe dÃ©tectÃ©e â†’ Mode HTN")
-        try:
-            return self._run_with_htn(user_query)
-        except Exception as e:
-            logger.error(f"âŒ Erreur HTN: {e}", exc_info=True)
-            logger.warning("ðŸ”„ Fallback vers mode simple")
-            # Enregistrer l'Ã©chec pour monitoring
-            if hasattr(self, 'metrics'):
-                self.metrics.increment('htn_fallback_count')
-            # Continuer en mode simple (fallback gracieux)
-            return self._run_simple(user_query)
-    # === FIN AJOUT ===
-    
-    # Mode simple (code existant)
-    logger.info("â„¹ï¸  Mode simple (HTN non requis ou dÃ©sactivÃ©)")
-    return self._run_simple(user_query)
-```
-
----
-
-## âœ… CRITÃˆRES DE SUCCÃˆS
+## ✅ CRITÈRES DE SUCCÈS
 
 ### Tests de Validation Minimaux
 
-Avant de considÃ©rer le task comme terminÃ©, vÃ©rifier:
+Avant de considérer le task comme terminé, vérifier:
 
-#### 1. Import et Initialisation
+#### 1. Fichier Créé et Valide
+```bash
+# Test: Fichier existe
+ls -la config/agent.yaml
+# ✅ Fichier présent
+
+# Test: YAML valide (syntaxe)
+python -c "import yaml; yaml.safe_load(open('config/agent.yaml'))"
+# ✅ Pas d'erreur de parsing
+
+# Test: Structure conforme
+python -c "
+import yaml
+config = yaml.safe_load(open('config/agent.yaml'))
+assert 'features' in config
+assert 'planner' in config
+assert 'executor' in config
+assert 'verifier' in config
+print('✅ Structure valide')
+"
+```
+
+#### 2. Valeurs Par Défaut Sécuritaires
 ```python
-# Test: Imports fonctionnent
+# Test: Feature flags désactivés par défaut
+import yaml
+config = yaml.safe_load(open('config/agent.yaml'))
+
+assert config['features']['htn_enabled'] == False
+assert config['features']['debug_mode'] == False
+# ✅ Safety by Design respecté
+
+# Test: Timeouts raisonnables
+assert config['executor']['timeout_per_task_sec'] >= 10
+assert config['executor']['total_execution_timeout_sec'] >= 30
+# ✅ Pas de risque de blocage infini
+```
+
+#### 3. Documentation Complète
+```bash
+# Test: Commentaires présents
+grep -c "#" config/agent.yaml
+# ✅ Devrait retourner > 100 (documentation extensive)
+
+# Test: Sections bien délimitées
+grep -c "========" config/agent.yaml
+# ✅ Devrait retourner > 20 (11 sections minimum)
+```
+
+#### 4. Chargement par Agent
+```python
+# Test: Agent peut charger la config
 from runtime.agent import Agent
-# âœ… Pas d'erreur d'import
+import yaml
 
-# Test: Initialisation avec HTN dÃ©sactivÃ©
-config = {"htn_enabled": False}
+config = yaml.safe_load(open('config/agent.yaml'))
 agent = Agent(config)
-assert agent.planner is None
-assert agent.executor is None
-# âœ… Mode simple fonctionne
+# ✅ Pas d'erreur de chargement
 
-# Test: Initialisation avec HTN activÃ©
-config = {"htn_enabled": True}
-agent = Agent(config)
-assert agent.planner is not None
-assert agent.executor is not None
-# âœ… Composants HTN initialisÃ©s
-```
-
-#### 2. DÃ©tection de RequÃªtes
-```python
-# Test: RequÃªte simple
-assert not agent._requires_htn("Lis data.csv")
-# âœ… Mode simple dÃ©tectÃ©
-
-# Test: RequÃªte complexe
-assert agent._requires_htn("Lis data.csv, analyse les donnÃ©es, gÃ©nÃ¨re rapport")
-# âœ… Mode HTN dÃ©tectÃ©
-```
-
-#### 3. ExÃ©cution End-to-End
-```python
-# Test: Mode simple continue de fonctionner
-response = agent.run("Bonjour")
-assert response is not None
-# âœ… Aucune rÃ©gression
-
-# Test: Mode HTN avec fallback
-config = {"htn_enabled": True}
-agent = Agent(config)
-response = agent.run("RequÃªte complexe simulÃ©e")
-# âœ… Pas de crash (fallback si erreur)
+# Test: Paramètres appliqués correctement
+assert agent.htn_enabled == config['features']['htn_enabled']
+# ✅ Configuration prise en compte
 ```
 
 ### Checklist de Validation
 
-- [ ] âœ… Code ajoutÃ© compile sans erreur
-- [ ] âœ… Imports HTN fonctionnent
-- [ ] âœ… Agent s'initialise avec `htn_enabled=False`
-- [ ] âœ… Agent s'initialise avec `htn_enabled=True`
-- [ ] âœ… MÃ©thode `_requires_htn()` dÃ©tecte correctement
-- [ ] âœ… Registre d'actions construit sans erreur
-- [ ] âœ… Mode simple continue de fonctionner (aucune rÃ©gression)
-- [ ] âœ… Fallback fonctionne si HTN Ã©choue
-- [ ] âœ… Logs informatifs prÃ©sents
-- [ ] âœ… Code commentÃ© et documentÃ©
+- [ ] ✅ Fichier config/agent.yaml créé
+- [ ] ✅ Syntaxe YAML valide (parse sans erreur)
+- [ ] ✅ Toutes les 11 sections présentes
+- [ ] ✅ Feature flags avec valeurs par défaut sécuritaires
+- [ ] ✅ Paramètres planner documentés
+- [ ] ✅ Paramètres executor documentés
+- [ ] ✅ Paramètres verifier documentés
+- [ ] ✅ Configuration logging complète
+- [ ] ✅ Configurations par environnement (dev, test, prod)
+- [ ] ✅ Commentaires inline pour chaque paramètre
+- [ ] ✅ Métadonnées et changelog présents
+- [ ] ✅ Agent peut charger le fichier sans erreur
 
 ---
 
-## ðŸš¨ CONTRAINTES ET GARDE-FOUS
+## 🚨 CONTRAINTES ET GARDE-FOUS
 
-### RÃ¨gles de SÃ©curitÃ©
+### Règles de Sécurité
 
-1. **Ne JAMAIS casser le mode simple**
-   - Le code existant doit continuer de fonctionner
-   - Fallback systÃ©matique en cas d'erreur HTN
+1. **Valeurs par défaut TOUJOURS sécuritaires**
+   - Features désactivées par défaut (`htn_enabled: false`)
+   - Timeouts raisonnables (pas d'infini)
+   - Validation stricte activée
+   - Traçabilité activée
 
-2. **Feature flag obligatoire**
-   - HTN doit Ãªtre dÃ©sactivable via config
-   - DÃ©faut: `htn_enabled=False` (sÃ©curitÃ©)
+2. **Documentation obligatoire**
+   - Chaque paramètre doit avoir un commentaire
+   - Expliquer l'impact de chaque valeur
+   - Donner des exemples de valeurs valides
+   - Indiquer les valeurs de production recommandées
 
-3. **Logs exhaustifs**
-   - Logger chaque dÃ©cision (HTN vs simple)
-   - Logger chaque erreur avec stack trace
-   - ConformitÃ© Loi 25: traÃ§abilitÃ© totale
+3. **Pas de secrets dans le fichier**
+   - ❌ Pas de clés API
+   - ❌ Pas de mots de passe
+   - ❌ Pas de tokens
+   - ✅ Utiliser variables d'environnement ou fichier séparé
 
-4. **Gestion d'erreurs robuste**
-   - Try-catch autour de chaque appel HTN
-   - Jamais propager d'exception au niveau supÃ©rieur
-   - Fallback gracieux systÃ©matique
+4. **Versioning et traçabilité**
+   - Section metadata avec version
+   - Changelog pour chaque modification
+   - Auteur et date de création
 
-### Standards de Code FilAgent
+### Standards YAML
 
-```python
-# âœ… BON: Logging dÃ©taillÃ©
-logger.info("ðŸš€ HTN Planning activÃ©")
-logger.error(f"âŒ Erreur HTN: {e}", exc_info=True)
+```yaml
+# ✅ BON: Commentaires descriptifs
+# Active le planificateur HTN pour requêtes complexes
+# Impact: Si false, agent utilise uniquement mode simple
+# Production: Commencer à false, activer après validation
+htn_enabled: false
 
-# âœ… BON: Docstrings complÃ¨tes
-def _requires_htn(self, query: str) -> bool:
-    """Documentation avec exemples..."""
+# ✅ BON: Valeurs explicites
+timeout_per_task_sec: 60  # Integer explicite
 
-# âœ… BON: Type hints
-def run(self, user_query: str) -> Dict[str, Any]:
+# ✅ BON: Structure cohérente
+features:
+  htn_enabled: false
+  debug_mode: false
 
-# âŒ MAUVAIS: Pas de logs
-if htn_enabled: ...
+# ❌ MAUVAIS: Pas de commentaire
+htn_enabled: false
 
-# âŒ MAUVAIS: Pas de docstring
-def _requires_htn(self, query):
+# ❌ MAUVAIS: Valeur dangereuse par défaut
+timeout_per_task_sec: 999999  # Risque de blocage
 
-# âŒ MAUVAIS: Pas de type hints
-def run(self, query):
-```
-
----
-
-## ðŸ“ NOTES D'IMPLÃ‰MENTATION
-
-### Ordre de DÃ©veloppement RecommandÃ©
-
-1. **Phase 1: Imports et structure** (30 min)
-   - Ajouter imports HTN
-   - CrÃ©er mÃ©thodes vides avec signatures
-
-2. **Phase 2: Initialisation** (1h)
-   - Coder `__init__` avec feature flag
-   - Tester initialisation basique
-
-3. **Phase 3: DÃ©tection** (1h)
-   - Coder `_requires_htn()`
-   - Tester avec cas simples et complexes
-
-4. **Phase 4: Registre d'actions** (1h)
-   - Coder `_build_action_registry()`
-   - Tester mapping des outils
-
-5. **Phase 5: ExÃ©cution HTN** (2h)
-   - Coder `_run_with_htn()`
-   - Coder `_format_htn_response()`
-   - Tester end-to-end simulÃ©
-
-6. **Phase 6: IntÃ©gration finale** (30 min)
-   - Modifier `run()` avec routage
-   - Tester avec requÃªtes rÃ©elles
-   - Valider fallback
-
-### Points d'Attention SpÃ©cifiques
-
-âš ï¸ **Closure dans `_build_action_registry()`**
-```python
-# âŒ MAUVAIS: Toutes les fonctions rÃ©fÃ©rencent le dernier outil
-for tool in tools:
-    registry[tool.name] = lambda params: tool.execute(**params)
-
-# âœ… BON: Factory avec closure correcte
-for tool in tools:
-    def create_wrapper(t):
-        return lambda params: t.execute(**params)
-    registry[tool.name] = create_wrapper(tool)
-```
-
-âš ï¸ **Config non prÃ©sent**
-```python
-# GÃ©rer le cas oÃ¹ config n'a pas les clÃ©s HTN
-self.htn_enabled = config.get("htn_enabled", False)  # DÃ©faut safe
-max_depth = config.get("htn_max_depth", 3)  # DÃ©faut raisonnable
-```
-
-âš ï¸ **Logging appropriÃ©**
-```python
-# Utiliser les emojis pour faciliter le debug
-logger.info("ðŸš€ ...")  # SuccÃ¨s / Lancement
-logger.warning("âš ï¸  ...") # Avertissement
-logger.error("âŒ ...")    # Erreur
-logger.debug("ðŸ” ...")    # Debug dÃ©taillÃ©
+# ❌ MAUVAIS: Structure incohérente
+features:
+  htn_enabled: false
+debug_mode: false  # Devrait être sous features
 ```
 
 ---
 
-## ðŸŽ¯ LIVRABLES ATTENDUS
+## 📝 NOTES D'IMPLÉMENTATION
 
-### 1. Code ModifiÃ©
-- `runtime/agent.py` avec toutes les modifications ci-dessus
-- Code propre, commentÃ©, conforme aux standards
+### Ordre de Développement Recommandé
 
-### 2. Tests Manuels RÃ©ussis
-- Initialisation HTN activÃ©/dÃ©sactivÃ©
-- DÃ©tection de requÃªtes simples/complexes
-- ExÃ©cution mode simple (aucune rÃ©gression)
-- Fallback en cas d'erreur
+1. **Phase 1: Structure de base** (5 min)
+   - Créer fichier config/agent.yaml vide
+   - Ajouter header avec métadonnées
+   - Créer sections principales (11 sections)
+
+2. **Phase 2: Features et Planner** (10 min)
+   - Section 1: Feature Flags
+   - Section 2: Planificateur HTN
+   - Tester parsing YAML
+
+3. **Phase 3: Executor et Verifier** (10 min)
+   - Section 3: Exécuteur de Tâches
+   - Section 4: Vérificateur de Résultats
+   - Tester parsing YAML
+
+4. **Phase 4: Infrastructure** (10 min)
+   - Section 5: Logging et Traçabilité
+   - Section 6: Decision Records
+   - Section 7: Performance et Ressources
+
+5. **Phase 5: Sécurité et Intégrations** (10 min)
+   - Section 8: Sécurité et Conformité
+   - Section 9: Intégrations Externes
+
+6. **Phase 6: Environnements et Finalisation** (10 min)
+   - Section 10: Environnements
+   - Section 11: Métadonnées
+   - Validation finale et tests
+
+### Points d'Attention Spécifiques
+
+⚠️ **Indentation YAML**
+```yaml
+# ❌ MAUVAIS: Indentation incorrecte (mélange tabs/spaces)
+features:
+	htn_enabled: false
+  debug_mode: false
+
+# ✅ BON: Indentation cohérente (2 espaces partout)
+features:
+  htn_enabled: false
+  debug_mode: false
+```
+
+⚠️ **Types de données**
+```yaml
+# ✅ BON: Types explicites
+timeout_per_task_sec: 60  # Integer
+min_confidence_score: 0.7  # Float
+htn_enabled: false  # Boolean
+default_strategy: "hybrid"  # String
+
+# ❌ MAUVAIS: Types ambigus
+timeout_per_task_sec: "60"  # String au lieu de int
+```
+
+⚠️ **Commentaires multilignes**
+```yaml
+# ✅ BON: Commentaires courts et précis
+# Active le planificateur HTN
+htn_enabled: false
+
+# ✅ BON: Commentaires structurés
+# Active le planificateur HTN pour requêtes complexes
+# Impact: Si false, agent utilise uniquement mode simple
+# Production: Commencer à false, activer après validation
+htn_enabled: false
+
+# ❌ MAUVAIS: Commentaire trop long non structuré
+# Ce paramètre active ou désactive le planificateur HTN qui est responsable de la décomposition des requêtes complexes en graphes de tâches exécutables avec parallélisation...
+htn_enabled: false
+```
+
+---
+
+## 🎯 LIVRABLES ATTENDUS
+
+### 1. Fichier de Configuration
+- `config/agent.yaml` complet et documenté
+- Syntaxe YAML valide
+- Toutes les 11 sections présentes
+- Commentaires inline pour chaque paramètre
+
+### 2. Tests de Validation
+- Parse YAML sans erreur
+- Structure conforme aux attentes
+- Valeurs par défaut sécuritaires vérifiées
+- Chargement par Agent réussi
 
 ### 3. Documentation
-- Commentaires inline pour chaque mÃ©thode
-- Docstrings complÃ¨tes
-- Logs informatifs
+- Commentaires inline complets
+- Section métadonnées avec version
+- Changelog initialisé
+- README.md mis à jour (optionnel)
 
 ---
 
-## ðŸ”— RESSOURCES
+## 📗 RESSOURCES
 
-### Fichiers de RÃ©fÃ©rence
-- `/Volumes/DevSSD/FilAgent/planner/README.md` - Documentation HTN
-- `/Volumes/DevSSD/FilAgent/planner/__init__.py` - Exports disponibles
-- `/Volumes/DevSSD/FilAgent/examples/htn_integration_example.py` - Exemple complet
+### Documentation YAML
+- Spécification YAML 1.2: https://yaml.org/spec/1.2/spec.html
+- Parser Python: https://pyyaml.org/wiki/PyYAMLDocumentation
 
-### Documentation Externe
-- Rapport d'analyse: `ANALYSE_HTN_FILAGENT.md`
-- SynthÃ¨se HTN: `SYNTHESE_HTN.md`
+### Exemples de Référence
+- `/Volumes/DevSSD/FilAgent/planner/README.md` - Paramètres HTN
+- `/Volumes/DevSSD/FilAgent/examples/config_example.yaml` - Template
 
----
+### Validation de Configuration
+```python
+# Script pour valider config/agent.yaml
+import yaml
+import jsonschema
 
-## ðŸš¦ STATUT DU TASK
+# Charger config
+with open('config/agent.yaml') as f:
+    config = yaml.safe_load(f)
 
-**Ã‰tat actuel**: ðŸŸ¡ **Ã€ FAIRE**
+# Valider structure minimale
+required_sections = [
+    'features', 'planner', 'executor', 'verifier',
+    'logging', 'decision_records', 'performance',
+    'security', 'integrations', 'environments', 'metadata'
+]
 
-**Prochaine action**: Commencer Phase 1 - Imports et structure
+for section in required_sections:
+    assert section in config, f"Section manquante: {section}"
 
-**Bloqueurs**: Aucun
-
----
-
-## ðŸ’¬ QUESTIONS / CLARIFICATIONS
-
-Si des questions se prÃ©sentent pendant l'implÃ©mentation:
-
-1. **Feature flag**: Est-ce que `config` est un dict ou un objet?
-   â†’ Utiliser `.get()` qui fonctionne pour les deux
-
-2. **Decision Manager**: Est-il toujours prÃ©sent?
-   â†’ VÃ©rifier avec `hasattr(self, 'decision_manager')`
-
-3. **Tools Registry**: Quelle est l'interface exacte?
-   â†’ Voir `tools/registry.py` pour la structure
-
-4. **Format de rÃ©ponse**: Quel est le format standard de `run()`?
-   â†’ Dict avec clÃ© `response` minimalement
+print("✅ Configuration valide!")
+```
 
 ---
 
-**Task crÃ©Ã© le**: 4 novembre 2025  
-**DerniÃ¨re mise Ã  jour**: 4 novembre 2025  
+## 🚦 STATUT DU TASK
+
+**État actuel**: 🟡 **À FAIRE**
+
+**Prochaine action**: Créer config/agent.yaml selon structure ci-dessus
+
+**Bloqueurs**: Aucun (indépendant de HTN-INT-001)
+
+---
+
+## 💬 QUESTIONS / CLARIFICATIONS
+
+Si des questions se présentent pendant l'implémentation:
+
+1. **Emplacement du fichier**: Où créer config/?
+   → Racine du projet FilAgent: `/Volumes/DevSSD/FilAgent/config/`
+
+2. **Format des commentaires**: Quel style adopter?
+   → Style ci-dessus: commentaire multi-ligne avec Impact/Production
+
+3. **Valeurs par environnement**: Créer fichiers séparés?
+   → Optionnel dans ce task. Section 10 suffit pour commencer.
+
+4. **Validation de schema**: Créer schema.yaml?
+   → Optionnel dans ce task. Peut être fait dans HTN-INT-003.
+
+---
+
+**Task créé le**: 4 novembre 2025  
+**Dernière mise à jour**: 4 novembre 2025  
 **Auteur**: Claude (Anthropic) via Fil  
 **Version**: 1.0.0
-
-
-
-
-
-
-
-
-
-
-
