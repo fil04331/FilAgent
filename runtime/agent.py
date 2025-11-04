@@ -327,7 +327,8 @@ class Agent:
         except Exception as e:
             print(f"⚠ Failed to load conversation history: {e}")
             history = []
-        context = self._build_context(history, conversation_id, task_id)
+        trimmed_history = history[:-1] if history else history
+        context = self._build_context(trimmed_history, conversation_id, task_id)
 
         max_iterations = 10
         iterations = 0
@@ -355,7 +356,12 @@ class Agent:
             )
 
             full_prompt = self._compose_prompt(context, current_message)
-            current_prompt_hash = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
+            current_prompt_hash = self._compute_prompt_hash(
+                context,
+                current_message,
+                conversation_id,
+                task_id,
+            )
 
             generation_result = self.model.generate(
                 prompt=full_prompt,
@@ -435,9 +441,12 @@ class Agent:
 
         if final_response is None:
             final_response = "Erreur: boucle de raisonnement trop longue"
-            final_prompt_hash = final_prompt_hash or hashlib.sha256(
-                self._compose_prompt(context, current_message).encode("utf-8")
-            ).hexdigest()
+            final_prompt_hash = final_prompt_hash or self._compute_prompt_hash(
+                context,
+                current_message,
+                conversation_id,
+                task_id,
+            )
 
         try:
             add_message(
@@ -547,19 +556,48 @@ class Agent:
         """Assembler le contexte et le dernier message utilisateur pour le modèle."""
         context = context.strip()
         message = message.strip()
+        assistant_header = "Assistant:"
         if not context:
-            return f"Utilisateur: {message}\nAssistant:"
-        return f"{context}\n\nUtilisateur: {message}\nAssistant:"
-    
+            return f"Utilisateur: {message}\n{assistant_header}\n"
+        return f"{context}\n\nUtilisateur: {message}\n{assistant_header}\n"
+
     def _build_context(self, history: List[Dict], conversation_id: str, task_id: Optional[str]) -> str:
         """Construire le contexte conversationnel pour le modèle."""
+        role_labels = {
+            "user": "Utilisateur",
+            "assistant": "Assistant",
+            "system": "Système",
+            "tool": "Outil",
+        }
+
         context_messages = []
         for msg in history[-10:]:  # 10 derniers messages
-            role = "Utilisateur" if msg["role"] == "user" else "Assistant"
-            content = msg["content"]
+            role_key = msg.get("role", "assistant")
+            role = role_labels.get(role_key, role_key.capitalize())
+            content = msg.get("content", "").strip()
+            if not content:
+                continue
             context_messages.append(f"{role}: {content}")
-        
+
         return "\n".join(context_messages)
+
+    def _compute_prompt_hash(
+        self,
+        context: str,
+        message: str,
+        conversation_id: str,
+        task_id: Optional[str] = None,
+    ) -> str:
+        """Générer un hash stable incluant les identifiants de conversation."""
+
+        payload = {
+            "conversation_id": conversation_id,
+            "task_id": task_id,
+            "context": context,
+            "message": message,
+        }
+        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     
     def _get_system_prompt(self) -> str:
         """Retourner le prompt système avec les outils disponibles"""
