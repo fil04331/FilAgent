@@ -1,63 +1,747 @@
+# ðŸŽ¯ TASK CARD: IntÃ©gration HTN dans Agent Principal
 
-1. Cartographie de la configuration et des dépendances
-Le guide de démarrage confirme l’environnement Python 3.10+, l’installation via pip install -r requirements.txt, l’initialisation de la base SQLite et le démarrage du serveur sur python runtime/server.py avec un curl de test sur /chat.
+**ID Task**: HTN-INT-001  
+**Titre**: IntÃ©grer le module HTN Planning dans runtime/agent.py  
+**Phase**: Phase 1 - IntÃ©gration Minimale  
+**PrioritÃ©**: ðŸ”´ P0 - CRITIQUE  
+**Estimation**: 4-6 heures  
+**DÃ©pendances**: Aucune (premier task)  
+**AssignÃ© Ã **: Agent/DÃ©veloppeur  
 
-requirements.txt regroupe les dépendances clés : FastAPI/uvicorn pour l’API, llama-cpp-python pour le backend LLM par défaut, cryptography pour les signatures EdDSA, ainsi que les outils d’observabilité et de test.
+---
 
-config/agent.yaml fixe les paramètres de génération (temperature 0.2, top_p 0.95, max_tokens 800), les timeouts (60 s pour la génération, 30 s pour les outils, 300 s global), le modèle GGUF par défaut et la mémoire (TTL 30 jours pour l’épisodique, 14 jours pour la reconstruction sémantique) tout en activant WORM, PII redaction et provenance par défaut.
+## ðŸ“‹ CONTEXTE DU PROJET
 
-Le loader Pydantic (runtime/config.py) valide ces sections et expose un singleton get_config(), ce qui permet de centraliser toute évolution des paramètres.
+### Situation Actuelle
+FilAgent fonctionne actuellement avec une **boucle simple** (max 10 itÃ©rations) qui ne peut pas gÃ©rer efficacement les requÃªtes multi-Ã©tapes complexes.
 
-2. Pipeline FastAPI ↔️ agent
-L’API /chat (FastAPI) instancie l’agent via get_agent(), vérifie la présence d’un message utilisateur, et renvoie une réponse type OpenAI en injectant l’ID de conversation et le modèle actif; les TODO signalent la nécessité de calculer les tokens réels et d’enrichir /health avec des checks de dépendances.
+### Objectif Global
+IntÃ©grer un systÃ¨me de **Planification HiÃ©rarchique (HTN)** permettant de dÃ©composer automatiquement des requÃªtes complexes en graphes de tÃ¢ches exÃ©cutables avec parallÃ©lisation.
 
-Le cœur agent applique une boucle de raisonnement sur 10 itérations maximum, avec enregistrement de chaque message en mémoire, hachage du prompt pour la traçabilité, parsing des balises <tool_call> et relance du modèle après exécution d’outils; la logique actuelle ne réutilise cependant pas la variable context construite pour le modèle (le prompt reste message), ce qui limite l’ancrage conversationnel et mérite une correction avant les tests.
+### Valeurs Fondamentales du Projet
+1. **Safety by Design** - SÃ©curitÃ© et conformitÃ© avant tout
+2. **Fallback Gracieux** - Ne jamais casser l'existant
+3. **Feature Flag** - Activation progressive et contrÃ´lÃ©e
+4. **TraÃ§abilitÃ©** - Logs et Decision Records systÃ©matiques
 
-Les appels d’outils sont journalisés, hashés puis tracés, et un DR signé est émis si des outils sont utilisés ou si des actions critiques sont détectées dans la réponse; la boucle se termine en stockant la réponse et en loggant la fin de conversation.
+---
 
-Suggestion : intégrer context au prompt transmis au modèle et propager les métriques d’usage (tokens) depuis GenerationResult vers la réponse API pour disposer d’un suivi cohérent avant benchmarking.
+## ðŸŽ¯ OBJECTIF DE CE TASK
 
-3. Middlewares de conformité et traçabilité
-Le logger JSONL crée des événements append-only avec trace/span IDs et hash des entrées/sorties outils, mais il faudrait relier ce flux au logger WORM pour garantir l’immuabilité promise dans la configuration.
+### Mission
+Modifier le fichier `runtime/agent.py` pour intÃ©grer les composants HTN (HierarchicalPlanner, TaskExecutor, TaskVerifier) avec:
+- âœ… Feature flag pour activation/dÃ©sactivation
+- âœ… DÃ©tection automatique de requÃªtes complexes
+- âœ… Fallback vers mode simple en cas d'erreur
+- âœ… Registre d'actions pour mapper outils FilAgent
 
-Les Decision Records sont signés EdDSA, sauvegardés dans logs/decisions/, et les clés sont stockées sous provenance/signatures/; pour durcir WORM, envisager un stockage hors disque (vault/HSM) et l’intégration d’une vérification périodique via le middleware WORM.
+### RÃ©sultat Attendu
+AprÃ¨s ce task:
+- Agent peut utiliser HTN pour requÃªtes complexes
+- Mode simple continue de fonctionner pour requÃªtes simples
+- Aucune rÃ©gression sur fonctionnalitÃ©s existantes
+- Code bien documentÃ© et conforme aux standards FilAgent
 
-Le tracker PROV-JSON enregistre les graphes d’activités (génération, outils) dans logs/traces/otlp, avec liens agent→activité→artefacts.
+---
 
-Le middleware WORM génère un arbre de Merkle et des checkpoints sur logs/digests/; il manque cependant le branchement effectif depuis le logger pour bénéficier du mode append-only automatique.
+## ðŸ“‚ FICHIERS Ã€ MODIFIER
 
-Recommandations : compléter /health avec une vérification de disponibilité des logs/provenance, exécuter régulièrement create_checkpoint/verify_integrity, et automatiser la rotation/rotation de clés selon la politique 90 jours définie dans provenance.yaml.
+### Fichier Principal
+```
+ðŸ“ /Volumes/DevSSD/FilAgent/
+â””â”€â”€ runtime/
+    â””â”€â”€ agent.py  â† MODIFIER CE FICHIER
+```
 
-4. Persistance mémoire
-memory/episodic.py crée deux tables (conversations/messages) avec index sur conversation_id et timestamp, stocke chaque échange et propose un nettoyage basé sur updated_at; la TTL par défaut est de 30 jours.
+### Fichiers Ã  Consulter (RÃ©fÃ©rence)
+```
+ðŸ“ /Volumes/DevSSD/FilAgent/
+â”œâ”€â”€ planner/
+â”‚   â”œâ”€â”€ __init__.py         â† Imports disponibles
+â”‚   â”œâ”€â”€ task_graph.py       â† Structures Task, TaskGraph
+â”‚   â”œâ”€â”€ planner.py          â† HierarchicalPlanner
+â”‚   â”œâ”€â”€ executor.py         â† TaskExecutor
+â”‚   â””â”€â”€ verifier.py         â† TaskVerifier
+â”œâ”€â”€ config/
+â”‚   â””â”€â”€ agent.yaml          â† Configuration HTN (Ã  crÃ©er aprÃ¨s)
+â””â”€â”€ tools/
+    â””â”€â”€ registry.py         â† ToolsRegistry existant
+```
 
-RetentionManager charge config/retention.yaml, applique les TTL par type (événements 90 jours, DR 365 jours, audit 7 ans, etc.), et fournit une routine de purge multi-dossiers, avec option dry-run et export avant suppression.
+---
 
-Avant montée en charge, prévoir des migrations (ex. vers Postgres) en gardant la même couche DAO, et ajouter des tests automatiques pour run_cleanup afin de vérifier la conformité aux bases légales configurées.
+## ðŸ”§ MODIFICATIONS Ã€ EFFECTUER
 
-5. Arsenal d’outils et sandbox
-Le registre central (tools/registry.py) instancie par défaut python_sandbox, file_read, math_calculator et expose register() pour brancher rapidement des outils métiers supplémentaires; l’agent réutilise ce registre pour générer le prompt système dynamique.
+### 1. Ajouter les Imports HTN
 
-Le sandbox Python bloque des patterns dangereux (__import__, eval, os.system, etc.), limite la taille du code et stoppe l’exécution après 30 secondes; prévoir un durcissement supplémentaire (cgroups ou execution dans un microservice isolé) pour supporter du code utilisateur non fiable en production.
+**Emplacement**: DÃ©but du fichier `runtime/agent.py`, section imports
 
-Le lecteur de fichiers applique une allowlist (working_set/, temp/, memory/working_set/), détecte le path traversal et limite la taille à 10 MB, mais il serait utile d’aligner dynamiquement ces chemins avec config/policies.yaml pour éviter les divergences statiques.
+**Code Ã  ajouter**:
+```python
+# === AJOUT HTN ===
+from planner import (
+    HierarchicalPlanner,
+    TaskExecutor,
+    TaskVerifier,
+    PlanningStrategy,
+    ExecutionStrategy,
+    VerificationLevel,
+    TaskPriority,
+)
+# === FIN AJOUT HTN ===
+```
 
-6. Benchmarks et mesure continue
-config/eval_targets.yaml fixe les seuils (HumanEval pass@1≥0.65, MBPP≥0.60, SWE-bench lite 50 % sur 50 tâches, scénarios agentiques ≥0.75) et impose des métriques de conformité (DR/provenance ≥95 % de couverture, zéro violation critique sur 1000 tâches).
+**âš ï¸ Important**: Placer aprÃ¨s les imports existants de FilAgent, avant la classe Agent.
 
-Le harnais générique (eval/base.py) charge les tâches, mesure la latence par item, calcule le taux de réussite et sauvegarde les rapports datés dans eval/reports/; il suffit de fournir un callback agent qui wrappe /chat pour orchestrer une campagne complète.
+---
 
-Plan de campagne conseillé : automatiser un run hebdomadaire (cron ou CI) qui 1) synchronise le modèle/config, 2) exécute chaque benchmark avec suivi des métriques citées, 3) compare les rapports aux seuils acceptance_criteria, puis 4) archive les rapports/artefacts dans le pipeline de provenance pour détecter toute régression de performance ou de conformité.
+### 2. Modifier Agent.__init__
 
-Aucune commande de test exécutée pour cette analyse (revue statique uniquement).
+**Emplacement**: Dans la mÃ©thode `__init__` de la classe `Agent`
 
+**Code Ã  ajouter** (Ã  la fin de `__init__`, aprÃ¨s initialisation des composants existants):
+```python
+def __init__(self, config: AgentConfig):
+    # ... code existant (ne pas toucher) ...
+    
+    # === AJOUT HTN: Initialisation des composants ===
+    # Feature flag pour activation progressive
+    self.htn_enabled = config.get("htn_enabled", False)
+    
+    if self.htn_enabled:
+        logger.info("ðŸš€ HTN Planning activÃ© - Mode avancÃ© disponible")
+        
+        # 1. Planificateur HTN
+        self.planner = HierarchicalPlanner(
+            model_interface=self.model,
+            tools_registry=self.tools_registry,
+            max_decomposition_depth=config.get("htn_max_depth", 3),
+            enable_tracing=True,  # ConformitÃ© Loi 25
+        )
+        
+        # 2. ExÃ©cuteur de tÃ¢ches
+        self.executor = TaskExecutor(
+            action_registry=self._build_action_registry(),
+            strategy=ExecutionStrategy.ADAPTIVE,
+            max_workers=config.get("htn_max_workers", 4),
+            timeout_per_task_sec=config.get("htn_task_timeout", 60),
+            enable_tracing=True,
+        )
+        
+        # 3. VÃ©rificateur de rÃ©sultats
+        self.verifier = TaskVerifier(
+            default_level=VerificationLevel.STRICT,
+            enable_tracing=True,
+        )
+        
+        logger.info("âœ… Composants HTN initialisÃ©s avec succÃ¨s")
+    else:
+        logger.info("â„¹ï¸  HTN Planning dÃ©sactivÃ© - Mode simple uniquement")
+        self.planner = None
+        self.executor = None
+        self.verifier = None
+    # === FIN AJOUT HTN ===
+```
 
+---
 
+### 3. CrÃ©er la MÃ©thode de DÃ©tection HTN
 
+**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
 
+**Code Ã  ajouter** (aprÃ¨s les mÃ©thodes existantes, avant `run()`):
+```python
+def _requires_htn(self, query: str) -> bool:
+    """
+    DÃ©termine si une requÃªte nÃ©cessite le planificateur HTN
+    
+    CritÃ¨res de dÃ©tection:
+    - PrÃ©sence de mots-clÃ©s multi-Ã©tapes ("puis", "ensuite", "aprÃ¨s")
+    - Nombre de verbes d'action >= 2 ("lis", "analyse", "gÃ©nÃ¨re")
+    - RequÃªtes explicitement complexes
+    
+    Args:
+        query: RequÃªte utilisateur Ã  analyser
+        
+    Returns:
+        True si HTN recommandÃ©, False pour mode simple
+        
+    Exemples:
+        >>> self._requires_htn("Lis data.csv")
+        False  # RequÃªte simple
+        
+        >>> self._requires_htn("Lis data.csv, analyse les donnÃ©es, gÃ©nÃ¨re rapport")
+        True  # Multi-Ã©tapes
+    """
+    query_lower = query.lower()
+    
+    # Mots-clÃ©s indiquant plusieurs Ã©tapes
+    multi_step_keywords = [
+        "puis", "ensuite", "aprÃ¨s", "finalement", 
+        "et ensuite", "et puis", "suivi de"
+    ]
+    
+    # Verbes d'action courants
+    action_verbs = [
+        "lis", "lit", "lire", "analyse", "analyser",
+        "gÃ©nÃ¨re", "gÃ©nÃ©rer", "crÃ©e", "crÃ©er", "calcule", "calculer",
+        "transforme", "transformer", "extrait", "extraire"
+    ]
+    
+    # DÃ©tection multi-Ã©tapes
+    has_multi_step_keywords = any(kw in query_lower for kw in multi_step_keywords)
+    
+    # Comptage des actions
+    num_actions = sum(1 for verb in action_verbs if verb in query_lower)
+    
+    # DÃ©cision
+    requires_htn = has_multi_step_keywords or num_actions >= 2
+    
+    if requires_htn:
+        logger.debug(f"ðŸŽ¯ HTN recommandÃ©: multi_step={has_multi_step_keywords}, actions={num_actions}")
+    
+    return requires_htn
+```
 
+---
 
+### 4. CrÃ©er le Registre d'Actions
 
+**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
+
+**Code Ã  ajouter**:
+```python
+def _build_action_registry(self) -> Dict[str, Callable]:
+    """
+    Construit le registre d'actions pour l'exÃ©cuteur HTN
+    
+    Mappe chaque outil FilAgent Ã  une action exÃ©cutable par le TaskExecutor.
+    Les actions sont des wrappers qui adaptent l'interface des outils.
+    
+    Returns:
+        Dict[action_name, fonction_exÃ©cutable]
+        
+    Exemple de registre:
+        {
+            "read_file": <fonction wrapper>,
+            "analyze_data": <fonction wrapper>,
+            "generate_report": <fonction wrapper>,
+            ...
+        }
+    """
+    registry = {}
+    
+    # Mapper chaque outil du registre FilAgent
+    for tool in self.tools_registry.get_all():
+        # CrÃ©er un wrapper pour adapter l'interface
+        def create_tool_wrapper(tool_instance):
+            """Factory pour crÃ©er des wrappers avec closure correcte"""
+            def tool_wrapper(params: Dict[str, Any]) -> Any:
+                """
+                Wrapper qui exÃ©cute l'outil avec les paramÃ¨tres HTN
+                
+                Args:
+                    params: ParamÃ¨tres de la tÃ¢che HTN
+                    
+                Returns:
+                    RÃ©sultat de l'exÃ©cution de l'outil
+                """
+                try:
+                    return tool_instance.execute(**params)
+                except Exception as e:
+                    logger.error(f"Erreur outil {tool_instance.name}: {e}")
+                    raise
+            return tool_wrapper
+        
+        registry[tool.name] = create_tool_wrapper(tool)
+    
+    # Action gÃ©nÃ©rique pour tÃ¢ches non mappÃ©es
+    registry["generic_execute"] = self._generic_execute
+    
+    logger.info(f"ðŸ“ Registre d'actions HTN: {len(registry)} actions disponibles")
+    return registry
+
+def _generic_execute(self, params: Dict[str, Any]) -> Any:
+    """
+    Action gÃ©nÃ©rique pour tÃ¢ches non mappÃ©es Ã  un outil spÃ©cifique
+    
+    UtilisÃ©e comme fallback quand le planificateur gÃ©nÃ¨re une action
+    qui n'a pas de correspondance directe dans le registre d'outils.
+    
+    Args:
+        params: ParamÃ¨tres avec clÃ© "query" contenant la sous-requÃªte
+        
+    Returns:
+        RÃ©sultat de l'exÃ©cution en mode simple
+    """
+    query = params.get("query", "")
+    logger.warning(f"âš ï¸  Action gÃ©nÃ©rique pour: {query}")
+    return self._run_simple(query)
+```
+
+---
+
+### 5. CrÃ©er la MÃ©thode d'ExÃ©cution HTN
+
+**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
+
+**Code Ã  ajouter**:
+```python
+def _run_with_htn(self, user_query: str) -> Dict[str, Any]:
+    """
+    ExÃ©cute une requÃªte en utilisant le planificateur HTN
+    
+    Workflow:
+    1. Planification: DÃ©compose requÃªte en graphe de tÃ¢ches
+    2. ExÃ©cution: ExÃ©cute le plan avec parallÃ©lisation
+    3. VÃ©rification: Valide les rÃ©sultats
+    4. TraÃ§abilitÃ©: Enregistre Decision Record
+    5. Formatage: Construit la rÃ©ponse finale
+    
+    Args:
+        user_query: RequÃªte utilisateur complexe
+        
+    Returns:
+        Dict contenant:
+        - response: Texte de rÃ©ponse formatÃ©
+        - plan: DÃ©tails du plan HTN
+        - execution: RÃ©sultats d'exÃ©cution
+        - metadata: MÃ©tadonnÃ©es de traÃ§abilitÃ©
+        
+    Raises:
+        Exception: En cas d'erreur critique (propagÃ©e au caller)
+    """
+    logger.info(f"ðŸš€ ExÃ©cution HTN pour: {user_query}")
+    
+    # === 1. PLANIFICATION ===
+    plan_result = self.planner.plan(
+        query=user_query,
+        strategy=PlanningStrategy.HYBRID,  # Rule-based + LLM
+        context={
+            "conversation_id": self.conversation_id,
+            "user_id": getattr(self, "user_id", "unknown"),
+        },
+    )
+    
+    logger.info(f"ðŸ“‹ Plan crÃ©Ã©: {len(plan_result.graph.tasks)} tÃ¢ches, "
+                f"confiance={plan_result.confidence:.0%}")
+    
+    # === 2. ENREGISTREMENT DÃ‰CISION (ConformitÃ© Loi 25) ===
+    if hasattr(self, 'decision_manager'):
+        self.decision_manager.record_decision(
+            decision_type="htn_planning",
+            input_data={"query": user_query},
+            output_data={
+                "plan": plan_result.to_dict(),
+                "num_tasks": len(plan_result.graph.tasks),
+                "strategy": plan_result.strategy_used.value,
+            },
+            reasoning=plan_result.reasoning,
+            metadata={
+                "confidence": plan_result.confidence,
+                "htn_version": "1.0.0",
+            }
+        )
+    
+    # === 3. EXÃ‰CUTION ===
+    exec_result = self.executor.execute(
+        graph=plan_result.graph,
+        context={
+            "conversation_id": self.conversation_id,
+            "user_query": user_query,
+        },
+    )
+    
+    logger.info(f"âœ… ExÃ©cution terminÃ©e: {exec_result.completed_tasks}/{len(plan_result.graph.tasks)} "
+                f"rÃ©ussies en {exec_result.total_duration_ms:.0f}ms")
+    
+    # === 4. VÃ‰RIFICATION ===
+    verifications = self.verifier.verify_graph_results(
+        graph=plan_result.graph,
+        level=VerificationLevel.STRICT,
+    )
+    
+    failed_verifications = [
+        task_id for task_id, verif in verifications.items()
+        if not verif.passed
+    ]
+    
+    if failed_verifications:
+        logger.warning(f"âš ï¸  {len(failed_verifications)} vÃ©rifications Ã©chouÃ©es")
+    
+    # === 5. FORMATAGE RÃ‰PONSE ===
+    response = self._format_htn_response(
+        plan_result, exec_result, verifications
+    )
+    
+    return response
+```
+
+---
+
+### 6. CrÃ©er la MÃ©thode de Formatage
+
+**Emplacement**: Nouvelle mÃ©thode privÃ©e dans la classe `Agent`
+
+**Code Ã  ajouter**:
+```python
+def _format_htn_response(
+    self,
+    plan_result: "PlanningResult",
+    exec_result: "ExecutionResult",
+    verifications: Dict[str, "VerificationResult"],
+) -> Dict[str, Any]:
+    """
+    Formate la rÃ©ponse finale aprÃ¨s exÃ©cution HTN
+    
+    AgrÃ¨ge les rÃ©sultats de toutes les tÃ¢ches et gÃ©nÃ¨re une rÃ©ponse
+    cohÃ©rente pour l'utilisateur.
+    
+    Args:
+        plan_result: RÃ©sultat de la planification
+        exec_result: RÃ©sultat de l'exÃ©cution
+        verifications: RÃ©sultats des vÃ©rifications par task_id
+        
+    Returns:
+        Dict formatÃ© selon l'interface Agent standard
+    """
+    # AgrÃ©ger les rÃ©sultats des tÃ¢ches complÃ©tÃ©es
+    completed_tasks = []
+    for task in plan_result.graph.topological_sort():
+        if task.status.value == "completed":
+            completed_tasks.append({
+                "task_id": task.task_id,
+                "name": task.name,
+                "action": task.action,
+                "result": task.result,
+                "verified": verifications.get(task.task_id, None),
+            })
+    
+    # GÃ©nÃ©rer le texte de rÃ©ponse (simpliste pour l'instant)
+    if exec_result.success:
+        response_text = self._generate_success_message(completed_tasks)
+    else:
+        response_text = self._generate_failure_message(
+            exec_result.errors, 
+            exec_result.completed_tasks,
+            len(plan_result.graph.tasks)
+        )
+    
+    # Construire la rÃ©ponse complÃ¨te
+    return {
+        "response": response_text,
+        "plan": plan_result.to_dict(),
+        "execution": exec_result.to_dict(),
+        "verifications": {
+            k: v.to_dict() for k, v in verifications.items()
+        },
+        "metadata": {
+            "mode": "htn",
+            "planning_strategy": plan_result.strategy_used.value,
+            "execution_strategy": "adaptive",
+            "total_duration_ms": exec_result.total_duration_ms,
+            "success": exec_result.success,
+            "completed_tasks": exec_result.completed_tasks,
+            "failed_tasks": exec_result.failed_tasks,
+        },
+    }
+
+def _generate_success_message(self, completed_tasks: List[Dict]) -> str:
+    """GÃ©nÃ¨re message de succÃ¨s (version simple)"""
+    return f"âœ… Traitement terminÃ© avec succÃ¨s! {len(completed_tasks)} tÃ¢ches complÃ©tÃ©es."
+
+def _generate_failure_message(self, errors: Dict, completed: int, total: int) -> str:
+    """GÃ©nÃ¨re message d'erreur (version simple)"""
+    return f"âš ï¸  Traitement partiellement Ã©chouÃ©: {completed}/{total} tÃ¢ches rÃ©ussies."
+```
+
+---
+
+### 7. Modifier la MÃ©thode run() Principale
+
+**Emplacement**: MÃ©thode `run()` existante de la classe `Agent`
+
+**Modification Ã  effectuer**:
+```python
+def run(self, user_query: str) -> Dict[str, Any]:
+    """
+    Point d'entrÃ©e principal de l'agent
+    
+    COMPORTEMENT MODIFIÃ‰:
+    - Si HTN activÃ© ET requÃªte complexe â†’ Mode HTN
+    - Sinon â†’ Mode simple (comportement original)
+    - Fallback automatique si HTN Ã©choue
+    
+    Args:
+        user_query: RequÃªte utilisateur
+        
+    Returns:
+        RÃ©ponse formatÃ©e selon l'interface Agent
+    """
+    # === AJOUT: DÃ©tection et routage HTN ===
+    if self.htn_enabled and self._requires_htn(user_query):
+        logger.info("ðŸŽ¯ RequÃªte complexe dÃ©tectÃ©e â†’ Mode HTN")
+        try:
+            return self._run_with_htn(user_query)
+        except Exception as e:
+            logger.error(f"âŒ Erreur HTN: {e}", exc_info=True)
+            logger.warning("ðŸ”„ Fallback vers mode simple")
+            # Enregistrer l'Ã©chec pour monitoring
+            if hasattr(self, 'metrics'):
+                self.metrics.increment('htn_fallback_count')
+            # Continuer en mode simple (fallback gracieux)
+            return self._run_simple(user_query)
+    # === FIN AJOUT ===
+    
+    # Mode simple (code existant)
+    logger.info("â„¹ï¸  Mode simple (HTN non requis ou dÃ©sactivÃ©)")
+    return self._run_simple(user_query)
+```
+
+---
+
+## âœ… CRITÃˆRES DE SUCCÃˆS
+
+### Tests de Validation Minimaux
+
+Avant de considÃ©rer le task comme terminÃ©, vÃ©rifier:
+
+#### 1. Import et Initialisation
+```python
+# Test: Imports fonctionnent
+from runtime.agent import Agent
+# âœ… Pas d'erreur d'import
+
+# Test: Initialisation avec HTN dÃ©sactivÃ©
+config = {"htn_enabled": False}
+agent = Agent(config)
+assert agent.planner is None
+assert agent.executor is None
+# âœ… Mode simple fonctionne
+
+# Test: Initialisation avec HTN activÃ©
+config = {"htn_enabled": True}
+agent = Agent(config)
+assert agent.planner is not None
+assert agent.executor is not None
+# âœ… Composants HTN initialisÃ©s
+```
+
+#### 2. DÃ©tection de RequÃªtes
+```python
+# Test: RequÃªte simple
+assert not agent._requires_htn("Lis data.csv")
+# âœ… Mode simple dÃ©tectÃ©
+
+# Test: RequÃªte complexe
+assert agent._requires_htn("Lis data.csv, analyse les donnÃ©es, gÃ©nÃ¨re rapport")
+# âœ… Mode HTN dÃ©tectÃ©
+```
+
+#### 3. ExÃ©cution End-to-End
+```python
+# Test: Mode simple continue de fonctionner
+response = agent.run("Bonjour")
+assert response is not None
+# âœ… Aucune rÃ©gression
+
+# Test: Mode HTN avec fallback
+config = {"htn_enabled": True}
+agent = Agent(config)
+response = agent.run("RequÃªte complexe simulÃ©e")
+# âœ… Pas de crash (fallback si erreur)
+```
+
+### Checklist de Validation
+
+- [ ] âœ… Code ajoutÃ© compile sans erreur
+- [ ] âœ… Imports HTN fonctionnent
+- [ ] âœ… Agent s'initialise avec `htn_enabled=False`
+- [ ] âœ… Agent s'initialise avec `htn_enabled=True`
+- [ ] âœ… MÃ©thode `_requires_htn()` dÃ©tecte correctement
+- [ ] âœ… Registre d'actions construit sans erreur
+- [ ] âœ… Mode simple continue de fonctionner (aucune rÃ©gression)
+- [ ] âœ… Fallback fonctionne si HTN Ã©choue
+- [ ] âœ… Logs informatifs prÃ©sents
+- [ ] âœ… Code commentÃ© et documentÃ©
+
+---
+
+## ðŸš¨ CONTRAINTES ET GARDE-FOUS
+
+### RÃ¨gles de SÃ©curitÃ©
+
+1. **Ne JAMAIS casser le mode simple**
+   - Le code existant doit continuer de fonctionner
+   - Fallback systÃ©matique en cas d'erreur HTN
+
+2. **Feature flag obligatoire**
+   - HTN doit Ãªtre dÃ©sactivable via config
+   - DÃ©faut: `htn_enabled=False` (sÃ©curitÃ©)
+
+3. **Logs exhaustifs**
+   - Logger chaque dÃ©cision (HTN vs simple)
+   - Logger chaque erreur avec stack trace
+   - ConformitÃ© Loi 25: traÃ§abilitÃ© totale
+
+4. **Gestion d'erreurs robuste**
+   - Try-catch autour de chaque appel HTN
+   - Jamais propager d'exception au niveau supÃ©rieur
+   - Fallback gracieux systÃ©matique
+
+### Standards de Code FilAgent
+
+```python
+# âœ… BON: Logging dÃ©taillÃ©
+logger.info("ðŸš€ HTN Planning activÃ©")
+logger.error(f"âŒ Erreur HTN: {e}", exc_info=True)
+
+# âœ… BON: Docstrings complÃ¨tes
+def _requires_htn(self, query: str) -> bool:
+    """Documentation avec exemples..."""
+
+# âœ… BON: Type hints
+def run(self, user_query: str) -> Dict[str, Any]:
+
+# âŒ MAUVAIS: Pas de logs
+if htn_enabled: ...
+
+# âŒ MAUVAIS: Pas de docstring
+def _requires_htn(self, query):
+
+# âŒ MAUVAIS: Pas de type hints
+def run(self, query):
+```
+
+---
+
+## ðŸ“ NOTES D'IMPLÃ‰MENTATION
+
+### Ordre de DÃ©veloppement RecommandÃ©
+
+1. **Phase 1: Imports et structure** (30 min)
+   - Ajouter imports HTN
+   - CrÃ©er mÃ©thodes vides avec signatures
+
+2. **Phase 2: Initialisation** (1h)
+   - Coder `__init__` avec feature flag
+   - Tester initialisation basique
+
+3. **Phase 3: DÃ©tection** (1h)
+   - Coder `_requires_htn()`
+   - Tester avec cas simples et complexes
+
+4. **Phase 4: Registre d'actions** (1h)
+   - Coder `_build_action_registry()`
+   - Tester mapping des outils
+
+5. **Phase 5: ExÃ©cution HTN** (2h)
+   - Coder `_run_with_htn()`
+   - Coder `_format_htn_response()`
+   - Tester end-to-end simulÃ©
+
+6. **Phase 6: IntÃ©gration finale** (30 min)
+   - Modifier `run()` avec routage
+   - Tester avec requÃªtes rÃ©elles
+   - Valider fallback
+
+### Points d'Attention SpÃ©cifiques
+
+âš ï¸ **Closure dans `_build_action_registry()`**
+```python
+# âŒ MAUVAIS: Toutes les fonctions rÃ©fÃ©rencent le dernier outil
+for tool in tools:
+    registry[tool.name] = lambda params: tool.execute(**params)
+
+# âœ… BON: Factory avec closure correcte
+for tool in tools:
+    def create_wrapper(t):
+        return lambda params: t.execute(**params)
+    registry[tool.name] = create_wrapper(tool)
+```
+
+âš ï¸ **Config non prÃ©sent**
+```python
+# GÃ©rer le cas oÃ¹ config n'a pas les clÃ©s HTN
+self.htn_enabled = config.get("htn_enabled", False)  # DÃ©faut safe
+max_depth = config.get("htn_max_depth", 3)  # DÃ©faut raisonnable
+```
+
+âš ï¸ **Logging appropriÃ©**
+```python
+# Utiliser les emojis pour faciliter le debug
+logger.info("ðŸš€ ...")  # SuccÃ¨s / Lancement
+logger.warning("âš ï¸  ...") # Avertissement
+logger.error("âŒ ...")    # Erreur
+logger.debug("ðŸ” ...")    # Debug dÃ©taillÃ©
+```
+
+---
+
+## ðŸŽ¯ LIVRABLES ATTENDUS
+
+### 1. Code ModifiÃ©
+- `runtime/agent.py` avec toutes les modifications ci-dessus
+- Code propre, commentÃ©, conforme aux standards
+
+### 2. Tests Manuels RÃ©ussis
+- Initialisation HTN activÃ©/dÃ©sactivÃ©
+- DÃ©tection de requÃªtes simples/complexes
+- ExÃ©cution mode simple (aucune rÃ©gression)
+- Fallback en cas d'erreur
+
+### 3. Documentation
+- Commentaires inline pour chaque mÃ©thode
+- Docstrings complÃ¨tes
+- Logs informatifs
+
+---
+
+## ðŸ”— RESSOURCES
+
+### Fichiers de RÃ©fÃ©rence
+- `/Volumes/DevSSD/FilAgent/planner/README.md` - Documentation HTN
+- `/Volumes/DevSSD/FilAgent/planner/__init__.py` - Exports disponibles
+- `/Volumes/DevSSD/FilAgent/examples/htn_integration_example.py` - Exemple complet
+
+### Documentation Externe
+- Rapport d'analyse: `ANALYSE_HTN_FILAGENT.md`
+- SynthÃ¨se HTN: `SYNTHESE_HTN.md`
+
+---
+
+## ðŸš¦ STATUT DU TASK
+
+**Ã‰tat actuel**: ðŸŸ¡ **Ã€ FAIRE**
+
+**Prochaine action**: Commencer Phase 1 - Imports et structure
+
+**Bloqueurs**: Aucun
+
+---
+
+## ðŸ’¬ QUESTIONS / CLARIFICATIONS
+
+Si des questions se prÃ©sentent pendant l'implÃ©mentation:
+
+1. **Feature flag**: Est-ce que `config` est un dict ou un objet?
+   â†’ Utiliser `.get()` qui fonctionne pour les deux
+
+2. **Decision Manager**: Est-il toujours prÃ©sent?
+   â†’ VÃ©rifier avec `hasattr(self, 'decision_manager')`
+
+3. **Tools Registry**: Quelle est l'interface exacte?
+   â†’ Voir `tools/registry.py` pour la structure
+
+4. **Format de rÃ©ponse**: Quel est le format standard de `run()`?
+   â†’ Dict avec clÃ© `response` minimalement
+
+---
+
+**Task crÃ©Ã© le**: 4 novembre 2025  
+**DerniÃ¨re mise Ã  jour**: 4 novembre 2025  
+**Auteur**: Claude (Anthropic) via Fil  
+**Version**: 1.0.0
 
 
 
