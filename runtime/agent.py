@@ -547,21 +547,19 @@ class Agent:
         """Assembler le contexte et le dernier message utilisateur pour le modèle."""
         context = context.strip()
         message = message.strip()
+        if not context:
+            return f"Utilisateur: {message}\nAssistant:"
         return f"{context}\n\nUtilisateur: {message}\nAssistant:"
     
     def _build_context(self, history: List[Dict], conversation_id: str, task_id: Optional[str]) -> str:
-        """Construire le contexte pour le modèle"""
-        context = f"Conversation ID: {conversation_id}\n"
-        if task_id:
-            context += f"Task ID: {task_id}\n"
-        
-        context += "\nHistorique:\n"
+        """Construire le contexte conversationnel pour le modèle."""
+        context_messages = []
         for msg in history[-10:]:  # 10 derniers messages
-            role = msg['role']
-            content = msg['content']
-            context += f"{role}: {content}\n"
+            role = "Utilisateur" if msg["role"] == "user" else "Assistant"
+            content = msg["content"]
+            context_messages.append(f"{role}: {content}")
         
-        return context
+        return "\n".join(context_messages)
     
     def _get_system_prompt(self) -> str:
         """Retourner le prompt système avec les outils disponibles"""
