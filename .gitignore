@@ -74,3 +74,8 @@ htmlcov/
 # Divers
 *.log
 temp/
+
+# Données et secrets (compliance)
+/data/
+/logs/
+/secrets/

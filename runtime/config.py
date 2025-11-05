@@ -89,6 +89,19 @@ class HTNVerificationConfig(BaseModel):
     custom_verifiers: list[str] = Field(default_factory=list)
 
 
+class ComplianceGuardianConfig(BaseModel):
+    """Configuration du ComplianceGuardian"""
+    enabled: bool = True
+    rules_path: str = "config/compliance_rules.yaml"
+    validate_queries: bool = True
+    validate_plans: bool = True
+    audit_executions: bool = True
+    auto_generate_dr: bool = True
+    strict_mode: bool = True
+    log_compliance_events: bool = True
+    active_frameworks: list[str] = Field(default_factory=lambda: ["loi25", "gdpr", "ai_act", "nist_ai_rmf"])
+
+
 class AgentConfig(BaseModel):
     """Configuration principale de l'agent"""
     name: str = "llmagenta"
@@ -103,6 +116,7 @@ class AgentConfig(BaseModel):
     htn_planning: Optional[HTNPlanningConfig] = None
     htn_execution: Optional[HTNExecutionConfig] = None
     htn_verification: Optional[HTNVerificationConfig] = None
+    compliance_guardian: Optional[ComplianceGuardianConfig] = None
 
     @classmethod
     def load(cls, config_dir: str = "config") -> "AgentConfig":
@@ -126,6 +140,7 @@ class AgentConfig(BaseModel):
         htn_planning_data = raw_config.get('htn_planning', {})
         htn_execution_data = raw_config.get('htn_execution', {})
         htn_verification_data = raw_config.get('htn_verification', {})
+        compliance_guardian_data = raw_config.get('compliance_guardian', {})
         
         # Adapter la configuration mémoire pour supporter les structures imbriquées
         memory_kwargs: Dict[str, Any] = {}
@@ -168,6 +183,9 @@ class AgentConfig(BaseModel):
         htn_execution_config = HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
         htn_verification_config = HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
         
+        # Configuration ComplianceGuardian optionnelle
+        compliance_guardian_config = ComplianceGuardianConfig(**compliance_guardian_data) if compliance_guardian_data else None
+        
         return cls(
             name=agent_data.get('name', 'llmagenta'),
             version=agent_data.get('version', '0.1.0'),
@@ -181,6 +199,7 @@ class AgentConfig(BaseModel):
             htn_planning=htn_planning_config,
             htn_execution=htn_execution_config,
             htn_verification=htn_verification_config,
+            compliance_guardian=compliance_guardian_config,
         )
 
     @property

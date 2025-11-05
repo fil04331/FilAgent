@@ -65,6 +65,19 @@ class Agent:
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
         
+        # Initialiser le ComplianceGuardian
+        try:
+            from planner.compliance_guardian import ComplianceGuardian
+            cg_config = getattr(self.config, 'compliance_guardian', None)
+            if cg_config and cg_config.enabled:
+                self.compliance_guardian = ComplianceGuardian(config_path=cg_config.rules_path)
+                print("✓ ComplianceGuardian initialized")
+            else:
+                self.compliance_guardian = None
+        except Exception as e:
+            print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+            self.compliance_guardian = None
+        
         # Initialiser le planificateur HTN (sera configuré après initialisation du modèle)
         self.planner = None
         self.executor = None
@@ -208,6 +221,25 @@ class Agent:
         # Rafraîchir les middlewares patchables
         self._refresh_middlewares()
         
+        # COMPLIANCE: Valider la requête avant planification
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.validate_queries:
+                    context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                        'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
+                    }
+                    self.compliance_guardian.validate_query(user_query, context)
+            except Exception as e:
+                # En mode strict, propager l'erreur
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.strict_mode:
+                    raise
+                else:
+                    print(f"⚠ Compliance validation warning: {e}")
+        
         # Métriques: enregistrer requête HTN
         from planner.metrics import get_metrics
         metrics = get_metrics()
@@ -240,6 +272,25 @@ class Agent:
             context={"conversation_id": conversation_id, "task_id": task_id},
         )
         
+        # COMPLIANCE: Valider le plan d'exécution
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.validate_plans:
+                    plan_dict = plan_result.to_dict() if hasattr(plan_result, 'to_dict') else {'graph': plan_result.graph}
+                    context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.validate_execution_plan(plan_dict, context)
+            except Exception as e:
+                # En mode strict, propager l'erreur
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.strict_mode:
+                    raise
+                else:
+                    print(f"⚠ Plan validation warning: {e}")
+        
         # Log decision record (conformité Loi 25)
         if self.dr_manager:
             try:
@@ -266,6 +317,48 @@ class Agent:
             graph=plan_result.graph,
             context={"conversation_id": conversation_id, "task_id": task_id},
         )
+        
+        # COMPLIANCE: Auditer l'exécution
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.audit_executions:
+                    exec_dict = exec_result.to_dict() if hasattr(exec_result, 'to_dict') else {
+                        'success': exec_result.success,
+                        'errors': getattr(exec_result, 'errors', [])
+                    }
+                    context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.audit_execution(exec_dict, context)
+            except Exception as e:
+                print(f"⚠ Execution audit warning: {e}")
+        
+        # COMPLIANCE: Générer Decision Record si configuré
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.auto_generate_dr:
+                    plan_dict = plan_result.to_dict() if hasattr(plan_result, 'to_dict') else {'graph': plan_result.graph}
+                    exec_dict = exec_result.to_dict() if hasattr(exec_result, 'to_dict') else {
+                        'success': exec_result.success,
+                        'errors': getattr(exec_result, 'errors', [])
+                    }
+                    context = {
+                        'actor': 'agent.core',
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.generate_decision_record(
+                        decision_type='htn_execution',
+                        query=user_query,
+                        plan=plan_dict,
+                        execution_result=exec_dict,
+                        context=context
+                    )
+            except Exception as e:
+                print(f"⚠ Decision record generation warning: {e}")
         
         # 3. Vérifier
         verif_config = getattr(self.config, 'htn_verification', None)
@@ -297,6 +390,25 @@ class Agent:
         
         # Rafraîchir les middlewares patchables (important pour les tests)
         self._refresh_middlewares()
+
+        # COMPLIANCE: Valider la requête avant exécution
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.validate_queries:
+                    context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                        'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
+                    }
+                    self.compliance_guardian.validate_query(message, context)
+            except Exception as e:
+                # En mode strict, propager l'erreur
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.strict_mode:
+                    raise
+                else:
+                    print(f"⚠ Compliance validation warning: {e}")
 
         # Logger le début de la conversation (avec fallback)
         if self.logger:
@@ -529,6 +641,48 @@ class Agent:
                         print(f"⚠ Failed to log dr.created event: {e}")
             except Exception as e:
                 print(f"⚠ Failed to create decision record: {e}")
+
+        # COMPLIANCE: Auditer l'exécution et générer Decision Record
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                
+                # Auditer l'exécution
+                if cg_config and cg_config.audit_executions:
+                    exec_result = {
+                        'success': final_response is not None and "Erreur" not in final_response,
+                        'errors': [] if final_response is not None else ['No response generated']
+                    }
+                    audit_context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.audit_execution(exec_result, audit_context)
+                
+                # Générer Decision Record
+                if cg_config and cg_config.auto_generate_dr:
+                    plan = {
+                        'actions': [{'tool': tool, 'params': {}} for tool in unique_tools],
+                        'tools_used': unique_tools
+                    }
+                    exec_result = {
+                        'success': final_response is not None and "Erreur" not in final_response,
+                        'errors': [] if final_response is not None else ['No response generated']
+                    }
+                    dr_context = {
+                        'actor': 'agent.core',
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.generate_decision_record(
+                        decision_type='simple_execution',
+                        query=message,
+                        plan=plan,
+                        execution_result=exec_result,
+                        context=dr_context
+                    )
+            except Exception as e:
+                print(f"⚠ Compliance audit/DR generation warning: {e}")
 
         if self.logger:
             try:

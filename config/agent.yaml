@@ -357,7 +357,47 @@ integrations:
 
 
 # ============================================================================
-# SECTION 10: ENVIRONNEMENTS
+# SECTION 10: COMPLIANCE GUARDIAN
+# ============================================================================
+# Configuration du ComplianceGuardian pour conformité réglementaire
+# Conformité: Loi 25, RGPD, AI Act, NIST AI RMF
+
+compliance_guardian:
+  # Activer le ComplianceGuardian
+  enabled: true
+  
+  # Chemin vers le fichier de règles de conformité
+  rules_path: "config/compliance_rules.yaml"
+  
+  # Validation des requêtes avant traitement
+  validate_queries: true
+  
+  # Validation des plans d'exécution
+  validate_plans: true
+  
+  # Audit des exécutions
+  audit_executions: true
+  
+  # Génération automatique de Decision Records
+  auto_generate_dr: true
+  
+  # Mode strict: rejeter immédiatement en cas de violation
+  # Si false, émettre seulement des warnings
+  strict_mode: true
+  
+  # Logger les événements de conformité
+  log_compliance_events: true
+  
+  # Frameworks de conformité actifs
+  active_frameworks:
+    - loi25
+    - gdpr
+    - ai_act
+    - nist_ai_rmf
+
+
+# ============================================================================
+# SECTION 11: ENVIRONNEMENTS
 # ============================================================================
 # Configurations spécifiques par environnement
 # Note: Les valeurs ci-dessous peuvent être surchargées par
@@ -372,6 +412,8 @@ environments:
       level: "DEBUG"
     performance:
       max_workers: 2  # Moins de charge sur machine dev
+    compliance_guardian:
+      strict_mode: false  # Plus permissif en dev
 
   # Configuration pour tests
   testing:
@@ -383,6 +425,8 @@ environments:
       timeout_per_task_sec: 10  # Tests rapides
     verifier:
       default_level: "paranoid"  # Validation maximale
+    compliance_guardian:
+      strict_mode: true  # Tester en mode strict
 
   # Configuration pour production
   production:
@@ -402,10 +446,14 @@ environments:
     performance:
       max_workers: 4
       enable_plan_caching: true
+    compliance_guardian:
+      enabled: true
+      strict_mode: true
+      auto_generate_dr: true
 
 
 # ============================================================================
-# SECTION 11: MÉTADONNÉES
+# SECTION 12: MÉTADONNÉES
 # ============================================================================
 # Informations sur ce fichier de configuration
 
