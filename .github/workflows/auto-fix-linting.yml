@@ -1,0 +1,60 @@
+# Nom du workflow : Agent d'auto-réparation du linting
+name: Auto-fix Python Linting
+
+# Déclencheur : se lance à la fin du workflow "Python Linter" s'il a échoué
+on:
+  workflow_run:
+    workflows: ["Python Linter"]
+    types:
+      - completed
+
+# Permissions nécessaires pour lire et écrire dans le dépôt
+permissions:
+  contents: write
+
+jobs:
+  auto-fix:
+    # Ne s'exécute que si le workflow "Python Linter" a échoué
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      # Étape 1: Récupère le code de la branche qui a provoqué l'échec
+      - name: Checkout code from failed branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Étape 2: Configure l'environnement Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # Étape 3: Installe black
+      - name: Install black
+        run: |
+          python -m pip install --upgrade pip
+          pip install black
+
+      # Étape 4: Exécute black pour formater le code
+      - name: Run black formatter
+        run: |
+          black .
+
+      # Étape 5: Vérifie s'il y a des modifications
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code || echo "changes=true" >> $GITHUB_OUTPUT
+
+      # Étape 6: Commit et push les modifications (uniquement s'il y en a)
+      - name: Commit and push changes
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .
+          git commit -m "style: Auto-format Python code with black"
+          git push
