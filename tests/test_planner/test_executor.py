@@ -12,23 +12,14 @@ Exécution:
     pytest tests/test_planner/test_executor.py -v
 """
 
-import pytest
 import time
-from unittest.mock import Mock, MagicMock, patch
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import MagicMock, Mock, patch
 
-from planner.executor import (
-    TaskExecutor,
-    ExecutionStrategy,
-    ExecutionResult,
-    ExecutionError,
-)
-from planner.task_graph import (
-    TaskGraph,
-    Task,
-    TaskStatus,
-    TaskPriority,
-)
+import pytest
+
+from planner.executor import ExecutionError, ExecutionResult, ExecutionStrategy, TaskExecutor
+from planner.task_graph import Task, TaskGraph, TaskPriority, TaskStatus
 
 
 class TestTaskExecutor:

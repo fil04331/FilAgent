@@ -4,9 +4,9 @@ Supporte llama.cpp et vLLM (optionnel)
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List, Optional
 
 __all__ = [
     "ModelInterface",

@@ -15,20 +15,20 @@ import sys
 
 sys.path.insert(0, "/Volumes/DevSSD/FilAgent")
 
+import json
+from datetime import datetime, timezone
+
 from planner import (
+    ExecutionStrategy,
     HierarchicalPlanner,
-    TaskExecutor,
-    TaskVerifier,
+    PlanningStrategy,
     Task,
+    TaskExecutor,
     TaskGraph,
     TaskPriority,
-    PlanningStrategy,
-    ExecutionStrategy,
+    TaskVerifier,
     VerificationLevel,
 )
-from datetime import datetime, timezone
-import json
-
 
 # ============================================================================
 # MOCK: Actions simulées pour l'exemple

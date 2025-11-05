@@ -15,9 +15,9 @@ Usage:
     python3 scripts/validate_prometheus_setup.py [--check-prometheus] [--check-alerts]
 """
 
-import sys
-import os
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 

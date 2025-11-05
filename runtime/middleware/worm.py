@@ -1,12 +1,12 @@
 """Middleware WORM (Write Once Read Many) pour les journaux append-only."""
 
+import hashlib
 import json
 import os
-import hashlib
+import threading
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-from datetime import datetime
-import threading
 
 
 class MerkleNode:

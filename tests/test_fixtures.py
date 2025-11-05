@@ -7,14 +7,14 @@ This module tests that fixtures properly:
 - Provide correct types and interfaces
 """
 
-import pytest
 import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from runtime.model_interface import GenerationConfig
 from tools.base import ToolStatus
-
 
 # Mark all tests in this module as fixture tests
 pytestmark = pytest.mark.fixtures

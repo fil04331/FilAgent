@@ -2,16 +2,17 @@
 Tests pour les outils
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tools.base import ToolResult, ToolStatus
-from tools.python_sandbox import PythonSandboxTool
 from tools.calculator import CalculatorTool
 from tools.file_reader import FileReaderTool
+from tools.python_sandbox import PythonSandboxTool
 
 
 def test_python_sandbox_basic():

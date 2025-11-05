@@ -14,16 +14,16 @@ Conformité:
 - Logs structurés pour auditabilité (RGPD)
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Dict, Optional, Any
-from datetime import datetime
 import json
 import re
-
-from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError
-from .metrics import get_metrics
 import time
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from .metrics import get_metrics
+from .task_graph import Task, TaskDecompositionError, TaskGraph, TaskPriority
 
 
 class PlanningStrategy(str, Enum):

@@ -10,9 +10,11 @@ Exécution:
     pytest tests/test_planner/test_task_graph.py -v
 """
 
-import pytest
 from datetime import datetime
-from planner.task_graph import Task, TaskGraph, TaskStatus, TaskPriority, TaskDecompositionError
+
+import pytest
+
+from planner.task_graph import Task, TaskDecompositionError, TaskGraph, TaskPriority, TaskStatus
 
 
 class TestTask:

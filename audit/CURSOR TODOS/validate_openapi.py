@@ -4,11 +4,12 @@ Script de validation du spec OpenAPI pour FilAgent
 Vérifie la conformité syntaxique et sémantique du fichier openapi.yaml
 """
 
+import json
 import sys
-import yaml
 from pathlib import Path
 from typing import Dict, List, Tuple
-import json
+
+import yaml
 
 
 def load_openapi_spec(spec_path: Path) -> Tuple[Dict, List[str]]:

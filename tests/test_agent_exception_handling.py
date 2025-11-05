@@ -2,11 +2,12 @@
 Tests for exception handling in Agent
 """
 
-import pytest
 import sys
+from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock, patch
-from io import StringIO
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

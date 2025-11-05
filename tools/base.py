@@ -4,9 +4,9 @@ Tous les outils doivent hériter de cette classe
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, Optional
 
 
 class ToolStatus(Enum):

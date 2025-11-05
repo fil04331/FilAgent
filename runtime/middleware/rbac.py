@@ -3,10 +3,11 @@ Middleware RBAC (Role-Based Access Control)
 Gestion des rôles et permissions selon config/policies.yaml
 """
 
-import yaml
-from typing import Dict, List, Optional
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import yaml
 
 
 @dataclass

@@ -13,11 +13,12 @@ Usage:
     pytest tests/test_scripts_prometheus.py -v
 """
 
-import pytest
-import sys
 import os
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 # Ajouter le répertoire racine au path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

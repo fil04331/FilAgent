@@ -3,12 +3,13 @@ Gestionnaire de rétention des données
 Applique les politiques de TTL et de purge automatique
 """
 
-import yaml
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-import shutil
 import json
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import yaml
 
 
 class RetentionPolicy:

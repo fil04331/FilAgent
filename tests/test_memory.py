@@ -2,17 +2,17 @@
 Tests pour la mémoire épisodique
 """
 
-import pytest
 import os
+import sys
 import tempfile
 from pathlib import Path
-import sys
+
+import pytest
 
 # Ajouter le parent au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from memory.episodic import create_tables, add_message, get_messages, cleanup_old_conversations
-
+from memory.episodic import add_message, cleanup_old_conversations, create_tables, get_messages
 
 # Note: temp_db fixture is now defined in conftest.py with proper DB_PATH patching
 

@@ -13,18 +13,12 @@ Exécution:
     pytest tests/test_planner/test_verifier.py -v
 """
 
-import pytest
 from unittest.mock import Mock
-from planner.verifier import (
-    TaskVerifier,
-    VerificationLevel,
-    VerificationResult,
-)
-from planner.task_graph import (
-    Task,
-    TaskStatus,
-    TaskPriority,
-)
+
+import pytest
+
+from planner.task_graph import Task, TaskPriority, TaskStatus
+from planner.verifier import TaskVerifier, VerificationLevel, VerificationResult
 
 
 class TestTaskVerifier:

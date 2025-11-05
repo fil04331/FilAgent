@@ -9,12 +9,12 @@ Usage:
     python3 scripts/generate_test_metrics.py [--count N] [--delay D]
 """
 
-import sys
-import os
-import time
 import argparse
-from pathlib import Path
+import os
+import sys
+import time
 from datetime import datetime
+from pathlib import Path
 
 # Import requests (optionnel, avec message d'erreur clair)
 try:

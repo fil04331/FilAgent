@@ -18,11 +18,12 @@ Niveaux de validation:
 - PARANOID: Vérifications exhaustives (sémantique, cohérence)
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Dict, Optional, Any, Callable
-from datetime import datetime
 import json
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
+
 from .metrics import get_metrics
 
 

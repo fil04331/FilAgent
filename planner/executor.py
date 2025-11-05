@@ -18,16 +18,16 @@ Conformité:
 - Provenance tracking (W3C PROV)
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Dict, Optional, Any, Callable
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
-import traceback
 import time
+import traceback
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
-from .task_graph import Task, TaskGraph, TaskStatus, TaskPriority
 from .metrics import get_metrics
+from .task_graph import Task, TaskGraph, TaskPriority, TaskStatus
 
 
 class ExecutionStrategy(str, Enum):

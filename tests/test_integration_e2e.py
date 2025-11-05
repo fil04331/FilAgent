@@ -7,17 +7,17 @@ Ce module teste les flux complets:
 - Intégration complète de tous les composants
 """
 
-import pytest
 import json
-import time
 import sqlite3
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+import time
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from runtime.model_interface import GenerationResult, GenerationConfig
+import pytest
+
+from runtime.model_interface import GenerationConfig, GenerationResult
 from tools.base import ToolResult, ToolStatus
-
 
 # ============================================================================
 # TESTS E2E: Flux Complet Chat → Génération → Outils → DR → Provenance

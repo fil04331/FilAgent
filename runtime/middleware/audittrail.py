@@ -3,13 +3,14 @@ Middleware pour Decision Records (DR)
 Génération de DR signés pour traçabilité décisionnelle
 """
 
-import json
 import hashlib
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-from pathlib import Path
+import json
 import threading
-from cryptography.hazmat.primitives import serialization, hashes
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 

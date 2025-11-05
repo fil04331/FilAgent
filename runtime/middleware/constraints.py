@@ -3,11 +3,12 @@ Middleware de contraintes et validation des sorties
 Guardrails avec regex, JSONSchema, et blocklist
 """
 
-import re
 import json
-from typing import Dict, Any, Optional, List
-from jsonschema import validate, ValidationError
+import re
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from jsonschema import ValidationError, validate
 
 
 class Guardrail:
@@ -86,8 +87,9 @@ class ConstraintsEngine:
 
     def _load_guardrails(self):
         """Charger les guardrails depuis la configuration"""
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         if not Path(self.config_path).exists():
             return

@@ -3,12 +3,12 @@ Middleware de provenance PROV-JSON
 Traçabilité des artefacts selon le standard W3C PROV
 """
 
-import json
 import hashlib
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-from pathlib import Path
+import json
 import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 
 class ProvBuilder:

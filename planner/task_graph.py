@@ -13,12 +13,12 @@ Complexité:
 - Tri topologique: O(V + E)
 """
 
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from typing import List, Dict, Set, Optional, Any
-from datetime import datetime
-import uuid
 import json
+import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 
 class TaskStatus(str, Enum):

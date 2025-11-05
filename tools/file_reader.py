@@ -3,8 +3,8 @@ Outil pour lire des fichiers de manière sécurisée
 Avec allowlist et validation de chemins
 """
 
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 from .base import BaseTool, ToolResult, ToolStatus
 

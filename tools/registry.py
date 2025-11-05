@@ -4,10 +4,11 @@ Permet de gérer et récupérer les outils de manière centralisée
 """
 
 from typing import Dict, Optional
+
 from .base import BaseTool
-from .python_sandbox import PythonSandboxTool
-from .file_reader import FileReaderTool
 from .calculator import CalculatorTool
+from .file_reader import FileReaderTool
+from .python_sandbox import PythonSandboxTool
 
 
 class ToolRegistry:

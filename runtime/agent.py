@@ -3,34 +3,36 @@ Agent core : Intègre le modèle et les outils
 Gère les boucles de raisonnement et les appels d'outils
 """
 
+import hashlib
 import json
 import re
-import hashlib
 import textwrap
-from typing import List, Dict, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from .config import get_config
-from .model_interface import GenerationConfig, GenerationResult, init_model as _init_model
 from memory.episodic import add_message, get_messages
-from tools.registry import get_registry
-from tools.base import BaseTool, ToolResult, ToolStatus
-
-# Import des middlewares de conformité
-from .middleware.logging import get_logger
-from .middleware.audittrail import get_dr_manager
-from .middleware.provenance import get_tracker
 
 # Import du planificateur HTN
 from planner import (
+    ExecutionStrategy,
     HierarchicalPlanner,
+    PlanningStrategy,
     TaskExecutor,
     TaskVerifier,
-    PlanningStrategy,
-    ExecutionStrategy,
     VerificationLevel,
 )
 from planner.task_graph import TaskStatus
+from tools.base import BaseTool, ToolResult, ToolStatus
+from tools.registry import get_registry
+
+from .config import get_config
+from .middleware.audittrail import get_dr_manager
+
+# Import des middlewares de conformité
+from .middleware.logging import get_logger
+from .middleware.provenance import get_tracker
+from .model_interface import GenerationConfig, GenerationResult
+from .model_interface import init_model as _init_model
 
 
 class Agent:
@@ -80,8 +82,8 @@ class Agent:
 
     def _refresh_middlewares(self):
         """Synchroniser logger, DR manager et tracker avec les singletons (patchables)."""
-        from .middleware import logging as logging_mw
         from .middleware import audittrail as audittrail_mw
+        from .middleware import logging as logging_mw
         from .middleware import provenance as provenance_mw
 
         try:

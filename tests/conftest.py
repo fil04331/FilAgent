@@ -18,19 +18,19 @@ Organization:
 - Cleanup & Teardown: Automatic cleanup fixtures
 """
 
-import os
-import sys
 import json
+import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 import threading
 import time
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Generator
-from datetime import datetime
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Generator, List, Optional
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -44,6 +44,7 @@ from fastapi.testclient import TestClient
 def start_fastapi_server() -> Generator[None, None, None]:
     """Démarrer l'API FastAPI dans un thread pour les tests de contrat."""
     import uvicorn
+
     from runtime.server import app
 
     config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="warning")
@@ -71,10 +72,9 @@ def start_fastapi_server() -> Generator[None, None, None]:
 # Ajouter le répertoire parent au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from runtime.model_interface import GenerationResult, GenerationConfig
 from runtime.config import AgentConfig
+from runtime.model_interface import GenerationConfig, GenerationResult
 from tools.base import ToolResult, ToolStatus
-
 
 # ============================================================================
 # FIXTURES: Mock Models

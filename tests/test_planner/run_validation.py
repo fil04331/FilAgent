@@ -10,8 +10,8 @@ Usage:
     python3 tests/test_planner/run_validation.py
 """
 
-import sys
 import os
+import sys
 
 # Ajouter le répertoire racine au path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -45,7 +45,7 @@ def test_planner_validation():
         print(f"✓ Planification HYBRID OK ({len(result2.graph.tasks)} tâches)")
 
         # Test validation
-        from planner.task_graph import TaskGraph, Task
+        from planner.task_graph import Task, TaskGraph
 
         empty_graph = TaskGraph()
         try:
@@ -69,8 +69,8 @@ def test_executor_validation():
     print("VALIDATION: TaskExecutor")
     print("=" * 70)
 
-    from planner import TaskExecutor, ExecutionStrategy
-    from planner.task_graph import TaskGraph, Task, TaskStatus
+    from planner import ExecutionStrategy, TaskExecutor
+    from planner.task_graph import Task, TaskGraph, TaskStatus
 
     try:
         # Test initialisation
@@ -171,14 +171,14 @@ def test_integration_validation():
     print("=" * 70)
 
     from planner import (
+        ExecutionStrategy,
         HierarchicalPlanner,
+        PlanningStrategy,
         TaskExecutor,
         TaskVerifier,
-        PlanningStrategy,
-        ExecutionStrategy,
         VerificationLevel,
     )
-    from planner.task_graph import TaskGraph, Task, TaskStatus
+    from planner.task_graph import Task, TaskGraph, TaskStatus
 
     try:
         # 1. Planifier

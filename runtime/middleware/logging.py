@@ -1,12 +1,12 @@
 """Middleware de journalisation JSONL compatible OpenTelemetry et WORM."""
 
+import hashlib
 import json
 import os
-from datetime import datetime
-from typing import Dict, Any, Optional
-from pathlib import Path
 import threading
-import hashlib
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from .worm import get_worm_logger
 

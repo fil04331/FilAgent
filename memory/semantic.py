@@ -3,11 +3,12 @@ Mémoire sémantique pour recherche de connaissances à long terme
 Utilise FAISS pour l'indexation vectorielle et sentence-transformers pour les embeddings
 """
 
-import json
 import hashlib
+import json
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
 try:

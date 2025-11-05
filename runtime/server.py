@@ -3,24 +3,26 @@ Serveur API pour l'agent LLM
 Compatible avec le format OpenAI pour faciliter l'intégration
 """
 
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import List, Optional
+
+import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
-from pathlib import Path
-import json
-import yaml
 
-from .config import get_config
+from memory.episodic import get_connection, get_messages
+
 from .agent import get_agent
-from memory.episodic import get_messages, get_connection
+from .config import get_config
 from .middleware.logging import get_logger
 from .middleware.worm import get_worm_logger
 
 # Import Prometheus metrics (optionnel)
 try:
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:

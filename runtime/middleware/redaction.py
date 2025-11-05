@@ -4,8 +4,9 @@ Masquage automatique des données sensibles selon config/policies.yaml
 """
 
 import re
-from typing import Dict, List, Optional
 from pathlib import Path
+from typing import Dict, List, Optional
+
 import yaml
 
 

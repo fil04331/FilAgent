@@ -2,11 +2,12 @@
 Tests for agent code quality improvements
 """
 
-import pytest
 import sys
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -54,9 +55,10 @@ def test_agent_exception_logging(capfd):
 
 def test_tool_execution_timing():
     """Test that tool execution timing is captured correctly"""
+    import time
+
     from runtime.agent import Agent
     from tools.base import ToolResult, ToolStatus
-    import time
 
     agent = Agent()
     agent.model = Mock()
@@ -114,8 +116,9 @@ def test_tool_execution_timing():
 
 def test_health_check_no_directory_creation(tmp_path):
     """Test that health check doesn't create directories"""
-    from runtime.server import health
     from pathlib import Path
+
+    from runtime.server import health
 
     # Create a non-existent directory path
     non_existent_dir = tmp_path / "should_not_be_created"

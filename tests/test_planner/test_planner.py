@@ -12,19 +12,12 @@ Exécution:
     pytest tests/test_planner/test_planner.py -v
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from planner.planner import (
-    HierarchicalPlanner,
-    PlanningStrategy,
-    PlanningResult,
-)
-from planner.task_graph import (
-    TaskGraph,
-    Task,
-    TaskPriority,
-    TaskDecompositionError,
-)
+
+from planner.planner import HierarchicalPlanner, PlanningResult, PlanningStrategy
+from planner.task_graph import Task, TaskDecompositionError, TaskGraph, TaskPriority
 
 
 class TestHierarchicalPlanner:

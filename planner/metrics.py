@@ -14,13 +14,13 @@ Usage:
     metrics.record_planning(...)
 """
 
-from typing import Optional, Dict, Any
-from datetime import datetime
 import time
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 # Try to import prometheus_client, but make it optional
 try:
-    from prometheus_client import Counter, Histogram, Gauge, Summary, Info
+    from prometheus_client import Counter, Gauge, Histogram, Info, Summary
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:

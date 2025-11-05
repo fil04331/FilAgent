@@ -5,8 +5,8 @@ Calculateur mathématique sécurisé
 
 import math
 import operator
-from typing import Dict, Any, Optional
 import re
+from typing import Any, Dict, Optional
 
 from .base import BaseTool, ToolResult, ToolStatus
 

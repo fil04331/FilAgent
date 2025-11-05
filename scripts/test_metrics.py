@@ -6,8 +6,8 @@ Usage:
     python3 scripts/test_metrics.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Import requests (optionnel, avec message d'erreur clair)

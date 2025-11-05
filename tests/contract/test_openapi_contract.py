@@ -1,6 +1,7 @@
 """Tests de contrat minimaux (smoke) contre l'API servie."""
 
 import time
+
 import requests
 
 

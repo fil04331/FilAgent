@@ -9,17 +9,17 @@ Ce module teste:
 - Politiques RBAC et PII
 """
 
-import pytest
-import json
 import hashlib
-from pathlib import Path
+import json
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from runtime.middleware.worm import MerkleTree, WormLogger
+import pytest
+
 from runtime.middleware.audittrail import DRManager
 from runtime.middleware.provenance import ProvBuilder, ProvenanceTracker
-
+from runtime.middleware.worm import MerkleTree, WormLogger
 
 # ============================================================================
 # TESTS: WORM Integrity (Write-Once-Read-Many)
@@ -276,9 +276,10 @@ def test_dr_signature_verification(isolated_fs):
     - La signature peut être vérifiée
     - Détection de tampering
     """
-    from cryptography.hazmat.primitives.asymmetric import ed25519
-    from cryptography.hazmat.primitives import serialization
     import base64
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
 
     dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 
@@ -326,8 +327,9 @@ def test_dr_tampering_detection(isolated_fs):
     - Modification détectée
     - Signature invalide après modification
     """
-    from cryptography.hazmat.primitives.asymmetric import ed25519
     import base64
+
+    from cryptography.hazmat.primitives.asymmetric import ed25519
 
     dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 

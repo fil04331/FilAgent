@@ -12,14 +12,11 @@ Exécution:
     pytest tests/test_planner/test_agent_htn_integration.py -v
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from planner import (
-    HierarchicalPlanner,
-    PlanningStrategy,
-    ExecutionStrategy,
-    VerificationLevel,
-)
+
+from planner import ExecutionStrategy, HierarchicalPlanner, PlanningStrategy, VerificationLevel
 from planner.task_graph import TaskStatus
 
 
@@ -133,9 +130,9 @@ class TestAgentHTNIntegration:
     @patch("runtime.model_interface.init_model")
     def test_agent_run_with_htn(self, mock_init_model, mock_get_config):
         """Test exécution avec HTN"""
-        from runtime.agent import Agent
-        from planner.task_graph import Task, TaskGraph, TaskPriority
         from planner.planner import PlanningResult
+        from planner.task_graph import Task, TaskGraph, TaskPriority
+        from runtime.agent import Agent
 
         # Mock configuration
         mock_config = Mock()
@@ -257,10 +254,10 @@ class TestAgentHTNErrorHandling:
     @patch("runtime.model_interface.init_model")
     def test_agent_htn_execution_failure_fallback(self, mock_init_model, mock_get_config):
         """Test fallback sur mode simple si HTN échoue"""
-        from runtime.agent import Agent
-        from planner.task_graph import TaskGraph
-        from planner.planner import PlanningResult
         from planner.executor import ExecutionResult
+        from planner.planner import PlanningResult
+        from planner.task_graph import TaskGraph
+        from runtime.agent import Agent
 
         # Mock configuration
         mock_config = Mock()

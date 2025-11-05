@@ -3,11 +3,11 @@ Classe de base pour les benchmarks d'évaluation
 Interface commune pour tous les harness de tests
 """
 
+import json
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
-import json
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
