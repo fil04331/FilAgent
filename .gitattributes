@@ -1,0 +1,100 @@
+# Git attributes for FilAgent project
+# This file helps prevent issues with file naming, line endings, and cloning
+
+# Enforce Unix-style line endings
+* text=auto eol=lf
+
+# Explicitly mark Python files
+*.py text eol=lf
+*.pyx text eol=lf
+*.pyi text eol=lf
+
+# Configuration files
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.json text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.rst text eol=lf
+*.txt text eol=lf
+LICENSE text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files
+*.pkl binary
+*.pickle binary
+*.npy binary
+*.npz binary
+*.h5 binary
+*.hdf5 binary
+*.parquet binary
+*.pyc binary
+*.pyo binary
+*.so binary
+*.dylib binary
+*.dll binary
+*.exe binary
+
+# Model files
+*.gguf binary
+*.bin binary
+*.safetensors binary
+*.pt binary
+*.pth binary
+*.onnx binary
+
+# Image files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+
+# Archive files
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.bz2 binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Jupyter notebooks
+*.ipynb text eol=lf
+
+# Lockfiles - do not merge
+poetry.lock merge=ours
+Pipfile.lock merge=ours
+package-lock.json merge=ours
+yarn.lock merge=ours
+
+# Git config
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.gitmodules text eol=lf
+
+# CI/CD
+.github/** text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+*.dockerfile text eol=lf
+
+# Prevent case-sensitivity issues on Windows/macOS
+# Force consistent naming - repository name should always be "FilAgent"
+# This helps avoid "FilAgent" vs "filagent" vs "FilAgent-1" issues

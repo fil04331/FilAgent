@@ -1,0 +1,46 @@
+# MANIFEST.in for FilAgent
+# Include additional files in source distribution
+
+# Documentation
+include README.md
+include README_SETUP.md
+include README_PROJET_COMPLET.md
+include LICENSE
+include CLAUDE.md
+include FilAgent.md
+include AGENT.md
+
+# Configuration files
+include pyproject.toml
+include setup.cfg
+include pytest.ini
+include .editorconfig
+include .gitattributes
+recursive-include config *.yaml *.yml
+
+# Policy and compliance
+recursive-include policy *.yaml *.yml *.json
+
+# OpenAPI specification
+include openapi.yaml
+
+# Scripts
+recursive-include scripts *.py
+
+# Examples
+recursive-include examples *.py *.yaml
+
+# Tests (optional, for sdist)
+recursive-include tests *.py *.yaml
+
+# Exclude certain files
+exclude .gitignore
+exclude .gitkeep
+exclude =0.19.0
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude models/weights *
+recursive-exclude logs *
+recursive-exclude audit/signed *.tar.gz
+recursive-exclude memory *.sqlite *.faiss *.parquet

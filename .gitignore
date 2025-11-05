@@ -70,7 +70,22 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+.hypothesis/
+coverage.xml
+.tox/
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Distribution / packaging
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Divers
 *.log
 temp/
+.ruff_cache/
