@@ -10,10 +10,49 @@ Lors du clonage du dépôt sur certains systèmes, un dossier `FilAgent-1` ou `f
 
 Le projet utilise maintenant plusieurs fichiers de configuration pour garantir la cohérence :
 
-1. **pyproject.toml** : Définit explicitement `name = "FilAgent"` pour le package Python
+1. **pyproject.toml** : Définit explicitement `name = "filagent"` pour le package Python (PEP 8 compliant)
 2. **.gitattributes** : Force la normalisation des fins de lignes et la gestion des fichiers binaires
 3. **setup.cfg** : Configuration compatible avec les outils plus anciens
 4. **.editorconfig** : Assure la cohérence du style de code entre éditeurs
+
+### 🔤 Convention de nommage
+
+**Important :** Ce projet suit la convention standard de la communauté Python (comme FastAPI, NumPy, etc.) :
+
+| Élément | Nom | Raison |
+|---------|-----|--------|
+| **Dépôt GitHub** | `FilAgent` | Lisibilité et marketing (PascalCase) |
+| **Dossier cloné** | `FilAgent/` | Nom du repo Git |
+| **Package Python** | `filagent` | Convention PEP 8 (lowercase) |
+| **Installation pip** | `pip install -e .` | Installe "filagent" |
+| **Imports Python** | `from runtime import ...` | Modules sans préfixe |
+
+**Exemples comparables :**
+- **FastAPI** : repo `FastAPI`, package `fastapi`, imports `from fastapi import ...`
+- **NumPy** : repo `numpy`, package `numpy`, imports `from numpy import ...`
+- **FilAgent** : repo `FilAgent`, package `filagent`, imports `from runtime import ...`
+
+**Structure réelle :**
+```
+FilAgent/           ← Dossier du repo Git (vous êtes ici après clone)
+├── runtime/        ← Module Python importable
+├── planner/        ← Module Python importable
+├── tools/          ← Module Python importable
+├── memory/         ← Module Python importable
+└── pyproject.toml  ← Définit name="filagent"
+```
+
+**Imports corrects :**
+```python
+# ✅ CORRECT - Imports directs depuis les modules
+from runtime.agent import Agent
+from planner import HierarchicalPlanner
+from tools.python_sandbox import PythonSandboxTool
+from memory.episodic import get_messages
+
+# ❌ INCORRECT - Pas de préfixe "filagent"
+from filagent.runtime import Agent  # NE PAS FAIRE
+```
 
 ### Instructions de clonage recommandées
 
@@ -77,10 +116,10 @@ pip install -e ".[all]"
 
 ```bash
 # Vérifier que le package est correctement installé
-python -c "import runtime; import planner; import memory; print('FilAgent OK')"
+python -c "import runtime; import planner; import memory; print('filagent OK')"
 
 # Vérifier la version
-python -c "from importlib.metadata import version; print(f'FilAgent v{version(\"FilAgent\")}')"
+python -c "from importlib.metadata import version; print(f'filagent v{version(\"filagent\")}')"
 
 # Lancer les tests
 pytest tests/ -v
@@ -132,7 +171,7 @@ git clone https://github.com/fil04331/FilAgent.git FilAgent
 
 ```bash
 # Si vous avez des imports qui échouent, réinstaller en mode éditable
-pip uninstall FilAgent -y
+pip uninstall filagent -y
 pip install -e .
 
 # Vérifier que PYTHONPATH est correct
@@ -171,7 +210,7 @@ git stash
 git pull origin main
 
 # 3. Réinstaller le package
-pip uninstall FilAgent -y
+pip uninstall filagent -y
 pip install -e ".[dev,test]"
 
 # 4. Restaurer vos modifications

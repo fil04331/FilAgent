@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "FilAgent"
+name = "filagent"
 version = "0.3.0"
 description = "Agent basé sur LLM avec gouvernance, traçabilité légale et conformité (Loi 25, AI Act, NIST AI RMF)"
 readme = "README.md"
@@ -114,7 +114,7 @@ test = [
 
 # All optional dependencies
 all = [
-    "FilAgent[gpu,vllm,dev,test]",
+    "filagent[gpu,vllm,dev,test]",
 ]
 
 [project.urls]
