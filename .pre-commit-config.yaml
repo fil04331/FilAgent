@@ -169,18 +169,6 @@ repos:
           - --force-scope
         # Types autorisés: feat, fix, docs, style, refactor, test, chore
 
-  # ============================
-  # Python-specific Checks
-  # ============================
-
-  # autopep8: Auto-fix des erreurs PEP 8 simples
-  - repo: https://github.com/hhatto/autopep8
-    rev: v2.0.4
-    hooks:
-      - id: autopep8
-        args: [--in-place, --aggressive, --aggressive]
-        exclude: ^(\.venv/|venv/)
-
 # Configuration globale
 default_language_version:
   python: python3.10
