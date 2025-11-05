@@ -1,6 +1,7 @@
 """
 Tests pour la mémoire épisodique
 """
+
 import pytest
 import os
 import tempfile
@@ -25,54 +26,50 @@ def test_create_tables(temp_db):
 def test_add_and_get_message(temp_db):
     """Test ajout et récupération de messages"""
     conv_id = "test-conv-1"
-    
+
     # Ajouter un message
-    add_message(
-        conversation_id=conv_id,
-        role="user",
-        content="Bonjour"
-    )
-    
+    add_message(conversation_id=conv_id, role="user", content="Bonjour")
+
     # Récupérer les messages
     messages = get_messages(conv_id)
-    
+
     assert len(messages) == 1
-    assert messages[0]['role'] == "user"
-    assert messages[0]['content'] == "Bonjour"
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Bonjour"
 
 
 def test_multiple_messages(temp_db):
     """Test avec plusieurs messages"""
     conv_id = "test-conv-2"
-    
+
     # Ajouter plusieurs messages
     add_message(conv_id, "user", "Message 1")
     add_message(conv_id, "assistant", "Réponse 1")
     add_message(conv_id, "user", "Message 2")
-    
+
     messages = get_messages(conv_id)
-    
+
     assert len(messages) == 3
-    assert messages[0]['content'] == "Message 1"
-    assert messages[1]['content'] == "Réponse 1"
-    assert messages[2]['content'] == "Message 2"
+    assert messages[0]["content"] == "Message 1"
+    assert messages[1]["content"] == "Réponse 1"
+    assert messages[2]["content"] == "Message 2"
 
 
 def test_conversation_isolation(temp_db):
     """Test que les conversations sont isolées"""
     conv1 = "test-conv-3"
     conv2 = "test-conv-4"
-    
+
     add_message(conv1, "user", "Message pour conv1")
     add_message(conv2, "user", "Message pour conv2")
-    
+
     messages1 = get_messages(conv1)
     messages2 = get_messages(conv2)
-    
+
     assert len(messages1) == 1
     assert len(messages2) == 1
-    assert messages1[0]['content'] == "Message pour conv1"
-    assert messages2[0]['content'] == "Message pour conv2"
+    assert messages1[0]["content"] == "Message pour conv1"
+    assert messages2[0]["content"] == "Message pour conv2"
 
 
 @pytest.mark.skip(reason="Requiert une implémentation plus avancée du TTL")

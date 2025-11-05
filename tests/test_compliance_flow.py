@@ -25,6 +25,7 @@ from runtime.middleware.provenance import ProvBuilder, ProvenanceTracker
 # TESTS: WORM Integrity (Write-Once-Read-Many)
 # ============================================================================
 
+
 @pytest.mark.compliance
 def test_worm_merkle_tree_basic():
     """
@@ -119,14 +120,14 @@ def test_worm_logger_append_only(isolated_logging):
     - Pas de modification possible
     - Intégrité maintenue
     """
-    worm_logger = isolated_logging['worm_logger']
-    log_dir = isolated_logging['event_log_dir']
+    worm_logger = isolated_logging["worm_logger"]
+    log_dir = isolated_logging["event_log_dir"]
 
     # Ajouter quelques entrées
     entries = [
         {"event": "test1", "timestamp": "2024-01-01T00:00:00Z"},
         {"event": "test2", "timestamp": "2024-01-01T00:01:00Z"},
-        {"event": "test3", "timestamp": "2024-01-01T00:02:00Z"}
+        {"event": "test3", "timestamp": "2024-01-01T00:02:00Z"},
     ]
 
     for entry in entries:
@@ -137,7 +138,7 @@ def test_worm_logger_append_only(isolated_logging):
     assert len(log_files) > 0
 
     # Lire le contenu
-    with open(log_files[0], 'r') as f:
+    with open(log_files[0], "r") as f:
         lines = f.readlines()
 
     # Vérifier que toutes les entrées sont présentes
@@ -154,8 +155,8 @@ def test_worm_digest_creation(isolated_logging):
     - Format JSON valide
     - Contient root hash
     """
-    worm_logger = isolated_logging['worm_logger']
-    digest_dir = isolated_logging['digest_dir']
+    worm_logger = isolated_logging["worm_logger"]
+    digest_dir = isolated_logging["digest_dir"]
 
     # Ajouter des entrées
     for i in range(10):
@@ -169,7 +170,7 @@ def test_worm_digest_creation(isolated_logging):
     assert len(digest_files) > 0
 
     # Vérifier le contenu du digest
-    with open(digest_files[0], 'r') as f:
+    with open(digest_files[0], "r") as f:
         digest = json.load(f)
 
     assert "timestamp" in digest
@@ -187,9 +188,9 @@ def test_worm_digest_integrity_verification(isolated_logging):
     - Le digest peut être utilisé pour vérifier l'intégrité
     - Détection de tampering
     """
-    worm_logger = isolated_logging['worm_logger']
-    log_dir = isolated_logging['event_log_dir']
-    digest_dir = isolated_logging['digest_dir']
+    worm_logger = isolated_logging["worm_logger"]
+    log_dir = isolated_logging["event_log_dir"]
+    digest_dir = isolated_logging["digest_dir"]
 
     # Ajouter des entrées
     entries = []
@@ -203,7 +204,7 @@ def test_worm_digest_integrity_verification(isolated_logging):
 
     # Lire le digest
     digest_files = list(digest_dir.glob("*.json"))
-    with open(digest_files[0], 'r') as f:
+    with open(digest_files[0], "r") as f:
         digest = json.load(f)
 
     original_root_hash = digest["root_hash"]
@@ -221,6 +222,7 @@ def test_worm_digest_integrity_verification(isolated_logging):
 # TESTS: Decision Records (DR) avec signatures EdDSA
 # ============================================================================
 
+
 @pytest.mark.compliance
 def test_dr_signature_creation(isolated_fs):
     """
@@ -231,24 +233,22 @@ def test_dr_signature_creation(isolated_fs):
     - Algorithme EdDSA
     - Format correct
     """
-    dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
-    )
+    dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 
     # Créer un Decision Record
     dr_id = dr_manager.create_record(
         conversation_id="test_conv",
         decision_type="tool_invocation",
         context={"tool": "python_sandbox", "params": {"code": "print('test')"}},
-        rationale="Testing DR creation"
+        rationale="Testing DR creation",
     )
 
     # Vérifier que le fichier existe
-    dr_files = list(isolated_fs['logs_decisions'].glob("*.json"))
+    dr_files = list(isolated_fs["logs_decisions"].glob("*.json"))
     assert len(dr_files) > 0
 
     # Lire le DR
-    with open(dr_files[0], 'r') as f:
+    with open(dr_files[0], "r") as f:
         dr_data = json.load(f)
 
     # Vérifier la structure
@@ -280,21 +280,19 @@ def test_dr_signature_verification(isolated_fs):
     from cryptography.hazmat.primitives import serialization
     import base64
 
-    dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
-    )
+    dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 
     # Créer un DR
     dr_id = dr_manager.create_record(
         conversation_id="test_conv",
         decision_type="tool_invocation",
         context={"tool": "test"},
-        rationale="Testing signature"
+        rationale="Testing signature",
     )
 
     # Lire le DR
-    dr_files = list(isolated_fs['logs_decisions'].glob("*.json"))
-    with open(dr_files[0], 'r') as f:
+    dr_files = list(isolated_fs["logs_decisions"].glob("*.json"))
+    with open(dr_files[0], "r") as f:
         dr_data = json.load(f)
 
     # Extraire la signature et la clé publique
@@ -331,21 +329,19 @@ def test_dr_tampering_detection(isolated_fs):
     from cryptography.hazmat.primitives.asymmetric import ed25519
     import base64
 
-    dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
-    )
+    dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 
     # Créer un DR
     dr_id = dr_manager.create_record(
         conversation_id="test_conv",
         decision_type="tool_invocation",
         context={"tool": "test"},
-        rationale="Original rationale"
+        rationale="Original rationale",
     )
 
     # Lire et modifier le DR
-    dr_files = list(isolated_fs['logs_decisions'].glob("*.json"))
-    with open(dr_files[0], 'r') as f:
+    dr_files = list(isolated_fs["logs_decisions"].glob("*.json"))
+    with open(dr_files[0], "r") as f:
         dr_data = json.load(f)
 
     # Modifier le rationale (tampering!)
@@ -378,20 +374,18 @@ def test_dr_complete_structure(isolated_fs):
 
     Vérifie tous les champs requis
     """
-    dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
-    )
+    dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 
     dr_id = dr_manager.create_record(
         conversation_id="test_conv",
         decision_type="tool_invocation",
         context={"tool": "python_sandbox"},
         rationale="Test rationale",
-        metadata={"user": "test_user", "session": "sess_123"}
+        metadata={"user": "test_user", "session": "sess_123"},
     )
 
-    dr_files = list(isolated_fs['logs_decisions'].glob("*.json"))
-    with open(dr_files[0], 'r') as f:
+    dr_files = list(isolated_fs["logs_decisions"].glob("*.json"))
+    with open(dr_files[0], "r") as f:
         dr_data = json.load(f)
 
     # Vérifier tous les champs requis
@@ -402,7 +396,7 @@ def test_dr_complete_structure(isolated_fs):
         "decision_type",
         "context",
         "rationale",
-        "signature"
+        "signature",
     ]
 
     for field in required_fields:
@@ -419,6 +413,7 @@ def test_dr_complete_structure(isolated_fs):
 # TESTS: Provenance PROV-JSON (W3C Standard)
 # ============================================================================
 
+
 @pytest.mark.compliance
 def test_provenance_prov_builder_entities():
     """
@@ -433,10 +428,7 @@ def test_provenance_prov_builder_entities():
     builder.add_entity(
         entity_id="entity:message_123",
         label="User Message",
-        attributes={
-            "content_hash": "abc123",
-            "prov:type": "Message"
-        }
+        attributes={"content_hash": "abc123", "prov:type": "Message"},
     )
 
     # Vérifier que l'entité est enregistrée
@@ -460,9 +452,7 @@ def test_provenance_prov_builder_activities():
     end_time = "2024-01-01T00:01:00Z"
 
     builder.add_activity(
-        activity_id="activity:generation_1",
-        start_time=start_time,
-        end_time=end_time
+        activity_id="activity:generation_1", start_time=start_time, end_time=end_time
     )
 
     # Vérifier l'activité
@@ -481,11 +471,7 @@ def test_provenance_prov_builder_agents():
     """
     builder = ProvBuilder()
 
-    builder.add_agent(
-        agent_id="agent:filagent_v1",
-        agent_type="softwareAgent",
-        version="1.0.0"
-    )
+    builder.add_agent(agent_id="agent:filagent_v1", agent_type="softwareAgent", version="1.0.0")
 
     assert "agent:filagent_v1" in builder.agents
 
@@ -511,20 +497,15 @@ def test_provenance_prov_builder_relations():
     builder.add_agent("agent:system", "softwareAgent")
 
     # Ajouter des relations
-    builder.was_generated_by.append({
-        "prov:entity": "entity:output",
-        "prov:activity": "activity:gen"
-    })
+    builder.was_generated_by.append(
+        {"prov:entity": "entity:output", "prov:activity": "activity:gen"}
+    )
 
-    builder.used.append({
-        "prov:activity": "activity:gen",
-        "prov:entity": "entity:input"
-    })
+    builder.used.append({"prov:activity": "activity:gen", "prov:entity": "entity:input"})
 
-    builder.was_associated_with.append({
-        "prov:activity": "activity:gen",
-        "prov:agent": "agent:system"
-    })
+    builder.was_associated_with.append(
+        {"prov:activity": "activity:gen", "prov:agent": "agent:system"}
+    )
 
     # Vérifier les relations
     assert len(builder.was_generated_by) == 1
@@ -542,26 +523,22 @@ def test_provenance_complete_graph_structure(isolated_fs):
     - Format JSON valide
     - Conforme au standard W3C
     """
-    tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
-    )
+    tracker = ProvenanceTracker(storage_dir=str(isolated_fs["logs"]))
 
     # Tracer une génération complète
     prov_id = tracker.track_generation(
         conversation_id="test_conv",
         input_message="Test input",
         output_message="Test output",
-        tool_calls=[
-            {"name": "python_sandbox", "result": "success"}
-        ],
-        metadata={"model": "test_model", "tokens": 100}
+        tool_calls=[{"name": "python_sandbox", "result": "success"}],
+        metadata={"model": "test_model", "tokens": 100},
     )
 
     # Vérifier que le fichier PROV a été créé
-    prov_files = list(isolated_fs['logs'].glob("**/prov_*.json"))
+    prov_files = list(isolated_fs["logs"].glob("**/prov_*.json"))
 
     if len(prov_files) > 0:
-        with open(prov_files[0], 'r') as f:
+        with open(prov_files[0], "r") as f:
             prov_data = json.load(f)
 
         # Vérifier la structure W3C PROV
@@ -570,9 +547,14 @@ def test_provenance_complete_graph_structure(isolated_fs):
 
         # Peut contenir ces sections (selon l'implémentation)
         possible_sections = [
-            "entity", "activity", "agent",
-            "wasGeneratedBy", "used", "wasAssociatedWith",
-            "wasAttributedTo", "wasDerivedFrom"
+            "entity",
+            "activity",
+            "agent",
+            "wasGeneratedBy",
+            "used",
+            "wasAssociatedWith",
+            "wasAttributedTo",
+            "wasDerivedFrom",
         ]
 
         # Au moins une section doit être présente
@@ -587,23 +569,21 @@ def test_provenance_json_schema_validation(isolated_fs):
 
     Vérifie que le JSON généré est bien formé
     """
-    tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
-    )
+    tracker = ProvenanceTracker(storage_dir=str(isolated_fs["logs"]))
 
     prov_id = tracker.track_generation(
         conversation_id="test_conv",
         input_message="Test",
         output_message="Response",
         tool_calls=[],
-        metadata={}
+        metadata={},
     )
 
-    prov_files = list(isolated_fs['logs'].glob("**/prov_*.json"))
+    prov_files = list(isolated_fs["logs"].glob("**/prov_*.json"))
 
     if len(prov_files) > 0:
         # Vérifier que c'est du JSON valide
-        with open(prov_files[0], 'r') as f:
+        with open(prov_files[0], "r") as f:
             try:
                 prov_data = json.load(f)
                 json_valid = True
@@ -623,9 +603,7 @@ def test_provenance_chain_traceability(isolated_fs):
     - La provenance peut être tracée
     - Relations wasDerivedFrom présentes
     """
-    tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
-    )
+    tracker = ProvenanceTracker(storage_dir=str(isolated_fs["logs"]))
 
     # Tracer plusieurs générations successives
     prov_id1 = tracker.track_generation(
@@ -633,7 +611,7 @@ def test_provenance_chain_traceability(isolated_fs):
         input_message="First input",
         output_message="First output",
         tool_calls=[],
-        metadata={}
+        metadata={},
     )
 
     prov_id2 = tracker.track_generation(
@@ -641,17 +619,18 @@ def test_provenance_chain_traceability(isolated_fs):
         input_message="Second input (based on first output)",
         output_message="Second output",
         tool_calls=[],
-        metadata={"derived_from": prov_id1}
+        metadata={"derived_from": prov_id1},
     )
 
     # Vérifier que les fichiers existent
-    prov_files = list(isolated_fs['logs'].glob("**/prov_*.json"))
+    prov_files = list(isolated_fs["logs"].glob("**/prov_*.json"))
     assert len(prov_files) >= 1  # Au moins un fichier créé
 
 
 # ============================================================================
 # TESTS: Conformité Intégrée (WORM + DR + PROV)
 # ============================================================================
+
 
 @pytest.mark.compliance
 def test_compliance_full_audit_trail(api_client, patched_middlewares):
@@ -664,40 +643,38 @@ def test_compliance_full_audit_trail(api_client, patched_middlewares):
     - Provenance tracking
     """
     # Envoyer une requête
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Test audit trail"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Test audit trail"}]}
+    )
 
     assert response.status_code == 200
     conversation_id = response.json()["id"]
 
-    isolated_fs = patched_middlewares['isolated_fs']
+    isolated_fs = patched_middlewares["isolated_fs"]
 
     # Vérifier WORM logs
-    log_files = list(isolated_fs['logs_events'].glob("*.jsonl"))
+    log_files = list(isolated_fs["logs_events"].glob("*.jsonl"))
     assert len(log_files) > 0, "No WORM logs created"
 
     # Vérifier que les logs sont en JSON lines
-    with open(log_files[0], 'r') as f:
+    with open(log_files[0], "r") as f:
         lines = f.readlines()
         for line in lines:
             json.loads(line)  # Ne doit pas crasher
 
     # Vérifier Decision Records (peuvent exister selon le flux)
-    dr_files = list(isolated_fs['logs_decisions'].glob("*.json"))
+    dr_files = list(isolated_fs["logs_decisions"].glob("*.json"))
     # Les DR ne sont créés que si décision prise, donc on vérifie juste le format
     for dr_file in dr_files:
-        with open(dr_file, 'r') as f:
+        with open(dr_file, "r") as f:
             dr_data = json.load(f)
             assert "decision_id" in dr_data
             assert "signature" in dr_data
 
     # Vérifier Provenance (peut exister selon le flux)
-    prov_files = list(isolated_fs['logs'].glob("**/prov_*.json"))
+    prov_files = list(isolated_fs["logs"].glob("**/prov_*.json"))
     for prov_file in prov_files:
-        with open(prov_file, 'r') as f:
+        with open(prov_file, "r") as f:
             json.load(f)  # Ne doit pas crasher
 
 
@@ -711,29 +688,29 @@ def test_compliance_data_retention_integrity(isolated_logging):
     - L'intégrité est maintenue
     - Les checkpoints fonctionnent
     """
-    worm_logger = isolated_logging['worm_logger']
+    worm_logger = isolated_logging["worm_logger"]
 
     # Ajouter des entrées sur plusieurs "périodes"
     for period in range(3):
         for i in range(10):
-            worm_logger.append(json.dumps({
-                "period": period,
-                "entry": i,
-                "timestamp": datetime.utcnow().isoformat()
-            }))
+            worm_logger.append(
+                json.dumps(
+                    {"period": period, "entry": i, "timestamp": datetime.utcnow().isoformat()}
+                )
+            )
 
         # Créer un checkpoint après chaque période
         worm_logger.create_checkpoint()
 
     # Vérifier que plusieurs checkpoints existent
-    digest_dir = isolated_logging['digest_dir']
+    digest_dir = isolated_logging["digest_dir"]
     digest_files = list(digest_dir.glob("*.json"))
 
     assert len(digest_files) >= 1, "No checkpoints created"
 
     # Vérifier que chaque checkpoint est valide
     for digest_file in digest_files:
-        with open(digest_file, 'r') as f:
+        with open(digest_file, "r") as f:
             digest = json.load(f)
 
         assert "root_hash" in digest
@@ -750,9 +727,7 @@ def test_compliance_non_repudiation(isolated_fs):
     - Les signatures garantissent la non-répudiation
     - Les DR ne peuvent être niés
     """
-    dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
-    )
+    dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
 
     # Créer un DR important
     dr_id = dr_manager.create_record(
@@ -760,12 +735,12 @@ def test_compliance_non_repudiation(isolated_fs):
         decision_type="critical_action",
         context={"action": "data_deletion", "target": "user_data_123"},
         rationale="User requested data deletion",
-        metadata={"user_id": "user_456", "timestamp": datetime.utcnow().isoformat()}
+        metadata={"user_id": "user_456", "timestamp": datetime.utcnow().isoformat()},
     )
 
     # Lire et vérifier
-    dr_files = list(isolated_fs['logs_decisions'].glob("*.json"))
-    with open(dr_files[0], 'r') as f:
+    dr_files = list(isolated_fs["logs_decisions"].glob("*.json"))
+    with open(dr_files[0], "r") as f:
         dr_data = json.load(f)
 
     # La signature garantit:

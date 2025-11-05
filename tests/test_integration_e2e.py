@@ -23,6 +23,7 @@ from tools.base import ToolResult, ToolStatus
 # TESTS E2E: Flux Complet Chat → Génération → Outils → DR → Provenance
 # ============================================================================
 
+
 @pytest.mark.e2e
 def test_complete_chat_flow_simple(api_client, patched_middlewares):
     """
@@ -35,11 +36,9 @@ def test_complete_chat_flow_simple(api_client, patched_middlewares):
     - WORM digest créé
     """
     # Envoyer un message via l'API
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Hello, how are you?"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Hello, how are you?"}]}
+    )
 
     # Vérifier la réponse
     assert response.status_code == 200
@@ -53,12 +52,12 @@ def test_complete_chat_flow_simple(api_client, patched_middlewares):
     conversation_id = data["id"]
 
     # Vérifier que les logs d'événements ont été créés
-    event_log_dir = patched_middlewares['isolated_fs']['logs_events']
+    event_log_dir = patched_middlewares["isolated_fs"]["logs_events"]
     log_files = list(event_log_dir.glob("*.jsonl"))
     assert len(log_files) > 0, "No event log files created"
 
     # Vérifier le contenu des logs
-    with open(log_files[0], 'r') as f:
+    with open(log_files[0], "r") as f:
         lines = f.readlines()
         assert len(lines) > 0, "Event log is empty"
 
@@ -69,7 +68,7 @@ def test_complete_chat_flow_simple(api_client, patched_middlewares):
         assert "event" in first_event
 
     # Vérifier que les digests WORM ont été créés
-    digest_dir = patched_middlewares['isolated_fs']['logs_digests']
+    digest_dir = patched_middlewares["isolated_fs"]["logs_digests"]
     digest_files = list(digest_dir.glob("*.json"))
     # Note: Les digests sont créés périodiquement, peut être vide sur test rapide
     # On vérifie juste que le répertoire existe
@@ -88,11 +87,9 @@ def test_complete_chat_flow_with_tools(api_client_with_tool_model, patched_middl
     - Provenance générée
     """
     # Envoyer un message qui déclenchera un appel d'outil
-    response = api_client_with_tool_model.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Calculate 2 + 2 using Python"}
-        ]
-    })
+    response = api_client_with_tool_model.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Calculate 2 + 2 using Python"}]}
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -102,13 +99,13 @@ def test_complete_chat_flow_with_tools(api_client_with_tool_model, patched_middl
     conversation_id = data["id"]
 
     # Vérifier que des Decision Records ont été créés
-    dr_dir = patched_middlewares['isolated_fs']['logs_decisions']
+    dr_dir = patched_middlewares["isolated_fs"]["logs_decisions"]
     dr_files = list(dr_dir.glob("*.json"))
 
     # Peut avoir des DR si des outils ont été appelés
     # On vérifie la structure si des fichiers existent
     if len(dr_files) > 0:
-        with open(dr_files[0], 'r') as f:
+        with open(dr_files[0], "r") as f:
             dr_data = json.load(f)
 
         # Vérifier la structure du Decision Record
@@ -136,24 +133,25 @@ def test_chat_persistence_across_turns(api_client, temp_db):
     - Continuité de conversation
     """
     # Premier message
-    response1 = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "My name is Alice"}
-        ]
-    })
+    response1 = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "My name is Alice"}]}
+    )
 
     assert response1.status_code == 200
     data1 = response1.json()
     conversation_id = data1["id"]
 
     # Deuxième message dans la même conversation
-    response2 = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "My name is Alice"},
-            {"role": "assistant", "content": data1["choices"][0]["message"]["content"]},
-            {"role": "user", "content": "What is my name?"}
-        ]
-    })
+    response2 = api_client.post(
+        "/chat",
+        json={
+            "messages": [
+                {"role": "user", "content": "My name is Alice"},
+                {"role": "assistant", "content": data1["choices"][0]["message"]["content"]},
+                {"role": "user", "content": "What is my name?"},
+            ]
+        },
+    )
 
     assert response2.status_code == 200
 
@@ -161,9 +159,12 @@ def test_chat_persistence_across_turns(api_client, temp_db):
     conn = sqlite3.connect(str(temp_db))
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT COUNT(*) FROM messages WHERE conversation_id = ?
-    """, (conversation_id,))
+    """,
+        (conversation_id,),
+    )
 
     message_count = cursor.fetchone()[0]
     conn.close()
@@ -184,11 +185,14 @@ def test_conversation_retrieval(api_client, conversation_factory, temp_db):
     """
     # Créer une conversation de test
     conv_id = "test_conv_123"
-    conversation_factory(conv_id, [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi there!"},
-        {"role": "user", "content": "How are you?"}
-    ])
+    conversation_factory(
+        conv_id,
+        [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there!"},
+            {"role": "user", "content": "How are you?"},
+        ],
+    )
 
     # Récupérer via l'API
     response = api_client.get(f"/conversations/{conv_id}")
@@ -210,6 +214,7 @@ def test_conversation_retrieval(api_client, conversation_factory, temp_db):
 # TESTS E2E: Résilience et Fallbacks
 # ============================================================================
 
+
 @pytest.mark.e2e
 @pytest.mark.resilience
 def test_resilience_middleware_logging_failure(api_client, patched_middlewares):
@@ -221,18 +226,17 @@ def test_resilience_middleware_logging_failure(api_client, patched_middlewares):
     - Réponse API toujours fonctionnelle
     - Pas de crash
     """
+
     # Faire échouer le logger
     def failing_log(*args, **kwargs):
         raise Exception("Logging system failure")
 
-    patched_middlewares['event_logger'].log_event = failing_log
+    patched_middlewares["event_logger"].log_event = failing_log
 
     # L'API devrait toujours fonctionner
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Test message"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Test message"}]}
+    )
 
     # Doit toujours réussir grâce aux fallbacks
     assert response.status_code == 200
@@ -246,18 +250,17 @@ def test_resilience_worm_logger_failure(api_client, patched_middlewares):
     """
     Test de résilience: Le système continue si WORM logger échoue
     """
+
     # Faire échouer le WORM logger
     def failing_append(*args, **kwargs):
         raise Exception("WORM logger failure")
 
-    patched_middlewares['worm_logger'].append = failing_append
+    patched_middlewares["worm_logger"].append = failing_append
 
     # L'API devrait toujours fonctionner
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Test message"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Test message"}]}
+    )
 
     assert response.status_code == 200
 
@@ -268,18 +271,17 @@ def test_resilience_dr_manager_failure(api_client, patched_middlewares):
     """
     Test de résilience: Le système continue si DR manager échoue
     """
+
     # Faire échouer le DR manager
     def failing_create_record(*args, **kwargs):
         raise Exception("DR manager failure")
 
-    patched_middlewares['dr_manager'].create_record = failing_create_record
+    patched_middlewares["dr_manager"].create_record = failing_create_record
 
     # L'API devrait toujours fonctionner
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Make a decision"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Make a decision"}]}
+    )
 
     assert response.status_code == 200
 
@@ -290,18 +292,17 @@ def test_resilience_provenance_tracker_failure(api_client, patched_middlewares):
     """
     Test de résilience: Le système continue si provenance tracker échoue
     """
+
     # Faire échouer le tracker
     def failing_track(*args, **kwargs):
         raise Exception("Provenance tracker failure")
 
-    patched_middlewares['tracker'].track_generation = failing_track
+    patched_middlewares["tracker"].track_generation = failing_track
 
     # L'API devrait toujours fonctionner
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Test message"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Test message"}]}
+    )
 
     assert response.status_code == 200
 
@@ -314,21 +315,20 @@ def test_resilience_all_middlewares_fail(api_client, patched_middlewares):
 
     Vérifie que le système reste fonctionnel même en cas de défaillance totale
     """
+
     # Faire échouer tous les middlewares
     def fail(*args, **kwargs):
         raise Exception("Total middleware failure")
 
-    patched_middlewares['event_logger'].log_event = fail
-    patched_middlewares['worm_logger'].append = fail
-    patched_middlewares['dr_manager'].create_record = fail
-    patched_middlewares['tracker'].track_generation = fail
+    patched_middlewares["event_logger"].log_event = fail
+    patched_middlewares["worm_logger"].append = fail
+    patched_middlewares["dr_manager"].create_record = fail
+    patched_middlewares["tracker"].track_generation = fail
 
     # L'API devrait TOUJOURS fonctionner (fallbacks critiques)
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": "Emergency test"}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": "Emergency test"}]}
+    )
 
     # Le système doit survivre
     assert response.status_code == 200
@@ -345,17 +345,15 @@ def test_resilience_database_unavailable(api_client):
     Note: Dans la vraie implémentation, ceci devrait gérer le cas gracieusement
     """
     # Patcher la DB pour qu'elle échoue
-    with patch('memory.episodic.add_message') as mock_add:
+    with patch("memory.episodic.add_message") as mock_add:
         mock_add.side_effect = Exception("Database unavailable")
 
         # Selon l'implémentation, cela peut soit échouer soit fallback
         # On teste juste qu'il n'y a pas de crash non géré
         try:
-            response = api_client.post("/chat", json={
-                "messages": [
-                    {"role": "user", "content": "Test"}
-                ]
-            })
+            response = api_client.post(
+                "/chat", json={"messages": [{"role": "user", "content": "Test"}]}
+            )
             # Si ça passe, vérifier le code de statut
             assert response.status_code in [200, 500, 503]
         except Exception as e:
@@ -372,6 +370,7 @@ def test_resilience_timeout_protection(api_client):
 
     Vérifie que les requêtes longues sont gérées correctement
     """
+
     # Créer un mock model très lent
     def slow_generate(*args, **kwargs):
         time.sleep(5)  # 5 secondes
@@ -380,10 +379,10 @@ def test_resilience_timeout_protection(api_client):
             finish_reason="stop",
             tokens_generated=10,
             prompt_tokens=10,
-            total_tokens=20
+            total_tokens=20,
         )
 
-    with patch('runtime.agent.init_model') as mock_init:
+    with patch("runtime.agent.init_model") as mock_init:
         mock_model = MagicMock()
         mock_model.generate = slow_generate
         mock_model.is_loaded.return_value = True
@@ -394,11 +393,9 @@ def test_resilience_timeout_protection(api_client):
         # - Retourner une erreur de timeout
         # On vérifie juste qu'il n'y a pas de crash
         try:
-            response = api_client.post("/chat", json={
-                "messages": [
-                    {"role": "user", "content": "Slow request"}
-                ]
-            })
+            response = api_client.post(
+                "/chat", json={"messages": [{"role": "user", "content": "Slow request"}]}
+            )
             assert response.status_code in [200, 408, 504]
         except Exception:
             # Timeout côté client est acceptable
@@ -417,12 +414,10 @@ def test_resilience_tool_execution_failure(api_client_with_tool_model, mock_tool
     - Ne crash pas
     """
     # Enregistrer un outil qui échoue
-    with patch('tools.registry.ToolRegistry.get_tool', return_value=mock_tool_failure):
-        response = api_client_with_tool_model.post("/chat", json={
-            "messages": [
-                {"role": "user", "content": "Use the failing tool"}
-            ]
-        })
+    with patch("tools.registry.ToolRegistry.get_tool", return_value=mock_tool_failure):
+        response = api_client_with_tool_model.post(
+            "/chat", json={"messages": [{"role": "user", "content": "Use the failing tool"}]}
+        )
 
         # Doit gérer l'échec gracieusement
         assert response.status_code == 200
@@ -436,6 +431,7 @@ def test_resilience_invalid_tool_call_format(api_client):
     """
     Test de résilience: Format d'appel d'outil invalide
     """
+
     # Créer un model qui retourne un format invalide
     def invalid_tool_call(*args, **kwargs):
         return GenerationResult(
@@ -444,25 +440,18 @@ def test_resilience_invalid_tool_call_format(api_client):
             tokens_generated=10,
             prompt_tokens=10,
             total_tokens=20,
-            tool_calls=[
-                {
-                    "name": "nonexistent_tool",
-                    "arguments": "not a dict"  # Format invalide
-                }
-            ]
+            tool_calls=[{"name": "nonexistent_tool", "arguments": "not a dict"}],  # Format invalide
         )
 
-    with patch('runtime.agent.init_model') as mock_init:
+    with patch("runtime.agent.init_model") as mock_init:
         mock_model = MagicMock()
         mock_model.generate = invalid_tool_call
         mock_model.is_loaded.return_value = True
         mock_init.return_value = mock_model
 
-        response = api_client.post("/chat", json={
-            "messages": [
-                {"role": "user", "content": "Test"}
-            ]
-        })
+        response = api_client.post(
+            "/chat", json={"messages": [{"role": "user", "content": "Test"}]}
+        )
 
         # Doit gérer le format invalide
         assert response.status_code in [200, 400]
@@ -471,6 +460,7 @@ def test_resilience_invalid_tool_call_format(api_client):
 # ============================================================================
 # TESTS E2E: Performance et Limites
 # ============================================================================
+
 
 @pytest.mark.e2e
 @pytest.mark.slow
@@ -483,11 +473,9 @@ def test_e2e_multiple_concurrent_requests(api_client):
     import concurrent.futures
 
     def send_request(i):
-        return api_client.post("/chat", json={
-            "messages": [
-                {"role": "user", "content": f"Concurrent request {i}"}
-            ]
-        })
+        return api_client.post(
+            "/chat", json={"messages": [{"role": "user", "content": f"Concurrent request {i}"}]}
+        )
 
     # Envoyer 5 requêtes concurrentes
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -510,11 +498,9 @@ def test_e2e_large_message_handling(api_client):
     # Créer un message très long
     large_message = "This is a test. " * 1000  # ~16KB
 
-    response = api_client.post("/chat", json={
-        "messages": [
-            {"role": "user", "content": large_message}
-        ]
-    })
+    response = api_client.post(
+        "/chat", json={"messages": [{"role": "user", "content": large_message}]}
+    )
 
     # Doit gérer correctement ou retourner une erreur appropriée
     assert response.status_code in [200, 413]  # 413 = Payload Too Large
@@ -549,26 +535,19 @@ def test_e2e_conversation_history_limit(api_client, temp_db, conversation_factor
 # TESTS E2E: Intégrité des Données
 # ============================================================================
 
+
 @pytest.mark.e2e
 def test_e2e_message_ordering_preserved(api_client, temp_db):
     """
     Test E2E: L'ordre des messages est préservé
     """
     # Envoyer plusieurs messages
-    messages = [
-        "First message",
-        "Second message",
-        "Third message"
-    ]
+    messages = ["First message", "Second message", "Third message"]
 
     conversation_id = None
 
     for msg in messages:
-        response = api_client.post("/chat", json={
-            "messages": [
-                {"role": "user", "content": msg}
-            ]
-        })
+        response = api_client.post("/chat", json={"messages": [{"role": "user", "content": msg}]})
         assert response.status_code == 200
         if conversation_id is None:
             conversation_id = response.json()["id"]
@@ -577,11 +556,14 @@ def test_e2e_message_ordering_preserved(api_client, temp_db):
     conn = sqlite3.connect(str(temp_db))
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT content FROM messages
         WHERE conversation_id = ? AND role = 'user'
         ORDER BY timestamp ASC
-    """, (conversation_id,))
+    """,
+        (conversation_id,),
+    )
 
     retrieved = [row[0] for row in cursor.fetchall()]
     conn.close()
