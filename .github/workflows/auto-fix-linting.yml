@@ -15,7 +15,10 @@ permissions:
 jobs:
   auto-fix:
     # Ne s'exécute que si le workflow "Python Linter" a échoué
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    # ET que le workflow provient du même dépôt (pas d'un fork)
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
