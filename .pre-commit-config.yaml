@@ -1,0 +1,209 @@
+# Pre-commit hooks pour FilAgent
+# Hooks exécutés AVANT chaque commit pour garantir la qualité du code
+#
+# Installation:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Exécution manuelle:
+#   pre-commit run --all-files
+#
+# Documentation: https://pre-commit.com/
+
+repos:
+  # ============================
+  # Code Formatting
+  # ============================
+
+  # Black: Formatage automatique PEP 8 (opinionated)
+  - repo: https://github.com/psf/black
+    rev: 24.1.0
+    hooks:
+      - id: black
+        language_version: python3.10
+        args: ["--config", "pyproject.toml"]
+        exclude: ^(models/|\.venv/|venv/)
+
+  # isort: Tri automatique des imports
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--settings-path", "pyproject.toml"]
+        exclude: ^(models/|\.venv/|venv/)
+
+  # ============================
+  # Code Quality & Linting
+  # ============================
+
+  # flake8: Linting Python (détecte erreurs PEP 8, code smell)
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args:
+          - --max-line-length=100
+          - --extend-ignore=E203,W503,W504
+          - --max-complexity=10
+        exclude: ^(tests/|docs/|models/|\.venv/|venv/|examples/)
+        additional_dependencies:
+          - flake8-docstrings
+          - flake8-bugbear
+
+  # ============================
+  # Type Checking
+  # ============================
+
+  # mypy: Vérification des types statiques
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args:
+          - --ignore-missing-imports
+          - --config-file=pyproject.toml
+        additional_dependencies:
+          - types-PyYAML
+          - types-requests
+          - pydantic>=2.5.0
+        exclude: ^(tests/|scripts/|examples/|\.venv/|venv/)
+
+  # ============================
+  # Security & Secrets Detection
+  # ============================
+
+  # detect-secrets: Détection de secrets (clés API, tokens, etc.)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args:
+          - --baseline
+          - .secrets.baseline
+        exclude: .*\.(lock|svg|min\.js)$
+
+  # ============================
+  # File Quality Checks
+  # ============================
+
+  # Pre-commit hooks standards
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Trailing whitespace (redondant avec Black mais défense en profondeur)
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: ^(\.gitattributes|MANIFEST\.in)
+
+      # Fin de fichier (newline obligatoire)
+      - id: end-of-file-fixer
+        exclude: ^(models/|\.venv/|venv/)
+
+      # YAML validation
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: ^(\.github/workflows/|templates/)
+
+      # JSON validation
+      - id: check-json
+
+      # TOML validation
+      - id: check-toml
+
+      # Fichiers volumineux (bloque >500KB)
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+        exclude: ^(models/weights/|docs/.*\.(png|jpg|jpeg|gif))
+
+      # Conflits de merge
+      - id: check-merge-conflict
+
+      # SÉCURITÉ: Détecte clés privées
+      - id: detect-private-key
+        exclude: ^(tests/fixtures/)
+
+      # Noms de fichiers (évite conflits case-insensitive)
+      - id: check-case-conflict
+
+      # Docstrings Python (premier caractère)
+      - id: check-docstring-first
+
+      # Exécutables Python doivent avoir shebang
+      - id: check-executables-have-shebangs
+
+      # Fichiers Python valides (syntax check)
+      - id: check-ast
+        exclude: ^(\.venv/|venv/)
+
+      # Pas de debug statements
+      - id: debug-statements
+        exclude: ^(tests/|examples/)
+
+      # Requirements.txt sorted
+      - id: requirements-txt-fixer
+        files: requirements.*\.txt$
+
+  # ============================
+  # Documentation
+  # ============================
+
+  # Markdown lint
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        args: [--fix]
+        exclude: ^(CHANGELOG\.md|\.github/)
+
+  # ============================
+  # Git Commit Quality
+  # ============================
+
+  # Conventional commits (format: type(scope): message)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - --force-scope
+        # Types autorisés: feat, fix, docs, style, refactor, test, chore
+
+  # ============================
+  # Python-specific Checks
+  # ============================
+
+  # autopep8: Auto-fix des erreurs PEP 8 simples
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.0.4
+    hooks:
+      - id: autopep8
+        args: [--in-place, --aggressive, --aggressive]
+        exclude: ^(\.venv/|venv/)
+
+# Configuration globale
+default_language_version:
+  python: python3.10
+
+# Options globales
+fail_fast: false  # Continue même si un hook échoue
+minimum_pre_commit_version: '3.0.0'
+
+# Exclure certains chemins globalement
+exclude: |
+  (?x)^(
+    \.git/|
+    \.venv/|
+    venv/|
+    \.hypothesis/|
+    \.pytest_cache/|
+    \.mypy_cache/|
+    __pycache__/|
+    \.egg-info/|
+    dist/|
+    build/|
+    models/weights/|
+    logs/|
+    audit/signed/|
+    .*\.pyc$
+  )
