@@ -36,7 +36,6 @@ recursive-include tests *.py *.yaml
 # Exclude certain files
 exclude .gitignore
 exclude .gitkeep
-exclude =0.19.0
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .DS_Store
