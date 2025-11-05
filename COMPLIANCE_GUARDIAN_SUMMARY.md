@@ -373,6 +373,7 @@ mkdir -p secrets
 
 ```python
 import secrets
+import os
 
 # Générer clé 256-bit pour HMAC
 signing_key = secrets.token_bytes(32)
