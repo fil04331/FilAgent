@@ -2,7 +2,7 @@
 Configuration management for FilAgent
 Loads and validates configuration from YAML files
 """
-import yaml
+from ruamel.yaml import YAML
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -110,10 +110,19 @@ class AgentConfig(BaseModel):
         config_path = Path(config_dir) / "agent.yaml"
         
         if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-        
+            # Create a default config file if it doesn't exist
+            default_config = {
+                'agent': {'name': 'default_agent', 'version': '0.1.0'},
+                'model': {'name': 'default-model'}
+            }
+            os.makedirs(config_dir, exist_ok=True)
+            with open(config_path, 'w') as f:
+                yaml = YAML()
+                yaml.dump(default_config, f)
+
+        yaml = YAML(typ='safe')
         with open(config_path, 'r') as f:
-            raw_config = yaml.safe_load(f)
+            raw_config = yaml.load(f)
         
         # Extraire et valider chaque section
         agent_data = raw_config.get('agent', {})
@@ -189,9 +198,53 @@ class AgentConfig(BaseModel):
         return self.runtime_settings
 
     def save(self, config_path: str = "config/agent.yaml"):
-        """Sauvegarder la configuration actuelle"""
-        # TODO: Implémenter la sauvegarde si nécessaire
-        pass
+        """Sauvegarder la configuration actuelle en préservant les commentaires."""
+        from ruamel.yaml import YAML
+        from ruamel.yaml.comments import CommentedMap
+
+        yaml = YAML()
+        yaml.preserve_quotes = True
+
+        config_dir = os.path.dirname(config_path)
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                data = yaml.load(f)
+        else:
+            data = CommentedMap()
+
+        def update_section(cfg_section, model_instance):
+            if model_instance is None:
+                return
+            if cfg_section not in data or data[cfg_section] is None:
+                data[cfg_section] = CommentedMap()
+
+            model_dict = model_instance.model_dump() if hasattr(model_instance, 'model_dump') else model_instance.dict()
+            for k, v in model_dict.items():
+                data[cfg_section][k] = v
+
+        # Update agent section
+        if 'agent' not in data: data['agent'] = CommentedMap()
+        data['agent']['name'] = self.name
+        data['agent']['version'] = self.version
+        data['agent']['max_iterations'] = self.runtime_settings.max_iterations
+        data['agent']['timeout'] = self.runtime_settings.timeout
+
+        # Update other sections
+        update_section('generation', self.generation)
+        update_section('timeouts', self.timeouts)
+        update_section('model', self.model)
+        update_section('memory', self.memory)
+        update_section('logging', self.logging)
+        update_section('compliance', self.compliance)
+        update_section('htn_planning', self.htn_planning)
+        update_section('htn_execution', self.htn_execution)
+        update_section('htn_verification', self.htn_verification)
+
+        with open(config_path, 'w') as f:
+            yaml.dump(data, f)
 
 
 # Variable globale pour stocker la configuration
@@ -206,8 +259,8 @@ def get_config() -> AgentConfig:
     return _config
 
 
-def reload_config() -> AgentConfig:
+def reload_config(config_dir: str = "config") -> AgentConfig:
     """Recharger la configuration depuis les fichiers"""
     global _config
-    _config = AgentConfig.load()
+    _config = AgentConfig.load(config_dir=config_dir)
     return _config

@@ -177,7 +177,7 @@ class HierarchicalPlanner:
                 result = self._plan_hybrid(query, planning_metadata)
             
             # Validation finale du plan
-            self._validate_plan(result.graph)
+            self.validate_execution_plan(result.graph)
             
             # Traçabilité: succès
             planning_success = True
@@ -461,14 +461,15 @@ Réponds TOUJOURS en JSON valide sans markdown."""
         
         return graph
     
-    def _validate_plan(self, graph: TaskGraph):
+    def validate_execution_plan(self, graph: TaskGraph, forbidden_tools: List[str] = None):
         """
-        Valide la cohérence du plan
+        Valide la cohérence du plan et vérifie les outils non autorisés.
         
         Vérifications:
         - Au moins 1 tâche
         - Pas de cycles (déjà vérifié par TaskGraph)
         - Actions valides (si tools_registry disponible)
+        - Pas d'outils interdits
         - Dépendances cohérentes
         
         Raises:
@@ -477,13 +478,19 @@ Réponds TOUJOURS en JSON valide sans markdown."""
         if len(graph.tasks) == 0:
             raise TaskDecompositionError("Plan must contain at least one task")
         
-        # Vérifier que toutes les actions sont valides
+        forbidden_tools = forbidden_tools or []
+
+        # Vérifier que toutes les actions sont valides et non interdites
         if self.tools:
             available_actions = set(self._get_available_actions())
             for task in graph.tasks.values():
                 if task.action not in available_actions and task.action != "generic_execute":
                     raise TaskDecompositionError(
                         f"Unknown action '{task.action}' in task {task.task_id}"
+                    )
+                if task.action in forbidden_tools:
+                    raise TaskDecompositionError(
+                        f"Forbidden tool '{task.action}' in task {task.task_id}"
                     )
         
         # Vérifier tri topologique possible (pas de cycles)

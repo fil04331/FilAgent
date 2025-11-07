@@ -153,8 +153,7 @@ class TestPlanningStrategyLLMBased:
         """Test LLM_BASED avec modèle mock"""
         # Créer un mock modèle qui retourne une réponse JSON valide
         mock_model = Mock()
-        mock_response = {
-            "text": """{
+        mock_response = """{
   "tasks": [
     {
       "name": "read_file",
@@ -173,7 +172,6 @@ class TestPlanningStrategyLLMBased:
   ],
   "reasoning": "LLM decomposition test"
 }"""
-        }
         mock_model.generate.return_value = mock_response
         
         planner = HierarchicalPlanner(model_interface=mock_model)
@@ -191,7 +189,7 @@ class TestPlanningStrategyLLMBased:
     def test_llm_based_invalid_json_response(self):
         """Test gestion erreur JSON invalide du LLM"""
         mock_model = Mock()
-        mock_model.generate.return_value = {"text": "Invalid JSON response"}
+        mock_model.generate.return_value = "Invalid JSON response"
         
         planner = HierarchicalPlanner(model_interface=mock_model)
         
@@ -311,7 +309,7 @@ class TestPlannerValidation:
         )
         
         with pytest.raises(TaskDecompositionError, match="at least one task"):
-            planner._validate_plan(graph)
+            planner.validate_execution_plan(graph)
     
     def test_validate_invalid_action(self):
         """Test validation avec action invalide"""
@@ -328,7 +326,7 @@ class TestPlannerValidation:
         graph.add_task(task)
         
         with pytest.raises(TaskDecompositionError, match="Unknown action"):
-            planner._validate_plan(graph)
+            planner.validate_execution_plan(graph)
     
     def test_validate_plan_success(self):
         """Test validation plan valide"""
@@ -339,7 +337,7 @@ class TestPlannerValidation:
         graph.add_task(task)
         
         # Ne devrait pas lever d'exception
-        planner._validate_plan(graph)
+        planner.validate_execution_plan(graph)
 
 
 class TestPlannerHelperMethods:

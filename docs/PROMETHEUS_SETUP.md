@@ -269,7 +269,7 @@ receivers:
         from: 'prometheus@filagent.local'
         smarthost: 'smtp.example.com:587'
         auth_username: 'prometheus'
-        auth_password: 'password'
+        auth_password: '<YOUR_PASSWORD>'
 ```
 
 ### Démarrage Alertmanager

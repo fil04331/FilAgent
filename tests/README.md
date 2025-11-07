@@ -7,6 +7,7 @@ This directory contains the test suite for FilAgent.
 ```
 tests/
 ├── conftest.py              # Shared fixtures and pytest configuration
+├── test_config.py           # Configuration management tests
 ├── test_fixtures.py         # Fixture validation tests
 ├── test_memory.py           # Memory/episodic storage tests
 ├── test_tools.py            # Tool execution tests
