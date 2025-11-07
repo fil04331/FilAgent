@@ -39,7 +39,7 @@ class EventLogger:
 
         try:
             from runtime.middleware.redaction import get_pii_redactor
-        except Exception as exc:
+        except ImportError as exc:
             print(f"⚠ Failed to load PII redactor: {exc}")
             return event_data
 
