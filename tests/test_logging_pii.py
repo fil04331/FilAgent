@@ -46,7 +46,7 @@ def test_event_logger_masks_pii(tmp_path):
     assert log_files, "Aucun fichier de log généré"
 
     lines = [line for line in log_files[0].read_text(encoding="utf-8").splitlines() if line.strip()]
-    assert len(lines) >= 2, "Le scan PII devrait créer un log de détection + l'événement masqué"
+    assert len(lines) == 3, "Le scan PII devrait créer 2 logs de détection + 1 événement masqué"
 
     records = [json.loads(line) for line in lines]
 
