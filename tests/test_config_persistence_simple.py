@@ -93,7 +93,7 @@ def test_htn_config_persistence():
 
         # Verify HTN configs
         assert loaded.htn_planning is not None
-        assert loaded.htn_planning.enabled == True
+        assert loaded.htn_planning.enabled
         assert loaded.htn_planning.default_strategy == "hybrid"
         assert loaded.htn_planning.max_decomposition_depth == 5
 
