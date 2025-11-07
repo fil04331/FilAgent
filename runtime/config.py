@@ -188,10 +188,58 @@ class AgentConfig(BaseModel):
         """Compatibilité historique: expose les paramètres runtime via config.agent"""
         return self.runtime_settings
 
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert configuration to dictionary format suitable for YAML serialization.
+        Dynamically builds the nested memory dictionary from MemoryConfig fields.
+        """
+        # Dynamically build the nested memory dictionary
+        memory_dict = {"episodic": {}, "semantic": {}}
+        for field_name in self.memory.model_fields:
+            value = getattr(self.memory, field_name)
+            if field_name.startswith("episodic_"):
+                key = field_name.removeprefix("episodic_")
+                memory_dict["episodic"][key] = value
+            elif field_name.startswith("semantic_"):
+                key = field_name.removeprefix("semantic_")
+                memory_dict["semantic"][key] = value
+
+        config_dict = {
+            'agent': {
+                'name': self.name,
+                'version': self.version,
+                'max_iterations': self.runtime_settings.max_iterations,
+                'timeout': self.runtime_settings.timeout,
+            },
+            'generation': self.generation.model_dump(),
+            'timeouts': self.timeouts.model_dump(),
+            'model': self.model.model_dump(),
+            'memory': memory_dict,
+            'logging': self.logging.model_dump(),
+            'compliance': self.compliance.model_dump(),
+        }
+
+        # Add optional HTN configurations if they exist
+        if self.htn_planning is not None:
+            config_dict['htn_planning'] = self.htn_planning.model_dump()
+        if self.htn_execution is not None:
+            config_dict['htn_execution'] = self.htn_execution.model_dump()
+        if self.htn_verification is not None:
+            config_dict['htn_verification'] = self.htn_verification.model_dump()
+
+        return config_dict
+
     def save(self, config_path: str = "config/agent.yaml"):
         """Sauvegarder la configuration actuelle"""
-        # TODO: Implémenter la sauvegarde si nécessaire
-        pass
+        config_dict = self.to_dict()
+        
+        # Ensure directory exists
+        path = Path(config_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save to YAML file
+        with open(path, 'w') as f:
+            yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
 
 
 # Variable globale pour stocker la configuration
