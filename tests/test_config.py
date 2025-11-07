@@ -3,7 +3,7 @@ Tests for runtime.config module
 Focus on configuration serialization and the to_dict() method
 """
 import pytest
-from runtime.config import AgentConfig, MemoryConfig
+from runtime.config import AgentConfig, MemoryConfig, HTNPlanningConfig, HTNExecutionConfig, HTNVerificationConfig
 
 
 class TestMemoryConfigToDictDynamic:
@@ -113,8 +113,6 @@ class TestMemoryConfigToDictDynamic:
 
     def test_htn_configs_included_when_present(self):
         """Test that optional HTN configurations are included when set"""
-        from runtime.config import HTNPlanningConfig, HTNExecutionConfig, HTNVerificationConfig
-        
         config = AgentConfig(
             htn_planning=HTNPlanningConfig(),
             htn_execution=HTNExecutionConfig(),

@@ -230,7 +230,7 @@ class AgentConfig(BaseModel):
         return config_dict
 
     def save(self, config_path: str = "config/agent.yaml"):
-        """Sauvegarder la configuration actuelle"""
+        """Save the current configuration to a YAML file."""
         config_dict = self.to_dict()
         
         # Ensure directory exists
