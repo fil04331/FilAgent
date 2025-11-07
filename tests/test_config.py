@@ -168,7 +168,7 @@ class TestConfigPersistence:
             loaded_config = AgentConfig.load(str(tmpdir))
 
             # Verify compliance config
-            assert loaded_config.compliance.worm_enabled == False
+            assert loaded_config.compliance.worm_enabled is False
             assert loaded_config.compliance.dr_required_for == ["write_file", "delete_file"]
             assert loaded_config.compliance.pii_redaction == True
             assert loaded_config.compliance.provenance_tracking is False
