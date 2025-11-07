@@ -195,7 +195,7 @@ class AgentConfig(BaseModel):
         """
         # Dynamically build the nested memory dictionary
         memory_dict = {"episodic": {}, "semantic": {}}
-        for field_name in MemoryConfig.model_fields:
+        for field_name in MemoryConfig.model_fields.keys():
             value = getattr(self.memory, field_name)
             if field_name.startswith("episodic_"):
                 key = field_name.removeprefix("episodic_")

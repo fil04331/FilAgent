@@ -88,7 +88,6 @@ class TestMemoryConfigToDictDynamic:
     def test_to_dict_adapts_to_new_memory_fields(self):
         """Test that the dynamic approach would handle new memory fields"""
         # This test verifies the introspection approach
-        from runtime.config import MemoryConfig
         
         # Get all field names from MemoryConfig class
         memory_fields = MemoryConfig.model_fields.keys()
