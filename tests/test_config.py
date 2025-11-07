@@ -88,10 +88,10 @@ class TestMemoryConfigToDictDynamic:
     def test_to_dict_adapts_to_new_memory_fields(self):
         """Test that the dynamic approach would handle new memory fields"""
         # This test verifies the introspection approach
-        config = AgentConfig()
+        from runtime.config import MemoryConfig
         
-        # Get all field names from MemoryConfig
-        memory_fields = config.memory.model_fields.keys()
+        # Get all field names from MemoryConfig class
+        memory_fields = MemoryConfig.model_fields.keys()
         
         # Verify we have the expected prefixes
         episodic_fields = [f for f in memory_fields if f.startswith('episodic_')]
@@ -101,6 +101,7 @@ class TestMemoryConfigToDictDynamic:
         assert len(semantic_fields) > 0, "Should have semantic fields"
         
         # Verify to_dict() includes all of them
+        config = AgentConfig()
         result = config.to_dict()
         
         for field_name in episodic_fields:
