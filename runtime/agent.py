@@ -142,7 +142,13 @@ class Agent:
                     settings=guardian_config.to_guardian_settings()
                 )
             except Exception as exc:
-                print(f"⚠ Failed to initialize ComplianceGuardian from config: {exc}")
+                self.logger.log_event(
+                    actor="agent.init",
+                    event="compliance_guardian.init_failed",
+                    level="WARNING",
+                    conversation_id="system",
+                    metadata={"error": str(exc)}
+                )
                 guardian = ComplianceGuardian()
 
         # Ajouter le planificateur HTN
