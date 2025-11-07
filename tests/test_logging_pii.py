@@ -50,9 +50,20 @@ def test_event_logger_masks_pii(tmp_path):
 
     records = [json.loads(line) for line in lines]
 
-    detection_event = next((record for record in records if record["actor"] == "pii.redactor"), None)
-    assert detection_event is not None, "La détection PII devrait être consignée"
-    assert detection_event["metadata"]["pii_count"] >= 1
+    detection_events = [record for record in records if record["actor"] == "pii.redactor"]
+    assert len(detection_events) == 2, "Deux événements de détection PII auraient dû être consignés"
+
+    # Vérifier la détection de l'e-mail
+    email_detection = next((e for e in detection_events if e["metadata"]["context"]["field"] == "metadata.email"), None)
+    assert email_detection is not None, "L'événement de détection pour l'e-mail est manquant"
+    assert email_detection["metadata"]["pii_count"] == 1
+    assert email_detection["metadata"]["pii_types"] == ["email"]
+
+    # Vérifier la détection du téléphone dans la note
+    note_detection = next((e for e in detection_events if e["metadata"]["context"]["field"] == "metadata.note"), None)
+    assert note_detection is not None, "L'événement de détection pour la note est manquant"
+    assert note_detection["metadata"]["pii_count"] == 1
+    assert note_detection["metadata"]["pii_types"] == ["phone"]
 
     logged_event = next(
         (record for record in records if record["actor"] == "agent.core" and record["event"] == "unit_test"),
