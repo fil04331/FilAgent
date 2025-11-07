@@ -189,13 +189,13 @@ class AgentConfig(BaseModel):
         return self.runtime_settings
 
     def save(self, config_path: str = "config/agent.yaml"):
-        """Sauvegarder la configuration actuelle vers un fichier YAML"""
+        """Save the current configuration to a YAML file"""
         config_file = Path(config_path)
 
-        # Créer le répertoire parent si nécessaire
+        # Create parent directory if needed
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Construire la structure YAML qui correspond au format de load()
+        # Build YAML structure matching load() format
         config_dict = {
             'agent': {
                 'name': self.name,
@@ -221,7 +221,7 @@ class AgentConfig(BaseModel):
             'compliance': self.compliance.model_dump(),
         }
 
-        # Ajouter les configurations HTN optionnelles si présentes
+        # Add optional HTN configurations if present
         if self.htn_planning is not None:
             config_dict['htn_planning'] = self.htn_planning.model_dump()
         if self.htn_execution is not None:
@@ -229,7 +229,7 @@ class AgentConfig(BaseModel):
         if self.htn_verification is not None:
             config_dict['htn_verification'] = self.htn_verification.model_dump()
 
-        # Sauvegarder dans le fichier YAML
+        # Save to YAML file
         with open(config_file, 'w') as f:
             yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False, indent=2)
 
