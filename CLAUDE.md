@@ -212,14 +212,19 @@ htn_policies:
     backoff_base_sec: 1
 
 🧪 TESTS ET VALIDATION
-Tests unitaires à exécuter
-bash# Tests task_graph (DÉJÀ CRÉÉS)
+Tests unitaires disponibles
+bash# Tests du module planner
 pytest tests/test_planner/test_task_graph.py -v
-
-# Tests à créer pour couverture complète
 pytest tests/test_planner/test_planner.py -v
 pytest tests/test_planner/test_executor.py -v
 pytest tests/test_planner/test_verifier.py -v
+pytest tests/test_planner/test_agent_htn_integration.py -v
+
+# Exécuter tous les tests du module planner
+pytest tests/test_planner/ -v
+
+# Script de validation
+python3 tests/test_planner/run_validation.py
 
 # Tests d'intégration
 python3 examples/htn_integration_example.py
@@ -280,7 +285,7 @@ CHOOSE WITH --->  Tests d'intégration - Exécuter exemples et valider
 
 Court terme (2 semaines)
 
- Tests supplémentaires - Créer test_planner.py, test_executor.py, test_verifier.py
+ Tests supplémentaires - Améliorer couverture des tests existants
  Monitoring - Ajouter métriques Prometheus pour HTN
  Optimisations - Profiling et amélioration performance
  Recovery avancé - Implémenter circuit breaker, fallback
