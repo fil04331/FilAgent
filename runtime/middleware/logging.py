@@ -2,6 +2,7 @@
 
 import json
 import os
+from copy import deepcopy
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
@@ -30,6 +31,63 @@ class EventLogger:
         except Exception as exc:
             print(f"⚠ Failed to initialize WORM logger: {exc}")
             self.worm_logger = None
+
+    def _redact_event_data(self, event_data: Dict[str, Any], actor: str, event_name: str) -> Dict[str, Any]:
+        """Masquer toute PII avant écriture."""
+        if actor == "pii.redactor":
+            return event_data
+
+        try:
+            from runtime.middleware.redaction import get_pii_redactor
+        except Exception as exc:
+            print(f"⚠ Failed to load PII redactor: {exc}")
+            return event_data
+
+        redactor = get_pii_redactor()
+        if not getattr(redactor, "enabled", False):
+            return event_data
+
+        detector = getattr(redactor, "detector", None)
+        if detector is None:
+            return event_data
+
+        should_log_detection = getattr(redactor, "scan_before_logging", True)
+        sanitized = deepcopy(event_data)
+
+        def sanitize(value: Any, path: str) -> Any:
+            if isinstance(value, str):
+                if not value:
+                    return value
+
+                detected = detector.detect(value)
+                if detected:
+                    if should_log_detection:
+                        redactor.scan_and_log(
+                            value,
+                            context={
+                                "actor": actor,
+                                "event": event_name,
+                                "field": path or "root",
+                            },
+                        )
+                    return detector.redact(value, redactor.replacement_pattern)
+                return value
+
+            if isinstance(value, dict):
+                return {
+                    key: sanitize(val, f"{path}.{key}" if path else key)
+                    for key, val in value.items()
+                }
+
+            if isinstance(value, list):
+                return [
+                    sanitize(item, f"{path}[{idx}]" if path else f"[{idx}]")
+                    for idx, item in enumerate(value)
+                ]
+
+            return value
+
+        return sanitize(sanitized, "")
     
     def _get_today_log_file(self) -> Path:
         """Obtenir le fichier de log du jour actuel"""
@@ -95,13 +153,15 @@ class EventLogger:
 
         # Alias pour compatibilité avec certains consommateurs
         event_data["timestamp"] = event_data["ts"]
-        
+
         # Ajouter les références de hash si applicable
         if "input_ref" in (metadata or {}):
             event_data["input_ref"] = metadata["input_ref"]
         if "output_ref" in (metadata or {}):
             event_data["output_ref"] = metadata["output_ref"]
-        
+
+        event_data = self._redact_event_data(event_data, actor, event)
+
         # Sérialiser en JSONL
         line = json.dumps(event_data, ensure_ascii=False)
         self._write_line(line)
