@@ -88,7 +88,6 @@ class EventLogger:
             return value
 
         return sanitize(sanitized, "")
-    
     def _get_today_log_file(self) -> Path:
         """Obtenir le fichier de log du jour actuel"""
         today = datetime.now().strftime("%Y-%m-%d")
