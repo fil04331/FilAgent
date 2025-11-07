@@ -22,6 +22,10 @@ import json
 import re
 
 from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError
+from .compliance_guardian import (
+    ComplianceGuardian,
+    CompliancePolicyViolation,
+)
 from .metrics import get_metrics
 import time
 
@@ -93,6 +97,7 @@ class HierarchicalPlanner:
         tools_registry: Optional[Any] = None,
         max_decomposition_depth: int = 3,
         enable_tracing: bool = True,
+        compliance_guardian: Optional[ComplianceGuardian] = None,
     ):
         """
         Initialise le planificateur
@@ -107,6 +112,7 @@ class HierarchicalPlanner:
         self.tools = tools_registry
         self.max_depth = max_decomposition_depth
         self.enable_tracing = enable_tracing
+        self.compliance_guardian = compliance_guardian or ComplianceGuardian()
         
         # Patterns courants pour règles prédéfinies
         self._init_rule_patterns()
@@ -168,6 +174,8 @@ class HierarchicalPlanner:
             "context": context or {},
         }
         
+        result: Optional[PlanningResult] = None
+
         try:
             if strategy == PlanningStrategy.RULE_BASED:
                 result = self._plan_rule_based(query, planning_metadata)
@@ -175,10 +183,14 @@ class HierarchicalPlanner:
                 result = self._plan_llm_based(query, planning_metadata)
             else:  # HYBRID
                 result = self._plan_hybrid(query, planning_metadata)
-            
+
             # Validation finale du plan
             self._validate_plan(result.graph)
-            
+
+            if self.compliance_guardian:
+                compliance_report = self.compliance_guardian.assess_plan(result)
+                result.metadata["compliance_guardian"] = compliance_report.to_dict()
+
             # Traçabilité: succès
             planning_success = True
             result.metadata["completed_at"] = datetime.utcnow().isoformat()
@@ -195,7 +207,26 @@ class HierarchicalPlanner:
             )
             
             return result
-            
+
+        except CompliancePolicyViolation as violation:
+            planning_metadata["completed_at"] = datetime.utcnow().isoformat()
+            planning_metadata["error"] = str(violation)
+            planning_metadata["validation_passed"] = False
+            planning_metadata["compliance_guardian_error"] = violation.details
+
+            duration_seconds = time.time() - start_time
+            metrics.record_planning(
+                strategy=strategy.value,
+                success=False,
+                duration_seconds=duration_seconds,
+                confidence=0.0,
+                tasks_count=len(result.graph.tasks) if result else 0,
+            )
+
+            raise TaskDecompositionError(
+                f"Planning rejected by ComplianceGuardian: {str(violation)}"
+            ) from violation
+
         except Exception as e:
             # Traçabilité: échec
             planning_metadata["completed_at"] = datetime.utcnow().isoformat()

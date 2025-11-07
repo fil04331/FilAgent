@@ -328,6 +328,34 @@ security:
 
 
 # ============================================================================
+# MODULE COMPLIANCE GUARDIAN
+# ============================================================================
+# Paramétrage du garde-fou de conformité
+
+compliance_guardian:
+  # Active le module de supervision
+  enabled: true
+
+  # Mode strict: bloque les plans non conformes
+  # Dev/Test: false pour faciliter le debug
+  # Production: true pour garantir la conformité
+  strict_mode: false
+
+  # Seuils de charge acceptables
+  max_tasks: 60
+  max_branching_factor: 12
+  warning_stress_threshold: 0.7
+  failure_stress_threshold: 0.9
+
+  # Actions sensibles à surveiller
+  flagged_actions:
+    - "delete_file"
+    - "drop_database"
+    - "exfiltrate_data"
+    - "disable_compliance"
+
+
+# ============================================================================
 # SECTION 9: INTÉGRATIONS EXTERNES
 # ============================================================================
 # Configuration des intégrations avec outils externes
@@ -402,6 +430,8 @@ environments:
     performance:
       max_workers: 4
       enable_plan_caching: true
+    compliance_guardian:
+      strict_mode: true
 
 
 # ============================================================================

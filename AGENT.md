@@ -1,3 +1,23 @@
+# 🛠️ Journal de Mission (2025-??-??)
+
+> **Mise à jour**: Intégration finale du module **ComplianceGuardian**
+
+## 🎯 Objectifs en cours
+
+1. **Stress-tests HTN** – ajouter des scénarios haute charge pour valider la robustesse du planificateur.
+2. **Configuration stricte prod** – activer `compliance_guardian.strict_mode` dans la configuration de production.
+3. **Guide d'exception** – documenter la procédure de contournement/exception lorsque ComplianceGuardian bloque un plan.
+
+### Suivi d'avancement
+
+| Objectif | État | Notes |
+| --- | --- | --- |
+| Stress-tests HTN | ✅ Terminé | `tests/test_planner/test_planner_stress.py` ajouté |
+| Strict mode production | ✅ Terminé | `compliance_guardian.strict_mode` activé pour `production` |
+| Guide d'exception | ✅ Terminé | SOP ajoutée dans `docs/SOPs/compliance_guardian_exceptions.md` |
+
+---
+
 # 🎯 TASK CARD: Configuration HTN Planning
 
 **ID Task**: HTN-INT-002  

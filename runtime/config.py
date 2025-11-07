@@ -63,6 +63,33 @@ class ComplianceConfig(BaseModel):
     provenance_tracking: bool = True
 
 
+class ComplianceGuardianConfig(BaseModel):
+    """Configuration du module ComplianceGuardian"""
+
+    enabled: bool = True
+    strict_mode: bool = False
+    max_tasks: int = Field(default=60, ge=1)
+    max_branching_factor: int = Field(default=12, ge=0)
+    warning_stress_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    failure_stress_threshold: float = Field(default=0.9, ge=0.0, le=1.0)
+    flagged_actions: list[str] = Field(default_factory=list)
+
+    def to_guardian_settings(self) -> "ComplianceGuardianSettings":
+        """Convertit la configuration en settings runtime."""
+
+        from planner.compliance_guardian import ComplianceGuardianSettings
+
+        return ComplianceGuardianSettings(
+            enabled=self.enabled,
+            strict_mode=self.strict_mode,
+            max_tasks=self.max_tasks,
+            max_branching_factor=self.max_branching_factor,
+            warning_stress_threshold=self.warning_stress_threshold,
+            failure_stress_threshold=self.failure_stress_threshold,
+            flagged_actions=self.flagged_actions,
+        )
+
+
 class AgentRuntimeSettings(BaseModel):
     """Configuration opérationnelle de l'agent"""
     max_iterations: int = 10
@@ -99,6 +126,7 @@ class AgentConfig(BaseModel):
     memory: MemoryConfig = MemoryConfig()
     logging: LoggingConfig = LoggingConfig()
     compliance: ComplianceConfig = ComplianceConfig()
+    compliance_guardian: ComplianceGuardianConfig = ComplianceGuardianConfig()
     runtime_settings: AgentRuntimeSettings = AgentRuntimeSettings()
     htn_planning: Optional[HTNPlanningConfig] = None
     htn_execution: Optional[HTNExecutionConfig] = None
@@ -123,6 +151,7 @@ class AgentConfig(BaseModel):
         memory_data = raw_config.get('memory', {})
         logging_data = raw_config.get('logging', {})
         compliance_data = raw_config.get('compliance', {})
+        compliance_guardian_data = raw_config.get('compliance_guardian', {})
         htn_planning_data = raw_config.get('htn_planning', {})
         htn_execution_data = raw_config.get('htn_execution', {})
         htn_verification_data = raw_config.get('htn_verification', {})
@@ -177,6 +206,7 @@ class AgentConfig(BaseModel):
             memory=memory_config,
             logging=LoggingConfig(**logging_data),
             compliance=ComplianceConfig(**compliance_data),
+            compliance_guardian=ComplianceGuardianConfig(**compliance_guardian_data),
             runtime_settings=runtime_settings,
             htn_planning=htn_planning_config,
             htn_execution=htn_execution_config,

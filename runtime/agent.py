@@ -28,6 +28,7 @@ from planner import (
     PlanningStrategy,
     ExecutionStrategy,
     VerificationLevel,
+    ComplianceGuardian,
 )
 from planner.task_graph import TaskStatus
 
@@ -127,19 +128,30 @@ class Agent:
         htn_config = getattr(self.config, 'htn_planning', None)
         exec_config = getattr(self.config, 'htn_execution', None)
         verif_config = getattr(self.config, 'htn_verification', None)
+        guardian_config = getattr(self.config, 'compliance_guardian', None)
         
         # Valeurs par défaut si configuration non présente
         max_depth = htn_config.max_decomposition_depth if htn_config else 3
         max_workers = exec_config.max_parallel_workers if exec_config else 4
         task_timeout = exec_config.task_timeout_sec if exec_config else 60
         verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
-        
+        guardian = None
+        if guardian_config:
+            try:
+                guardian = ComplianceGuardian(
+                    settings=guardian_config.to_guardian_settings()
+                )
+            except Exception as exc:
+                print(f"⚠ Failed to initialize ComplianceGuardian from config: {exc}")
+                guardian = ComplianceGuardian()
+
         # Ajouter le planificateur HTN
         self.planner = HierarchicalPlanner(
             model_interface=self.model,
             tools_registry=self.tool_registry,
             max_decomposition_depth=max_depth,
             enable_tracing=True,
+            compliance_guardian=guardian,
         )
         
         # Ajouter l'exécuteur

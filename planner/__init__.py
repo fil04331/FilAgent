@@ -32,6 +32,13 @@ from .planner import (
     PlanningResult,
 )
 
+from .compliance_guardian import (
+    ComplianceGuardian,
+    ComplianceGuardianSettings,
+    CompliancePolicyViolation,
+    ComplianceReport,
+)
+
 from .executor import (
     TaskExecutor,
     ExecutionResult,
@@ -57,7 +64,13 @@ __all__ = [
     "HierarchicalPlanner",
     "PlanningStrategy",
     "PlanningResult",
-    
+
+    # Compliance guardian
+    "ComplianceGuardian",
+    "ComplianceGuardianSettings",
+    "CompliancePolicyViolation",
+    "ComplianceReport",
+
     # Executor
     "TaskExecutor",
     "ExecutionResult",
