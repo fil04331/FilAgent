@@ -189,9 +189,49 @@ class AgentConfig(BaseModel):
         return self.runtime_settings
 
     def save(self, config_path: str = "config/agent.yaml"):
-        """Sauvegarder la configuration actuelle"""
-        # TODO: Implémenter la sauvegarde si nécessaire
-        pass
+        """Sauvegarder la configuration actuelle vers un fichier YAML"""
+        config_file = Path(config_path)
+
+        # Créer le répertoire parent si nécessaire
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Construire la structure YAML qui correspond au format de load()
+        config_dict = {
+            'agent': {
+                'name': self.name,
+                'version': self.version,
+                'max_iterations': self.runtime_settings.max_iterations,
+                'timeout': self.runtime_settings.timeout,
+            },
+            'generation': self.generation.model_dump(),
+            'timeouts': self.timeouts.model_dump(),
+            'model': self.model.model_dump(),
+            'memory': {
+                'episodic': {
+                    'ttl_days': self.memory.episodic_ttl_days,
+                    'max_conversations': self.memory.episodic_max_conversations,
+                },
+                'semantic': {
+                    'rebuild_days': self.memory.semantic_rebuild_days,
+                    'max_items': self.memory.semantic_max_items,
+                    'similarity_threshold': self.memory.semantic_similarity_threshold,
+                }
+            },
+            'logging': self.logging.model_dump(),
+            'compliance': self.compliance.model_dump(),
+        }
+
+        # Ajouter les configurations HTN optionnelles si présentes
+        if self.htn_planning is not None:
+            config_dict['htn_planning'] = self.htn_planning.model_dump()
+        if self.htn_execution is not None:
+            config_dict['htn_execution'] = self.htn_execution.model_dump()
+        if self.htn_verification is not None:
+            config_dict['htn_verification'] = self.htn_verification.model_dump()
+
+        # Sauvegarder dans le fichier YAML
+        with open(config_file, 'w') as f:
+            yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False, indent=2)
 
 
 # Variable globale pour stocker la configuration
