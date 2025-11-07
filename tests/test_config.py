@@ -170,7 +170,7 @@ class TestConfigPersistence:
             # Verify compliance config
             assert loaded_config.compliance.worm_enabled is False
             assert loaded_config.compliance.dr_required_for == ["write_file", "delete_file"]
-            assert loaded_config.compliance.pii_redaction == True
+            assert loaded_config.compliance.pii_redaction is True
             assert loaded_config.compliance.provenance_tracking is False
 
     def test_save_creates_directory_if_not_exists(self):
