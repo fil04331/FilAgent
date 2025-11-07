@@ -33,13 +33,28 @@ class EventLogger:
             self.worm_logger = None
 
     def _redact_event_data(self, event_data: Dict[str, Any], actor: str, event_name: str) -> Dict[str, Any]:
-        """Masquer toute PII avant écriture."""
+        """
+        Recursively redacts personally identifiable information (PII) from the event data before logging.
+
+        - If the actor is 'pii.redactor', redaction is bypassed and the data is returned as-is.
+        - The method returns a deep copy of the input data, leaving the original unmodified.
+        - Traverses nested dictionaries and lists to redact PII in all string fields.
+        - If PII is detected, may trigger a logging side effect via the redactor's scan_and_log method.
+
+        Args:
+            event_data: The event data dictionary to be redacted.
+            actor: The actor performing the logging; if 'pii.redactor', redaction is skipped.
+            event_name: The name of the event being logged (used for context in logging).
+
+        Returns:
+            A deep copy of event_data with PII redacted where detected.
+        """
         if actor == "pii.redactor":
             return event_data
 
         try:
             from runtime.middleware.redaction import get_pii_redactor
-        except ImportError as exc:
+        except (ImportError, ModuleNotFoundError) as exc:
             print(f"⚠ Failed to load PII redactor: {exc}")
             return event_data
 
@@ -250,3 +265,9 @@ def init_logger(log_dir: str = "logs/events"):
     global _logger
     _logger = EventLogger(log_dir)
     return _logger
+
+
+def reset_logger():
+    """Reset the global logger instance (primarily for testing)"""
+    global _logger
+    _logger = None

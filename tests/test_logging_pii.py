@@ -75,8 +75,8 @@ def test_event_logger_masks_pii(tmp_path):
     assert "[REDACTED]" in logged_event["metadata"]["note"]
 
     # Réinitialiser les singletons globaux pour éviter les fuites entre tests
-    from runtime.middleware import logging as logging_mw
-    from runtime.middleware import redaction as redaction_mw
+    from runtime.middleware.logging import reset_logger
+    from runtime.middleware.redaction import reset_pii_redactor
 
-    logging_mw._logger = None
-    redaction_mw._pii_redactor = None
+    reset_logger()
+    reset_pii_redactor()
