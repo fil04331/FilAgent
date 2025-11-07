@@ -214,13 +214,18 @@ class HierarchicalPlanner:
             planning_metadata["validation_passed"] = False
             planning_metadata["compliance_guardian_error"] = violation.details
 
+            # Handle case where result may not have been assigned yet
+            tasks_count = 0
+            if result is not None:
+                tasks_count = len(result.graph.tasks)
+
             duration_seconds = time.time() - start_time
             metrics.record_planning(
                 strategy=strategy.value,
                 success=False,
                 duration_seconds=duration_seconds,
                 confidence=0.0,
-                tasks_count=len(result.graph.tasks) if result else 0,
+                tasks_count=tasks_count,
             )
 
             raise TaskDecompositionError(
