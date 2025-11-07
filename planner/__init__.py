@@ -45,6 +45,14 @@ from .verifier import (
     VerificationLevel,
 )
 
+from .policy_loader import (
+    PolicyLoader,
+    HTNPolicies,
+    PolicyValidationError,
+    get_policy_loader,
+    init_policy_loader,
+)
+
 __all__ = [
     # Core types
     "Task",
@@ -52,22 +60,29 @@ __all__ = [
     "TaskPriority",
     "TaskGraph",
     "TaskDecompositionError",
-    
+
     # Planner
     "HierarchicalPlanner",
     "PlanningStrategy",
     "PlanningResult",
-    
+
     # Executor
     "TaskExecutor",
     "ExecutionResult",
     "ExecutionError",
     "ExecutionStrategy",
-    
+
     # Verifier
     "TaskVerifier",
     "VerificationResult",
     "VerificationLevel",
+
+    # Policy
+    "PolicyLoader",
+    "HTNPolicies",
+    "PolicyValidationError",
+    "get_policy_loader",
+    "init_policy_loader",
 ]
 
 __version__ = "1.0.0"
