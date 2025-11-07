@@ -51,12 +51,12 @@ def test_basic_save_and_load():
         loaded = AgentConfig.load(str(tmpdir))
 
         # Verify
-        assert loaded.name == "test_agent"
-        assert loaded.version == "1.0.0"
-        assert loaded.generation.temperature == 0.5
-        assert loaded.generation.max_tokens == 1000
-        assert loaded.runtime_settings.max_iterations == 15
-        assert loaded.runtime_settings.timeout == 400
+        assert loaded.name == original.name
+        assert loaded.version == original.version
+        assert loaded.generation.temperature == original.generation.temperature
+        assert loaded.generation.max_tokens == original.generation.max_tokens
+        assert loaded.runtime_settings.max_iterations == original.runtime_settings.max_iterations
+        assert loaded.runtime_settings.timeout == original.runtime_settings.timeout
 
     print("✓ Basic save and load test passed")
 
