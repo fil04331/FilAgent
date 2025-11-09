@@ -45,6 +45,14 @@ from .verifier import (
     VerificationLevel,
 )
 
+from .policy_loader import (
+    PolicyLoader,
+    PolicyValidationError,
+    HTNPolicies,
+    get_policy_loader,
+    init_policy_loader,
+)
+
 __all__ = [
     # Core types
     "Task",
@@ -68,6 +76,13 @@ __all__ = [
     "TaskVerifier",
     "VerificationResult",
     "VerificationLevel",
+    
+    # Policy Loader
+    "PolicyLoader",
+    "PolicyValidationError",
+    "HTNPolicies",
+    "get_policy_loader",
+    "init_policy_loader",
 ]
 
 __version__ = "1.0.0"

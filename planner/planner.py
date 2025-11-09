@@ -23,6 +23,7 @@ import re
 
 from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError
 from .metrics import get_metrics
+from .policy_loader import get_policy_loader, PolicyValidationError
 import time
 
 
@@ -469,6 +470,8 @@ Réponds TOUJOURS en JSON valide sans markdown."""
         - Au moins 1 tâche
         - Pas de cycles (déjà vérifié par TaskGraph)
         - Actions valides (si tools_registry disponible)
+        - Actions non interdites par les politiques (blocked_actions)
+        - Limites de tâches par plan
         - Dépendances cohérentes
         
         Raises:
@@ -477,7 +480,24 @@ Réponds TOUJOURS en JSON valide sans markdown."""
         if len(graph.tasks) == 0:
             raise TaskDecompositionError("Plan must contain at least one task")
         
-        # Vérifier que toutes les actions sont valides
+        # Charger les politiques HTN
+        policy_loader = get_policy_loader()
+        
+        # Extraire toutes les actions du plan
+        actions_in_plan = [task.action for task in graph.tasks.values()]
+        
+        # Valider le plan contre les politiques (nombre de tâches et actions interdites)
+        try:
+            policy_loader.validate_plan(
+                task_count=len(graph.tasks),
+                actions=actions_in_plan
+            )
+        except PolicyValidationError as e:
+            raise TaskDecompositionError(
+                f"Plan violates HTN policies: {str(e)}"
+            ) from e
+        
+        # Vérifier que toutes les actions sont valides (si tools_registry disponible)
         if self.tools:
             available_actions = set(self._get_available_actions())
             for task in graph.tasks.values():
