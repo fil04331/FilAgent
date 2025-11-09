@@ -245,13 +245,20 @@ class AgentConfig(BaseModel):
         else:
             data = CommentedMap()
         
+        def model_to_dict(model_instance):
+            """Return dict representation of a Pydantic model (v1/v2 compatible)"""
+            if hasattr(model_instance, "model_dump"):
+                return model_instance.model_dump()
+            else:
+                return model_instance.dict()
+
         def update_section(cfg_section, model_instance):
             if model_instance is None:
                 return
             if cfg_section not in data or data[cfg_section] is None:
                 data[cfg_section] = CommentedMap()
             
-            model_dict = model_instance.model_dump() if hasattr(model_instance, 'model_dump') else model_instance.dict()
+            model_dict = model_to_dict(model_instance)
             for k, v in model_dict.items():
                 data[cfg_section][k] = v
         
