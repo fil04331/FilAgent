@@ -199,6 +199,13 @@ class AgentConfig(BaseModel):
 
     def save(self, config_path: str = "config/agent.yaml"):
         """Sauvegarder la configuration actuelle en préservant les commentaires."""
+        def model_to_dict(model_instance):
+            """Return dict representation of a Pydantic model (v1/v2 compatible)"""
+            if hasattr(model_instance, "model_dump"):
+                return model_instance.model_dump()
+            else:
+                return model_instance.dict()
+        
         if not RUAMEL_AVAILABLE:
             # Fallback vers pyyaml si ruamel.yaml n'est pas disponible
             config_dict = {
@@ -208,20 +215,20 @@ class AgentConfig(BaseModel):
                     'max_iterations': self.runtime_settings.max_iterations,
                     'timeout': self.runtime_settings.timeout,
                 },
-                'generation': self.generation.model_dump() if hasattr(self.generation, 'model_dump') else self.generation.dict(),
-                'timeouts': self.timeouts.model_dump() if hasattr(self.timeouts, 'model_dump') else self.timeouts.dict(),
-                'model': self.model.model_dump() if hasattr(self.model, 'model_dump') else self.model.dict(),
-                'memory': self.memory.model_dump() if hasattr(self.memory, 'model_dump') else self.memory.dict(),
-                'logging': self.logging.model_dump() if hasattr(self.logging, 'model_dump') else self.logging.dict(),
-                'compliance': self.compliance.model_dump() if hasattr(self.compliance, 'model_dump') else self.compliance.dict(),
+                'generation': model_to_dict(self.generation),
+                'timeouts': model_to_dict(self.timeouts),
+                'model': model_to_dict(self.model),
+                'memory': model_to_dict(self.memory),
+                'logging': model_to_dict(self.logging),
+                'compliance': model_to_dict(self.compliance),
             }
             
             if self.htn_planning:
-                config_dict['htn_planning'] = self.htn_planning.model_dump() if hasattr(self.htn_planning, 'model_dump') else self.htn_planning.dict()
+                config_dict['htn_planning'] = model_to_dict(self.htn_planning)
             if self.htn_execution:
-                config_dict['htn_execution'] = self.htn_execution.model_dump() if hasattr(self.htn_execution, 'model_dump') else self.htn_execution.dict()
+                config_dict['htn_execution'] = model_to_dict(self.htn_execution)
             if self.htn_verification:
-                config_dict['htn_verification'] = self.htn_verification.model_dump() if hasattr(self.htn_verification, 'model_dump') else self.htn_verification.dict()
+                config_dict['htn_verification'] = model_to_dict(self.htn_verification)
             
             config_dir = os.path.dirname(config_path)
             if config_dir and not os.path.exists(config_dir):
@@ -245,14 +252,18 @@ class AgentConfig(BaseModel):
         else:
             data = CommentedMap()
         
-        def model_to_dict(model_instance):
-            """Return dict representation of a Pydantic model (v1/v2 compatible)"""
-            if hasattr(model_instance, "model_dump"):
-                return model_instance.model_dump()
-            else:
-                return model_instance.dict()
-
         def update_section(cfg_section, model_instance):
+            """
+            Update a section of the configuration with data from a model instance, preserving YAML comments.
+
+            Args:
+                cfg_section (str): The name of the section in the config to update.
+                model_instance (BaseModel): The model instance whose data will be serialized into the config.
+
+            Purpose:
+                Updates the specified config section with the serialized data from the model instance,
+                while preserving any existing comments in the YAML file.
+            """
             if model_instance is None:
                 return
             if cfg_section not in data or data[cfg_section] is None:
