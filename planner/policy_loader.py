@@ -233,7 +233,9 @@ def get_policy_loader(config_path: str = "config/policies.yaml") -> PolicyLoader
     """
     global _policy_loader
     if _policy_loader is None:
-        _policy_loader = PolicyLoader(config_path)
+        with _policy_loader_lock:
+            if _policy_loader is None:
+                _policy_loader = PolicyLoader(config_path)
     return _policy_loader
 
 
