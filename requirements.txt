@@ -3,6 +3,7 @@
 
 # Core dependencies
 pyyaml>=6.0.1
+ruamel.yaml>=0.17.21
 pydantic>=2.5.0
 python-dotenv>=1.0.0
 
