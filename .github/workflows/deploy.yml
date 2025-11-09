@@ -1,0 +1,108 @@
+name: Déploiement FilAgent
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement cible'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+jobs:
+  validate:
+    name: Validation pré-déploiement
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate configuration
+        run: |
+          echo "📋 Validation des configurations..."
+          for file in config/*.yaml; do
+            python -c "import yaml; yaml.safe_load(open('$file'))"
+            echo "✅ $file valide"
+          done
+
+      - name: Check compliance requirements
+        run: |
+          echo "🔒 Vérification conformité..."
+          required_files=(
+            "runtime/middleware/worm.py"
+            "runtime/middleware/audittrail.py"
+            "runtime/middleware/redaction.py"
+            "runtime/middleware/rbac.py"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Fichier critique manquant: $file"
+              exit 1
+            fi
+          done
+          echo "✅ Tous les modules de conformité présents"
+
+  package:
+    name: Package Application
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create deployment package
+        run: |
+          # Créer package de déploiement
+          mkdir -p dist/filagent
+
+          # Copier code
+          cp -r runtime tools memory config dist/filagent/
+          cp requirements.txt dist/filagent/
+
+          # Créer script de démarrage
+          cat > dist/filagent/start.sh << 'EOF'
+          #!/bin/bash
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          python -c "from memory.episodic import create_tables; create_tables()"
+          python runtime/server.py
+          EOF
+
+          chmod +x dist/filagent/start.sh
+
+          # Créer archive
+          tar -czf filagent-deployment.tar.gz -C dist filagent
+
+      - name: Upload package
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-package
+          path: filagent-deployment.tar.gz
+
+  deploy-staging:
+    name: Déployer en Staging
+    runs-on: ubuntu-latest
+    needs: package
+    if: github.event.inputs.environment == 'staging' || github.event_name == 'release'
+    environment:
+      name: staging
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v3
+        with:
+          name: deployment-package
+
+      - name: Deploy to staging
+        run: |
+          echo "🚀 Déploiement en staging..."
+          # Ici: ajoutez vos commandes de déploiement réelles
+          # Par exemple: scp, rsync, kubectl, docker push, etc.
+          echo "✅ Déployé en staging"
