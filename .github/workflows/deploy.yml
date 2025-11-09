@@ -1,4 +1,6 @@
 name: Déploiement FilAgent
+permissions:
+  contents: read
 
 on:
   release:
