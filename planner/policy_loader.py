@@ -177,7 +177,7 @@ class PolicyLoader:
             )
 
         # Valider chaque action
-        for action in actions:
+        for action in set(actions):
             self.validate_action(action)
 
     def get_blocked_actions(self) -> Set[str]:
