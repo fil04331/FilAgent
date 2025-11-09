@@ -2,6 +2,15 @@
 Configuration management for FilAgent
 Loads and validates configuration from YAML files
 """
+try:
+    from ruamel.yaml import YAML
+    from ruamel.yaml.comments import CommentedMap
+    RUAMEL_AVAILABLE = True
+except ImportError:
+    RUAMEL_AVAILABLE = False
+    YAML = None
+    CommentedMap = None
+
 import yaml
 import os
 from pathlib import Path
@@ -189,9 +198,85 @@ class AgentConfig(BaseModel):
         return self.runtime_settings
 
     def save(self, config_path: str = "config/agent.yaml"):
-        """Sauvegarder la configuration actuelle"""
-        # TODO: Implémenter la sauvegarde si nécessaire
-        pass
+        """Sauvegarder la configuration actuelle en préservant les commentaires."""
+        if not RUAMEL_AVAILABLE:
+            # Fallback vers pyyaml si ruamel.yaml n'est pas disponible
+            config_dict = {
+                'agent': {
+                    'name': self.name,
+                    'version': self.version,
+                    'max_iterations': self.runtime_settings.max_iterations,
+                    'timeout': self.runtime_settings.timeout,
+                },
+                'generation': self.generation.model_dump() if hasattr(self.generation, 'model_dump') else self.generation.dict(),
+                'timeouts': self.timeouts.model_dump() if hasattr(self.timeouts, 'model_dump') else self.timeouts.dict(),
+                'model': self.model.model_dump() if hasattr(self.model, 'model_dump') else self.model.dict(),
+                'memory': self.memory.model_dump() if hasattr(self.memory, 'model_dump') else self.memory.dict(),
+                'logging': self.logging.model_dump() if hasattr(self.logging, 'model_dump') else self.logging.dict(),
+                'compliance': self.compliance.model_dump() if hasattr(self.compliance, 'model_dump') else self.compliance.dict(),
+            }
+            
+            if self.htn_planning:
+                config_dict['htn_planning'] = self.htn_planning.model_dump() if hasattr(self.htn_planning, 'model_dump') else self.htn_planning.dict()
+            if self.htn_execution:
+                config_dict['htn_execution'] = self.htn_execution.model_dump() if hasattr(self.htn_execution, 'model_dump') else self.htn_execution.dict()
+            if self.htn_verification:
+                config_dict['htn_verification'] = self.htn_verification.model_dump() if hasattr(self.htn_verification, 'model_dump') else self.htn_verification.dict()
+            
+            config_dir = os.path.dirname(config_path)
+            if config_dir and not os.path.exists(config_dir):
+                os.makedirs(config_dir, exist_ok=True)
+            
+            with open(config_path, 'w') as f:
+                yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
+            return
+        
+        # Utiliser ruamel.yaml pour préserver les commentaires
+        yaml_loader = YAML()
+        yaml_loader.preserve_quotes = True
+        
+        config_dir = os.path.dirname(config_path)
+        if config_dir and not os.path.exists(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                data = yaml_loader.load(f)
+        else:
+            data = CommentedMap()
+        
+        def update_section(cfg_section, model_instance):
+            if model_instance is None:
+                return
+            if cfg_section not in data or data[cfg_section] is None:
+                data[cfg_section] = CommentedMap()
+            
+            model_dict = model_instance.model_dump() if hasattr(model_instance, 'model_dump') else model_instance.dict()
+            for k, v in model_dict.items():
+                data[cfg_section][k] = v
+        
+        # Update agent section
+        if 'agent' not in data:
+            data['agent'] = CommentedMap()
+        data['agent']['name'] = self.name
+        data['agent']['version'] = self.version
+        data['agent']['max_iterations'] = self.runtime_settings.max_iterations
+        data['agent']['timeout'] = self.runtime_settings.timeout
+        
+        # Update other sections
+        update_section('generation', self.generation)
+        update_section('timeouts', self.timeouts)
+        update_section('model', self.model)
+        update_section('memory', self.memory)
+        update_section('logging', self.logging)
+        update_section('compliance', self.compliance)
+        update_section('htn_planning', self.htn_planning)
+        update_section('htn_execution', self.htn_execution)
+        update_section('htn_verification', self.htn_verification)
+        
+        # Sauvegarder
+        with open(config_path, 'w') as f:
+            yaml_loader.dump(data, f)
 
 
 # Variable globale pour stocker la configuration
