@@ -166,6 +166,32 @@ class Agent:
         )
         print("✓ HTN system initialized")
 
+    def _resolve_verification_level(self, verif_config: Any) -> VerificationLevel:
+        """Normalise le niveau de vérification issu de la configuration."""
+        if not verif_config or self._is_mock(verif_config):
+            return VerificationLevel.STRICT
+
+        level_value = getattr(verif_config, "default_level", None)
+
+        if isinstance(level_value, VerificationLevel):
+            return level_value
+
+        if isinstance(level_value, str):
+            try:
+                return VerificationLevel(level_value.lower())
+            except ValueError:
+                pass
+
+        # Certains objets de config utilisent .value pour stocker l'enum
+        if hasattr(level_value, "value"):
+            try:
+                return VerificationLevel(str(level_value.value).lower())
+            except ValueError:
+                pass
+
+        # Gestion des mocks ou valeurs inattendues
+        return VerificationLevel.STRICT
+
     def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Analyser un message utilisateur et orchestrer la réponse de l'agent."""
 

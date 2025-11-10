@@ -423,11 +423,10 @@ class TaskExecutor:
             result = action_func(task.params)
             return result
         except Exception as e:
-            # Inclure le type d'exception dans le message pour faciliter le debugging
-            error_type = type(e).__name__
-            error_msg = str(e).strip() if str(e).strip() else f"{error_type} raised"
-            raise ExecutionError(f"Action '{task.action}' failed: {error_type}: {error_msg}") from e
-
+            raise ExecutionError(
+                f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}"
+            ) from e
+    
     def _check_dependencies(self, task: Task, graph: TaskGraph) -> bool:
         """
         Vérifie que toutes les dépendances sont complétées

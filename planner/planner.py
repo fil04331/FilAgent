@@ -389,13 +389,33 @@ Réponds TOUJOURS en JSON valide sans markdown."""
         """Retourne la liste des actions disponibles"""
         if self.tools:
             return [tool.name for tool in self.tools.get_all()]
-        return ["read_file", "write_file", "search", "calculate", "analyze_data", "generate_report", "execute_code"]
-
-    def _parse_llm_response(self, response: str) -> Dict[str, Any]:
-        """Parse la réponse JSON du LLM"""
-        # Si response est déjà un dict, le retourner directement
+        return [
+            "read_file", "write_file", "search", "calculate",
+            "analyze_data", "generate_report", "execute_code"
+        ]
+    
+    def _parse_llm_response(self, response: Any) -> Dict[str, Any]:
+        """Parse la réponse JSON du LLM ou retourne directement un dictionnaire."""
         if isinstance(response, dict):
-            return response
+            if "tasks" in response:
+                return response
+            if "text" in response and isinstance(response["text"], str):
+                response = response["text"]
+            elif "content" in response and isinstance(response["content"], str):
+                response = response["content"]
+            else:
+                raise TaskDecompositionError(
+                    "Failed to parse LLM response: missing JSON payload"
+                )
+
+        if hasattr(response, "text") and isinstance(response.text, str):
+            response = response.text
+
+        if not isinstance(response, str):
+            raise TaskDecompositionError(
+                f"Failed to parse LLM response: unsupported type {type(response).__name__}"
+            )
+
         # Nettoyer la réponse (enlever markdown, etc.)
         if not isinstance(response, str):
             response = str(response)
@@ -409,7 +429,7 @@ Réponds TOUJOURS en JSON valide sans markdown."""
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
             raise TaskDecompositionError(
-                f"Failed to parse LLM response as JSON: {str(e)}\nResponse: {response[:200]}"
+                f"Failed to parse LLM response: {str(e)}\nResponse: {response[:200]}"
             ) from e
 
     def _build_graph_from_decomposition(self, decomposition: Dict[str, Any]) -> TaskGraph:

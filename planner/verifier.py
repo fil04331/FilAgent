@@ -222,12 +222,16 @@ class TaskVerifier:
 
             # Métriques: enregistrer vérification
             metrics = get_metrics()
-            metrics.record_verification(
-                level=level.value,
-                passed=passed,
-                confidence_score=confidence,
-            )
-
+            try:
+                metrics.record_verification(
+                    level=level.value,
+                    passed=passed,
+                    confidence_score=confidence,
+                )
+            except Exception:
+                # Les métriques ne doivent jamais casser la vérification
+                pass
+            
             # Construire résultat
             metadata["completed_at"] = datetime.utcnow().isoformat()
 
@@ -281,37 +285,31 @@ class TaskVerifier:
         return results
 
     def _verify_schema(self, result: Any, schema: Dict[str, Any]) -> bool:
-        """
-        Vérifie que le résultat correspond au schéma attendu
+        """Vérifie que le résultat correspond au schéma attendu."""
+        if not isinstance(schema, dict):
+            return False
 
-        Supporte deux formats de schéma:
-        1. Format simple avec types Python: {"name": str, "value": int}
-        2. Format structuré: {"type": "dict", "required_keys": [...]}
-
-        Args:
-            result: Résultat à vérifier
-            schema: Schéma attendu
-
-        Returns:
-            True si le résultat correspond au schéma
-        """
-        # Format 1: Schéma avec types Python ({"name": str, "value": int})
-        # Vérifier si toutes les valeurs sont des types Python (sauf les strings qui sont des valeurs)
-        schema_values = list(schema.values())
-        if schema_values and all(isinstance(v, type) for v in schema_values):
+        # Support des schémas simples sous forme {"champ": type}
+        if "type" not in schema:
             if not isinstance(result, dict):
                 return False
-            for key, expected_type in schema.items():
+
+            for key, expected in schema.items():
                 if key not in result:
-                    return False  # Clé manquante
-                if not isinstance(result[key], expected_type):
-                    return False  # Type incorrect
+                    return False
+
+                expected_types = expected if isinstance(expected, tuple) else (expected,)
+                expected_types = tuple(
+                    t for t in expected_types if isinstance(t, type)
+                ) or (type(result[key]),)
+
+                if not isinstance(result[key], expected_types):
+                    return False
+
             return True
 
-        # Format 2: Schéma structuré
         expected_type = schema.get("type")
 
-        # Vérifier le type
         type_map = {
             "dict": dict,
             "list": list,
@@ -321,11 +319,9 @@ class TaskVerifier:
             "bool": bool,
         }
 
-        if expected_type in type_map:
-            if not isinstance(result, type_map[expected_type]):
-                return False
+        if expected_type in type_map and not isinstance(result, type_map[expected_type]):
+            return False
 
-        # Vérifications spécifiques selon le type
         if expected_type == "dict" and "required_keys" in schema:
             required = schema["required_keys"]
             if not all(key in result for key in required):

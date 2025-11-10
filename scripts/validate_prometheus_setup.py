@@ -19,7 +19,12 @@ import sys
 import os
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+
+try:
+    from importlib import metadata as importlib_metadata
+except ImportError:  # pragma: no cover
+    import importlib_metadata as importlib_metadata  # type: ignore
 
 # Import requests (optionnel, avec fallback)
 try:
@@ -92,11 +97,20 @@ class PrometheusSetupValidator:
         # Résumé
         return self.print_summary()
     
+    def _get_package_version(self, package: str) -> Optional[str]:
+        """Retourne la version d'un package installé."""
+        try:
+            return importlib_metadata.version(package)
+        except importlib_metadata.PackageNotFoundError:
+            return None
+        except Exception:
+            return None
+
     def validate_python_dependencies(self):
         """Vérifie les dépendances Python"""
         print("📦 1. Vérification des dépendances Python...")
         print()
-        
+
         # prometheus-client
         try:
             import prometheus_client
@@ -105,7 +119,7 @@ class PrometheusSetupValidator:
             self.results.append(ValidationResult(
                 "prometheus-client",
                 True,
-                f"Installé (version: {version})",
+                f"Package prometheus-client installé (version: {version})",
                 {"version": version}
             ))
         except ImportError:
@@ -114,14 +128,15 @@ class PrometheusSetupValidator:
                 False,
                 "Non installé. Installez avec: pip install prometheus-client"
             ))
-        
+
         # requests (pour les tests)
         try:
             import requests
+            version = getattr(requests, "__version__", None) or self._get_package_version("requests") or "unknown"
             self.results.append(ValidationResult(
                 "requests",
                 True,
-                "Installé"
+                f"Package requests disponible (version: {version})"
             ))
         except ImportError:
             self.results.append(ValidationResult(
