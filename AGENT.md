@@ -10,6 +10,12 @@
 
 ---
 
+## 🔄 MISE À JOUR 2025-11-07
+
+- ✅ Scan de secrets `detect-secrets 1.5.0` exécuté — aucun secret actif détecté (rapport dans `audit/reports/`).
+- ✅ Journalisation : ajout d'un masquage automatique PII avant écriture + test unitaire `tests/test_logging_pii.py`.
+- 📌 Prochaine étape liée : surveiller les prochaines exécutions de scan et étendre la couverture PII si de nouveaux champs apparaissent.
+
 ## 📋 CONTEXTE DU PROJET
 
 ### Situation Actuelle

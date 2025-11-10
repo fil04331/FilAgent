@@ -1,0 +1,198 @@
+# ============================================================================
+# FilAgent - Règles de Conformité
+# ============================================================================
+#
+# Ce fichier définit les règles de conformité pour le ComplianceGuardian
+# Conformité: Loi 25 (Québec), RGPD, AI Act, NIST AI RMF
+#
+# Version: 1.0.0
+# Date: 2025-11-05
+# ============================================================================
+
+version: "1.0.0"
+
+# ============================================================================
+# VALIDATION DES REQUÊTES
+# ============================================================================
+validation:
+  # Longueur maximale d'une requête utilisateur (caractères)
+  max_query_length: 10000
+  
+  # Patterns interdits dans les requêtes (regex)
+  # Sécurité: Détecter tentatives d'injection ou d'extraction de secrets
+  forbidden_patterns:
+    - '(?i)(password|secret|token|api[_-]?key)'  # Secrets
+    - '(?i)(hack|exploit|bypass|inject)'         # Mots malveillants
+    - '(?i)(rm -rf|format|mkfs)'                 # Commandes dangereuses
+  
+  # Patterns de détection de PII (Personally Identifiable Information)
+  # Conformité: Loi 25, RGPD
+  pii_patterns:
+    - '\b\d{3}-\d{2}-\d{4}\b'                    # SSN (USA)
+    - '\b[A-Z]{2}\d{6}\b'                        # Numéro d'assurance maladie Québec
+    - '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'  # Email
+    - '\b\d{10,}\b'                              # Numéros longs (possibles identifiants)
+  
+  # Champs recommandés dans le contexte de validation
+  required_fields:
+    - query
+    - user_id
+
+# ============================================================================
+# VALIDATION DES PLANS D'EXÉCUTION
+# ============================================================================
+execution:
+  # Profondeur maximale d'un plan hiérarchique
+  max_plan_depth: 5
+  
+  # Nombre maximum d'outils par plan
+  max_tools_per_plan: 20
+  
+  # Outils interdits (liste noire)
+  # Ajoutez ici les outils jugés trop risqués
+  forbidden_tools: []
+  
+  # Outils nécessitant approbation explicite
+  # Conformité: AI Act (surveillance humaine pour décisions critiques)
+  require_approval_for:
+    - file_delete
+    - system_command
+    - database_write
+    - api_external_call
+
+# ============================================================================
+# AUDIT ET TRAÇABILITÉ
+# ============================================================================
+audit:
+  # Logger toutes les requêtes (conformité Loi 25)
+  log_all_queries: true
+  
+  # Logger tous les plans d'exécution
+  log_all_plans: true
+  
+  # Logger toutes les exécutions
+  log_all_executions: true
+  
+  # Durée de rétention des logs (jours)
+  # Loi 25: Minimum 1 an, recommandé 7 ans pour certains secteurs
+  retention_days: 365
+  
+  # Activer les Decision Records cryptographiquement signés
+  # Conformité: NIST AI RMF (traçabilité et non-répudiation)
+  enable_decision_records: true
+
+# ============================================================================
+# CADRES LÉGAUX ET RÉGLEMENTAIRES
+# ============================================================================
+legal:
+  # Frameworks de conformité supportés
+  frameworks:
+    - loi25       # Loi 25 (Québec)
+    - gdpr        # RGPD (Europe)
+    - ai_act      # AI Act (Europe)
+    - nist_ai_rmf # NIST AI Risk Management Framework (USA)
+  
+  # Classification des données
+  data_classification:
+    - public        # Données publiques
+    - internal      # Données internes
+    - confidential  # Données confidentielles
+    - restricted    # Données restreintes (PII, secrets)
+
+# ============================================================================
+# POLITIQUE DE SÉCURITÉ
+# ============================================================================
+security:
+  # Masquer automatiquement les PII dans les logs
+  auto_mask_pii: true
+  
+  # Chiffrer les Decision Records sensibles
+  encrypt_sensitive_dr: true
+  
+  # Exiger signature cryptographique pour DR critiques
+  require_signature: true
+  
+  # Algorithme de signature (EdDSA recommandé)
+  signature_algorithm: "EdDSA"
+
+# ============================================================================
+# LIMITES ET QUOTAS
+# ============================================================================
+limits:
+  # Nombre maximum de requêtes par utilisateur par heure
+  max_requests_per_user_per_hour: 100
+  
+  # Nombre maximum de plans en exécution simultanée
+  max_concurrent_executions: 5
+  
+  # Temps d'exécution maximum par plan (secondes)
+  max_execution_time_sec: 300
+
+# ============================================================================
+# ALERTES ET NOTIFICATIONS
+# ============================================================================
+alerts:
+  # Activer les alertes de conformité
+  enabled: true
+  
+  # Seuil d'alertes (nombre de violations avant alerte)
+  violation_threshold: 3
+  
+  # Types d'événements déclenchant une alerte
+  alert_on:
+    - forbidden_pattern_detected
+    - pii_detected
+    - forbidden_tool_used
+    - plan_validation_failed
+    - execution_failed
+
+# ============================================================================
+# CONFIGURATION PAR ENVIRONNEMENT
+# ============================================================================
+environments:
+  development:
+    validation:
+      max_query_length: 50000  # Plus permissif en dev
+    audit:
+      retention_days: 30
+    limits:
+      max_requests_per_user_per_hour: 1000
+  
+  testing:
+    validation:
+      forbidden_patterns: []  # Désactiver pour tests
+    audit:
+      log_all_queries: false  # Réduire le bruit
+      retention_days: 7
+  
+  production:
+    security:
+      auto_mask_pii: true
+      encrypt_sensitive_dr: true
+      require_signature: true
+    audit:
+      log_all_queries: true
+      log_all_plans: true
+      log_all_executions: true
+      retention_days: 2555  # 7 ans (conformité légale)
+    alerts:
+      enabled: true
+      violation_threshold: 1  # Alerte immédiate en prod
+
+# ============================================================================
+# MÉTADONNÉES
+# ============================================================================
+metadata:
+  created_at: "2025-11-05T00:00:00Z"
+  updated_at: "2025-11-05T00:00:00Z"
+  author: "FilAgent Team"
+  description: "Règles de conformité pour ComplianceGuardian"
+  
+  changelog:
+    - version: "1.0.0"
+      date: "2025-11-05"
+      changes:
+        - "Création initiale des règles de conformité"
+        - "Support Loi 25, RGPD, AI Act, NIST AI RMF"
+        - "Validation de requêtes et plans"
+        - "Audit et traçabilité"
