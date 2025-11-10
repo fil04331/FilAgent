@@ -433,7 +433,7 @@ python scripts/audit_report.py --period=Q1  # ✓ Rapport pour auditeur
 
 **Points forts** :
 - ✅ **API simple** : OpenAI-compatible, facile à intégrer
-- ✅ **Documentation OpenAPI** : Spec complète dans `audit/CURSOR TODOS/openapi.yaml`
+- ✅ **Documentation OpenAPI** : Spec complète dans `openapi.yaml` (racine du projet)
 - ✅ **Traçabilité visible** : Chaque réponse inclut `metadata` avec provenance
 - ✅ **Déploiement local** : Pas de dépendance cloud
 
