@@ -440,7 +440,7 @@ class TaskExecutor:
             return result
         except Exception as e:
             raise ExecutionError(
-                f"Action '{task.action}' failed: {str(e)}"
+                f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}"
             ) from e
     
     def _check_dependencies(self, task: Task, graph: TaskGraph) -> bool:
