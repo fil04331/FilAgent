@@ -2,7 +2,7 @@
 
 Based on the analysis of 20 open PRs, here are the specific PRs to close and the reasons why.
 
-## ❌ PRs to Close (7 total)
+## ❌ PRs to Close (5 total)
 
 ### 1. PR #46 - Add auto-fix workflow for Python linting failures
 - **Author**: Copilot
@@ -80,7 +80,7 @@ These need a decision after checking for overlaps:
 ## 📊 After Closing
 
 After closing these PRs, you'll have:
-- **13 open PRs** (down from 20)
+- **15 open PRs** (down from 20)
 - **2 ready to auto-merge** (#74, #76)
 - **7 ready for review** (#56, #58, #60, #64, #66, #70, #71)
 - **4 needing work/consolidation** (#48, #54, #55, #57)
