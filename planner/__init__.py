@@ -52,18 +52,15 @@ __all__ = [
     "TaskPriority",
     "TaskGraph",
     "TaskDecompositionError",
-    
     # Planner
     "HierarchicalPlanner",
     "PlanningStrategy",
     "PlanningResult",
-    
     # Executor
     "TaskExecutor",
     "ExecutionResult",
     "ExecutionError",
     "ExecutionStrategy",
-    
     # Verifier
     "TaskVerifier",
     "VerificationResult",
