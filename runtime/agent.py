@@ -132,7 +132,19 @@ class Agent:
         max_depth = htn_config.max_decomposition_depth if htn_config else 3
         max_workers = exec_config.max_parallel_workers if exec_config else 4
         task_timeout = exec_config.task_timeout_sec if exec_config else 60
-        verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
+        # Vérifier que default_level est une string valide avant conversion
+        if verif_config and hasattr(verif_config, 'default_level'):
+            default_level = verif_config.default_level
+            # Si c'est un Mock ou autre objet, essayer de récupérer la valeur
+            if isinstance(default_level, str):
+                try:
+                    verif_level = VerificationLevel(default_level)
+                except (ValueError, TypeError):
+                    verif_level = VerificationLevel.STRICT
+            else:
+                verif_level = VerificationLevel.STRICT
+        else:
+            verif_level = VerificationLevel.STRICT
         
         # Ajouter le planificateur HTN
         self.planner = HierarchicalPlanner(

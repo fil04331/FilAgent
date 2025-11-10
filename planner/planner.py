@@ -322,7 +322,7 @@ Réponds UNIQUEMENT avec un JSON valide suivant ce format:
 Actions disponibles: {self._get_available_actions()}
 """
         
-        # Appeler le LLM
+            # Appeler le LLM
         try:
             response = self.model.generate(
                 messages=[
@@ -332,6 +332,10 @@ Actions disponibles: {self._get_available_actions()}
                 temperature=0.3,  # Bas pour cohérence
                 max_tokens=1000,
             )
+            
+            # Extraire le texte de la réponse si c'est un dict
+            if isinstance(response, dict):
+                response = response.get("text", response)
             
             # Parser la réponse JSON
             decomposition = self._parse_llm_response(response)
@@ -415,7 +419,12 @@ Réponds TOUJOURS en JSON valide sans markdown."""
     
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """Parse la réponse JSON du LLM"""
+        # Si response est déjà un dict, le retourner directement
+        if isinstance(response, dict):
+            return response
         # Nettoyer la réponse (enlever markdown, etc.)
+        if not isinstance(response, str):
+            response = str(response)
         cleaned = response.strip()
         if cleaned.startswith("```"):
             # Enlever les backticks markdown

@@ -224,7 +224,7 @@ class TaskVerifier:
             metrics.record_verification(
                 level=level.value,
                 passed=passed,
-                confidence_score=confidence_score,
+                confidence_score=confidence,
             )
             
             # Construire résultat
@@ -283,12 +283,9 @@ class TaskVerifier:
         """
         Vérifie que le résultat correspond au schéma attendu
         
-        Schéma simple:
-        {
-            "type": "dict" | "list" | "str" | "int" | "float" | "bool",
-            "required_keys": ["key1", "key2"],  # Pour dict
-            "min_length": 1,  # Pour list/str
-        }
+        Supporte deux formats de schéma:
+        1. Format simple avec types Python: {"name": str, "value": int}
+        2. Format structuré: {"type": "dict", "required_keys": [...]}
         
         Args:
             result: Résultat à vérifier
@@ -297,6 +294,20 @@ class TaskVerifier:
         Returns:
             True si le résultat correspond au schéma
         """
+        # Format 1: Schéma avec types Python ({"name": str, "value": int})
+        # Vérifier si toutes les valeurs sont des types Python (sauf les strings qui sont des valeurs)
+        schema_values = list(schema.values())
+        if schema_values and all(isinstance(v, type) for v in schema_values):
+            if not isinstance(result, dict):
+                return False
+            for key, expected_type in schema.items():
+                if key not in result:
+                    return False  # Clé manquante
+                if not isinstance(result[key], expected_type):
+                    return False  # Type incorrect
+            return True
+        
+        # Format 2: Schéma structuré
         expected_type = schema.get("type")
         
         # Vérifier le type

@@ -100,7 +100,9 @@ def test_prometheus_client():
     
     try:
         import prometheus_client
-        print(f"✅ prometheus-client installé (version: {prometheus_client.__version__})")
+        # prometheus_client peut ne pas avoir __version__
+        version = getattr(prometheus_client, '__version__', 'unknown')
+        print(f"✅ prometheus-client installé (version: {version})")
         return True
     except ImportError:
         print("❌ prometheus-client non installé")

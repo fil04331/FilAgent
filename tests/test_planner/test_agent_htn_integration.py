@@ -86,6 +86,7 @@ class TestAgentHTNIntegration:
         mock_config = Mock()
         mock_config.htn_planning = Mock()
         mock_config.htn_planning.enabled = False
+        mock_config.htn_verification = None  # Pas de config de vérification
         mock_get_config.return_value = mock_config
         
         # Mock model
@@ -226,6 +227,7 @@ class TestAgentHTNModes:
         mock_config = Mock()
         mock_config.htn_planning = Mock()
         mock_config.htn_planning.enabled = True
+        mock_config.htn_verification = None  # Pas de config de vérification
         mock_get_config.return_value = mock_config
         
         # Mock model
