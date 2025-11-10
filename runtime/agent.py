@@ -131,7 +131,7 @@ class Agent:
         # Vérifier que default_level est une string valide avant conversion
         if verif_config and hasattr(verif_config, "default_level"):
             default_level = verif_config.default_level
-            # Si c'est un Mock ou autre objet, essayer de récupérer la valeur
+            # Si ce n'est pas une string (y compris Mock ou autre objet), on utilise STRICT par défaut
             if isinstance(default_level, str):
                 try:
                     verif_level = VerificationLevel(default_level)

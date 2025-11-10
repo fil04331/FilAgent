@@ -425,7 +425,7 @@ class TaskExecutor:
         except Exception as e:
             # Inclure le type d'exception dans le message pour faciliter le debugging
             error_type = type(e).__name__
-            error_msg = str(e) if str(e) else f"{error_type} raised"
+            error_msg = str(e).strip() if str(e).strip() else f"{error_type} raised"
             raise ExecutionError(f"Action '{task.action}' failed: {error_type}: {error_msg}") from e
 
     def _check_dependencies(self, task: Task, graph: TaskGraph) -> bool:
