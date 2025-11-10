@@ -10,7 +10,7 @@ from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
 import yaml
-
+import traceback
 from .config import get_config
 from .agent import get_agent
 from memory.episodic import get_messages, get_connection
@@ -209,7 +209,17 @@ async def chat(request: ChatRequest):
 
         return JSONResponse(status_code=200, content=response, headers=headers)
     except Exception as e:
-        # Dernier repli : renvoyer une réponse minimale conforme pour éviter 500 en smoke tests
+        # Dernier repli : ne pas exposer les détails d'exception à l'utilisateur; journaliser l'erreur serveur uniquement
+        logger = None
+        try:
+            logger = get_logger()
+        except Exception:
+            pass
+        if logger is not None:
+            logger.error("Exception in chat endpoint", exc_info=True)
+        else:
+            print("Exception in chat endpoint:")
+            print(traceback.format_exc())
         fallback = {
             "id": conversation_id,
             "object": "chat.completion",
