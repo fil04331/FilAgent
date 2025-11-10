@@ -1,5 +1,7 @@
 # Nom du workflow (de l'agent)
 name: Python Linter
+permissions:
+  contents: read
 
 # Déclencheurs : l'agent se lancera à chaque 'push' et 'pull request'
 on: [push, pull_request]
