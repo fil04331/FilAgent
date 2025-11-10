@@ -99,6 +99,19 @@ class HTNVerificationConfig(BaseModel):
     custom_verifiers: list[str] = Field(default_factory=list)
 
 
+class ComplianceGuardianConfig(BaseModel):
+    """Configuration du ComplianceGuardian"""
+    enabled: bool = True
+    rules_path: str = "config/compliance_rules.yaml"
+    validate_queries: bool = True
+    validate_plans: bool = True
+    audit_executions: bool = True
+    auto_generate_dr: bool = True
+    strict_mode: bool = True
+    log_compliance_events: bool = True
+    active_frameworks: list[str] = Field(default_factory=lambda: ["loi25", "gdpr", "ai_act", "nist_ai_rmf"])
+
+
 class AgentConfig(BaseModel):
     """Configuration principale de l'agent"""
 
@@ -114,6 +127,7 @@ class AgentConfig(BaseModel):
     htn_planning: Optional[HTNPlanningConfig] = None
     htn_execution: Optional[HTNExecutionConfig] = None
     htn_verification: Optional[HTNVerificationConfig] = None
+    compliance_guardian: Optional[ComplianceGuardianConfig] = None
 
     @classmethod
     def load(cls, config_dir: str = "config") -> "AgentConfig":
@@ -192,6 +206,7 @@ class AgentConfig(BaseModel):
             htn_planning=htn_planning_config,
             htn_execution=htn_execution_config,
             htn_verification=htn_verification_config,
+            compliance_guardian=compliance_guardian_config,
         )
 
     @property
