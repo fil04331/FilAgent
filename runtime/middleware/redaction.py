@@ -175,3 +175,9 @@ def init_pii_redactor(config_path: str = "config/policies.yaml") -> PIIRedactor:
     global _pii_redactor
     _pii_redactor = PIIRedactor(config_path)
     return _pii_redactor
+
+
+def reset_pii_redactor():
+    """Reset the global PII redactor instance (primarily for testing)"""
+    global _pii_redactor
+    _pii_redactor = None

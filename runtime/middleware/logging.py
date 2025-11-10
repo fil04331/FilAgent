@@ -2,6 +2,7 @@
 
 import json
 import os
+from copy import deepcopy
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
@@ -186,3 +187,9 @@ def init_logger(log_dir: str = "logs/events"):
     global _logger
     _logger = EventLogger(log_dir)
     return _logger
+
+
+def reset_logger():
+    """Reset the global logger instance (primarily for testing)"""
+    global _logger
+    _logger = None
