@@ -69,17 +69,13 @@ class ChatResponse(BaseModel):
 
 
 def _load_manual_openapi_schema() -> dict:
-    """Charge le schéma OpenAPI manuel depuis la racine, avec repli.
+    """Charge le schéma OpenAPI manuel depuis la racine.
 
-    Ordre de recherche:
-    1) <repo_root>/openapi.yaml
-    2) <repo_root>/audit/CURSOR TODOS/openapi.yaml
+    Recherche openapi.yaml à la racine du projet.
     """
     repo_root = Path(__file__).parent.parent
-    primary = repo_root / "openapi.yaml"
-    fallback = repo_root / "audit" / "CURSOR TODOS" / "openapi.yaml"
+    openapi_path = repo_root / "openapi.yaml"
 
-    openapi_path = primary if primary.exists() else fallback
     if not openapi_path.exists():
         # Retour à un schéma minimal si absent, pour ne pas casser /docs
         return {
