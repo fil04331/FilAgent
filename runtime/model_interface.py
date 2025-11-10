@@ -245,7 +245,6 @@ _model_instance: Optional[ModelInterface] = None
 
 def get_model() -> ModelInterface:
     """Récupérer l'instance globale du modèle"""
-    global _model_instance
     if _model_instance is None:
         raise RuntimeError("Model not initialized. Call init_model() first.")
     return _model_instance
