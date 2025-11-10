@@ -1,0 +1,32 @@
+# Development dependencies for FilAgent
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+# Or better: pip install -e ".[dev]"
+
+# Testing frameworks
+pytest>=7.4.0,<9.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-cov>=4.1.0,<6.0.0
+pytest-mock>=3.12.0,<4.0.0
+pytest-xdist>=3.5.0,<4.0.0  # Parallel test execution
+pytest-timeout>=2.2.0,<3.0.0  # Timeout for long-running tests
+
+# OpenAPI validation & contract testing
+openapi-spec-validator>=0.7.1,<1.0.0
+schemathesis>=3.19.0,<4.0.0
+
+# Code quality & linting
+black>=23.11.0,<25.0.0
+flake8>=6.1.0,<8.0.0
+mypy>=1.7.0,<2.0.0
+ruff>=0.1.0,<1.0.0
+isort>=5.13.0,<6.0.0
+
+# Type stubs
+types-pyyaml>=6.0.0,<7.0.0
+types-python-dotenv>=1.0.0,<2.0.0
+
+# Development tools
+ipython>=8.18.0,<9.0.0  # Better REPL
+ipdb>=0.13.0,<1.0.0  # IPython debugger
+pip-tools>=7.3.0,<8.0.0  # For dependency management
+pre-commit>=3.6.0,<4.0.0  # Git hooks

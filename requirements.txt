@@ -1,55 +1,63 @@
 # Dépendances pour FilAgent / llmagenta
 # Phase 0-1 : MVP Agent fonctionnel
+#
+# NOTE: This project now uses pyproject.toml for dependency management (PEP 621).
+# To install dependencies: pip install -e .
+# To install with dev dependencies: pip install -e ".[dev]"
+#
+# This requirements.txt is maintained for backward compatibility and CI/CD systems.
+# For production, consider using: pip-compile pyproject.toml
 
 # Core dependencies
-pyyaml>=6.0.1
-pydantic>=2.5.0
-python-dotenv>=1.0.0
+pyyaml>=6.0.1,<7.0.0
+pydantic>=2.5.0,<3.0.0
+python-dotenv>=1.0.0,<2.0.0
 
 # LLM integration
-llama-cpp-python>=0.2.0  # Pour llama.cpp
-# transformers>=4.35.0  # Optionnel pour vLLM
-# vllm>=0.2.0  # Optionnel pour vLLM
+llama-cpp-python>=0.2.0,<1.0.0  # Pour llama.cpp
+# transformers>=4.35.0,<5.0.0  # Optionnel pour vLLM
+# vllm>=0.2.0,<1.0.0  # Optionnel pour vLLM
 
 # API Server
-fastapi>=0.104.0
-uvicorn>=0.24.0
-pydantic-settings>=2.0.0
+fastapi>=0.104.0,<1.0.0
+uvicorn>=0.24.0,<1.0.0
+pydantic-settings>=2.0.0,<3.0.0
 
 # Database & Memory
-aiosqlite>=0.19.0  # Async SQLite
-faiss-cpu>=1.7.4  # Pour mémoire sémantique (Phase 3)
-# faiss-gpu>=1.7.4  # Utiliser à la place de faiss-cpu si GPU disponible
-sentence-transformers>=2.2.2  # Pour embeddings (Phase 3)
+aiosqlite>=0.19.0,<1.0.0  # Async SQLite
+faiss-cpu>=1.7.4,<2.0.0  # Pour mémoire sémantique (Phase 3)
+# faiss-gpu>=1.7.4,<2.0.0  # Utiliser à la place de faiss-cpu si GPU disponible
+sentence-transformers>=2.2.2,<3.0.0  # Pour embeddings (Phase 3)
 
 # Sandboxing & Execution
 # Docker (optionnel, pour isolation avancée)
 
 # Logging & Observability
-structlog>=23.2.0
-prometheus-client>=0.19.0  # Pour métriques Prometheus
+structlog>=23.2.0,<25.0.0
+prometheus-client>=0.19.0,<1.0.0  # Pour métriques Prometheus
 
 # Security
-cryptography>=41.0.0  # Pour signatures EdDSA
-pyopenssl>=23.3.0
+cryptography>=41.0.0,<43.0.0  # Pour signatures EdDSA
+pyopenssl>=23.3.0,<25.0.0
 
 # Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.1.0
-pytest-mock>=3.12.0
+pytest>=7.4.0,<9.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-cov>=4.1.0,<6.0.0
+pytest-mock>=3.12.0,<4.0.0
 
 # OpenAPI validation & contract testing
-openapi-spec-validator>=0.7.1
-schemathesis>=3.19.0
+openapi-spec-validator>=0.7.1,<1.0.0
+schemathesis>=3.19.0,<4.0.0
 
 # Development
-black>=23.11.0
-flake8>=6.1.0
-mypy>=1.7.0
+black>=23.11.0,<25.0.0
+flake8>=6.1.0,<8.0.0
+mypy>=1.7.0,<2.0.0
+ruff>=0.1.0,<1.0.0  # Modern, fast Python linter
 
 # Data handling
-pandas>=2.1.0
-pyarrow>=14.0.0
-datasets
-filelock>=3.13.0  # For atomic dataset downloading in benchmarks
+pandas>=2.1.0,<3.0.0
+pyarrow>=14.0.0,<16.0.0
+datasets>=2.14.0,<3.0.0  # HuggingFace datasets library
+filelock>=3.13.0,<4.0.0  # For atomic dataset downloading in benchmarks
