@@ -2,8 +2,8 @@
 Configuration management for FilAgent
 Loads and validates configuration from YAML files
 """
+
 import yaml
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class GenerationConfig(BaseModel):
     """Configuration de génération du modèle"""
+
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     top_p: float = Field(default=0.95, ge=0.0, le=1.0)
     max_tokens: int = Field(default=800, ge=1, le=10000)
@@ -21,6 +22,7 @@ class GenerationConfig(BaseModel):
 
 class TimeoutConfig(BaseModel):
     """Configuration des timeouts"""
+
     generation: int = Field(default=60)
     tool_execution: int = Field(default=30)
     total_request: int = Field(default=300)
@@ -28,6 +30,7 @@ class TimeoutConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     """Configuration du modèle"""
+
     name: str = "llama-3"
     path: str = "models/weights/base.gguf"
     backend: str = "llama.cpp"
@@ -37,6 +40,7 @@ class ModelConfig(BaseModel):
 
 class MemoryConfig(BaseModel):
     """Configuration de la mémoire"""
+
     episodic_ttl_days: int = Field(default=30, alias="episodic.ttl_days")
     episodic_max_conversations: int = Field(default=1000, alias="episodic.max_conversations")
     semantic_rebuild_days: int = Field(default=14, alias="semantic.rebuild_days")
@@ -49,6 +53,7 @@ class MemoryConfig(BaseModel):
 
 class LoggingConfig(BaseModel):
     """Configuration du logging"""
+
     level: str = "INFO"
     rotate_daily: bool = True
     max_file_size_mb: int = 100
@@ -57,6 +62,7 @@ class LoggingConfig(BaseModel):
 
 class ComplianceConfig(BaseModel):
     """Configuration de conformité"""
+
     worm_enabled: bool = True
     dr_required_for: list[str] = Field(default=["write_file", "delete_file", "execute_code"])
     pii_redaction: bool = True
@@ -65,12 +71,14 @@ class ComplianceConfig(BaseModel):
 
 class AgentRuntimeSettings(BaseModel):
     """Configuration opérationnelle de l'agent"""
+
     max_iterations: int = 10
     timeout: int = 300
 
 
 class HTNPlanningConfig(BaseModel):
     """Configuration de planification HTN"""
+
     enabled: bool = True
     default_strategy: str = "hybrid"  # rule_based, llm_based, hybrid
     max_decomposition_depth: int = 3
@@ -78,6 +86,7 @@ class HTNPlanningConfig(BaseModel):
 
 class HTNExecutionConfig(BaseModel):
     """Configuration d'exécution HTN"""
+
     default_strategy: str = "adaptive"  # sequential, parallel, adaptive
     max_parallel_workers: int = 4
     task_timeout_sec: int = 60
@@ -85,6 +94,7 @@ class HTNExecutionConfig(BaseModel):
 
 class HTNVerificationConfig(BaseModel):
     """Configuration de vérification HTN"""
+
     default_level: str = "strict"  # basic, strict, paranoid
     custom_verifiers: list[str] = Field(default_factory=list)
 
@@ -104,6 +114,7 @@ class ComplianceGuardianConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     """Configuration principale de l'agent"""
+
     name: str = "llmagenta"
     version: str = "0.1.0"
     generation: GenerationConfig = GenerationConfig()
@@ -122,26 +133,25 @@ class AgentConfig(BaseModel):
     def load(cls, config_dir: str = "config") -> "AgentConfig":
         """Charger la configuration depuis les fichiers YAML"""
         config_path = Path(config_dir) / "agent.yaml"
-        
+
         if not config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
-        
-        with open(config_path, 'r') as f:
+
+        with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
-        
+
         # Extraire et valider chaque section
-        agent_data = raw_config.get('agent', {})
-        generation_data = raw_config.get('generation', {})
-        timeouts_data = raw_config.get('timeouts', {})
-        model_data = raw_config.get('model', {})
-        memory_data = raw_config.get('memory', {})
-        logging_data = raw_config.get('logging', {})
-        compliance_data = raw_config.get('compliance', {})
-        htn_planning_data = raw_config.get('htn_planning', {})
-        htn_execution_data = raw_config.get('htn_execution', {})
-        htn_verification_data = raw_config.get('htn_verification', {})
-        compliance_guardian_data = raw_config.get('compliance_guardian', {})
-        
+        agent_data = raw_config.get("agent", {})
+        generation_data = raw_config.get("generation", {})
+        timeouts_data = raw_config.get("timeouts", {})
+        model_data = raw_config.get("model", {})
+        memory_data = raw_config.get("memory", {})
+        logging_data = raw_config.get("logging", {})
+        compliance_data = raw_config.get("compliance", {})
+        htn_planning_data = raw_config.get("htn_planning", {})
+        htn_execution_data = raw_config.get("htn_execution", {})
+        htn_verification_data = raw_config.get("htn_verification", {})
+
         # Adapter la configuration mémoire pour supporter les structures imbriquées
         memory_kwargs: Dict[str, Any] = {}
 
@@ -154,41 +164,38 @@ class AgentConfig(BaseModel):
                 memory_kwargs[field_name] = memory_data[alias]
 
         # Support du format YAML imbriqué actuel
-        episodic_cfg = memory_data.get('episodic', {})
+        episodic_cfg = memory_data.get("episodic", {})
         if isinstance(episodic_cfg, dict):
-            if 'ttl_days' in episodic_cfg:
-                memory_kwargs.setdefault('episodic_ttl_days', episodic_cfg['ttl_days'])
-            if 'max_conversations' in episodic_cfg:
-                memory_kwargs.setdefault('episodic_max_conversations', episodic_cfg['max_conversations'])
+            if "ttl_days" in episodic_cfg:
+                memory_kwargs.setdefault("episodic_ttl_days", episodic_cfg["ttl_days"])
+            if "max_conversations" in episodic_cfg:
+                memory_kwargs.setdefault("episodic_max_conversations", episodic_cfg["max_conversations"])
 
-        semantic_cfg = memory_data.get('semantic', {})
+        semantic_cfg = memory_data.get("semantic", {})
         if isinstance(semantic_cfg, dict):
-            if 'rebuild_days' in semantic_cfg:
-                memory_kwargs.setdefault('semantic_rebuild_days', semantic_cfg['rebuild_days'])
-            if 'max_items' in semantic_cfg:
-                memory_kwargs.setdefault('semantic_max_items', semantic_cfg['max_items'])
-            if 'similarity_threshold' in semantic_cfg:
-                memory_kwargs.setdefault('semantic_similarity_threshold', semantic_cfg['similarity_threshold'])
+            if "rebuild_days" in semantic_cfg:
+                memory_kwargs.setdefault("semantic_rebuild_days", semantic_cfg["rebuild_days"])
+            if "max_items" in semantic_cfg:
+                memory_kwargs.setdefault("semantic_max_items", semantic_cfg["max_items"])
+            if "similarity_threshold" in semantic_cfg:
+                memory_kwargs.setdefault("semantic_similarity_threshold", semantic_cfg["similarity_threshold"])
 
         memory_config = MemoryConfig(**memory_kwargs)
 
         runtime_settings = AgentRuntimeSettings()
-        if 'max_iterations' in agent_data:
-            runtime_settings.max_iterations = agent_data['max_iterations']
-        if 'timeout' in agent_data:
-            runtime_settings.timeout = agent_data['timeout']
+        if "max_iterations" in agent_data:
+            runtime_settings.max_iterations = agent_data["max_iterations"]
+        if "timeout" in agent_data:
+            runtime_settings.timeout = agent_data["timeout"]
 
         # Configurations HTN optionnelles
         htn_planning_config = HTNPlanningConfig(**htn_planning_data) if htn_planning_data else None
         htn_execution_config = HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
         htn_verification_config = HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
-        
-        # Configuration ComplianceGuardian optionnelle
-        compliance_guardian_config = ComplianceGuardianConfig(**compliance_guardian_data) if compliance_guardian_data else None
-        
+
         return cls(
-            name=agent_data.get('name', 'llmagenta'),
-            version=agent_data.get('version', '0.1.0'),
+            name=agent_data.get("name", "llmagenta"),
+            version=agent_data.get("version", "0.1.0"),
             generation=GenerationConfig(**generation_data),
             timeouts=TimeoutConfig(**timeouts_data),
             model=ModelConfig(**model_data),
