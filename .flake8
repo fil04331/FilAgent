@@ -18,7 +18,7 @@ exclude =
     dist,
     *.egg-info,
     .eggs,
-    audit/CURSOR TODOS,
+    audit/CURSOR_TODOS,
     memory/semantic/*/,
     memory/working_set/*/,
     tools/code_exec/*/,
