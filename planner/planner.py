@@ -413,10 +413,20 @@ Réponds TOUJOURS en JSON valide sans markdown."""
             "analyze_data", "generate_report", "execute_code"
         ]
     
-    def _parse_llm_response(self, response: str) -> Dict[str, Any]:
+    def _parse_llm_response(self, response) -> Dict[str, Any]:
         """Parse la réponse JSON du LLM"""
+        # Handle dict responses (e.g., from mock models with {"text": "..."})
+        if isinstance(response, dict):
+            if "text" in response:
+                response_text = response["text"]
+            else:
+                # If it's already a dict with the expected structure, return as-is
+                return response
+        else:
+            response_text = response
+        
         # Nettoyer la réponse (enlever markdown, etc.)
-        cleaned = response.strip()
+        cleaned = response_text.strip()
         if cleaned.startswith("```"):
             # Enlever les backticks markdown
             lines = cleaned.split("\n")
@@ -426,7 +436,7 @@ Réponds TOUJOURS en JSON valide sans markdown."""
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
             raise TaskDecompositionError(
-                f"Failed to parse LLM response as JSON: {str(e)}\nResponse: {response[:200]}"
+                f"Failed to parse LLM response as JSON: {str(e)}\nResponse: {str(response)[:200]}"
             ) from e
     
     def _build_graph_from_decomposition(

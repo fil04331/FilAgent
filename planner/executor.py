@@ -439,8 +439,9 @@ class TaskExecutor:
             result = action_func(task.params)
             return result
         except Exception as e:
+            # Preserve original exception type in error message for traceability
             raise ExecutionError(
-                f"Action '{task.action}' failed: {str(e)}"
+                f"{type(e).__name__}: Action '{task.action}' failed: {str(e)}"
             ) from e
     
     def _check_dependencies(self, task: Task, graph: TaskGraph) -> bool:
