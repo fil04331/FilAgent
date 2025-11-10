@@ -3,6 +3,8 @@ name: Python Tests
 
 # Déclencheurs : l'agent se lancera à chaque 'push' et 'pull request'
 on: [push, pull_request]
+permissions:
+  contents: read
 
 jobs:
   test:
