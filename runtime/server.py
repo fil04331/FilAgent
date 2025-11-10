@@ -2,13 +2,13 @@
 Serveur API pour l'agent LLM
 Compatible avec le format OpenAI pour faciliter l'intégration
 """
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
-import json
 import yaml
 
 from .config import get_config
@@ -20,6 +20,7 @@ from .middleware.worm import get_worm_logger
 # Import Prometheus metrics (optionnel)
 try:
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -39,12 +40,14 @@ config = get_config()
 
 class Message(BaseModel):
     """Message dans une conversation"""
+
     role: str  # "user" ou "assistant"
     content: str
 
 
 class ChatRequest(BaseModel):
     """Requête de chat"""
+
     messages: List[Message]
     conversation_id: Optional[str] = None
     task_id: Optional[str] = None
@@ -56,6 +59,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Réponse du chat"""
+
     id: str
     object: str = "chat.completion"
     created: int
@@ -65,17 +69,13 @@ class ChatResponse(BaseModel):
 
 
 def _load_manual_openapi_schema() -> dict:
-    """Charge le schéma OpenAPI manuel depuis la racine, avec repli.
+    """Charge le schéma OpenAPI manuel depuis la racine.
 
-    Ordre de recherche:
-    1) <repo_root>/openapi.yaml
-    2) <repo_root>/audit/CURSOR TODOS/openapi.yaml
+    Recherche openapi.yaml à la racine du projet.
     """
     repo_root = Path(__file__).parent.parent
-    primary = repo_root / "openapi.yaml"
-    fallback = repo_root / "audit" / "CURSOR TODOS" / "openapi.yaml"
+    openapi_path = repo_root / "openapi.yaml"
 
-    openapi_path = primary if primary.exists() else fallback
     if not openapi_path.exists():
         # Retour à un schéma minimal si absent, pour ne pas casser /docs
         return {
@@ -103,11 +103,7 @@ app.openapi = custom_openapi
 @app.get("/")
 async def root():
     """Endpoint de santé"""
-    return {
-        "service": "FilAgent",
-        "version": config.version,
-        "status": "healthy"
-    }
+    return {"service": "FilAgent", "version": config.version, "status": "healthy"}
 
 
 @app.get("/health")
@@ -178,11 +174,7 @@ async def chat(request: ChatRequest):
         last_user_message = user_messages[-1].content
 
         if agent is not None:
-            result = agent.chat(
-                message=last_user_message,
-                conversation_id=conversation_id,
-                task_id=request.task_id
-            )
+            result = agent.chat(message=last_user_message, conversation_id=conversation_id, task_id=request.task_id)
             response_content = result["response"]
             usage = result.get("usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
         else:
@@ -195,20 +187,15 @@ async def chat(request: ChatRequest):
             "object": "chat.completion",
             "created": int(datetime.now().timestamp()),
             "model": getattr(getattr(config, "model", None), "name", "unknown"),
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": response_content
-                },
-                "finish_reason": "stop"
-            }],
+            "choices": [
+                {"index": 0, "message": {"role": "assistant", "content": response_content}, "finish_reason": "stop"}
+            ],
             "usage": {
                 "prompt_tokens": usage.get("prompt_tokens", 0),
                 "completion_tokens": usage.get("completion_tokens", 0),
-                "total_tokens": usage.get("total_tokens", 0)
+                "total_tokens": usage.get("total_tokens", 0),
             },
-            "conversation_id": conversation_id
+            "conversation_id": conversation_id,
         }
         # Ajouter un header X-Trace-ID si disponible via logger
         headers = {}
@@ -228,13 +215,15 @@ async def chat(request: ChatRequest):
             "object": "chat.completion",
             "created": int(datetime.now().timestamp()),
             "model": getattr(getattr(config, "model", None), "name", "unknown"),
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": f"[stub-error] {str(e)}"},
-                "finish_reason": "error"
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": f"[stub-error] {str(e)}"},
+                    "finish_reason": "error",
+                }
+            ],
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-            "conversation_id": conversation_id
+            "conversation_id": conversation_id,
         }
         return JSONResponse(status_code=200, content=fallback)
 
@@ -243,38 +232,34 @@ async def chat(request: ChatRequest):
 async def get_conversation(conversation_id: str):
     """Récupérer l'historique d'une conversation"""
     messages = get_messages(conversation_id)
-    
+
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    return {
-        "conversation_id": conversation_id,
-        "messages": messages
-    }
+
+    return {"conversation_id": conversation_id, "messages": messages}
 
 
 @app.get("/metrics")
 async def metrics():
     """
     Endpoint Prometheus pour exposer les métriques HTN
-    
+
     Returns:
         Métriques au format Prometheus
     """
     if not PROMETHEUS_AVAILABLE:
         from fastapi.responses import PlainTextResponse
+
         return PlainTextResponse(
-            content="# Prometheus client not available. Install with: pip install prometheus-client\n",
-            status_code=200
+            content="# Prometheus client not available. Install with: pip install prometheus-client\n", status_code=200
         )
-    
+
     from fastapi.responses import Response
-    return Response(
-        content=generate_latest(),
-        media_type=CONTENT_TYPE_LATEST
-    )
+
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

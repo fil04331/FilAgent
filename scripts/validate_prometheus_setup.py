@@ -100,7 +100,8 @@ class PrometheusSetupValidator:
         # prometheus-client
         try:
             import prometheus_client
-            version = prometheus_client.__version__
+            # prometheus_client peut ne pas avoir __version__
+            version = getattr(prometheus_client, '__version__', 'unknown')
             self.results.append(ValidationResult(
                 "prometheus-client",
                 True,
