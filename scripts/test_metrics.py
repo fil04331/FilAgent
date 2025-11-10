@@ -119,7 +119,8 @@ def test_prometheus_client():
     
     try:
         import prometheus_client
-        version = getattr(prometheus_client, "__version__", None) or _get_package_version("prometheus-client")
+        # Use getattr to get version if available
+        version = getattr(prometheus_client, "__version__", getattr(prometheus_client, "VERSION", "unknown"))
         print(f"✅ prometheus-client installé (version: {version})")
         return True
     except ImportError:
@@ -179,4 +180,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

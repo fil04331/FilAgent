@@ -114,9 +114,8 @@ class PrometheusSetupValidator:
         # prometheus-client
         try:
             import prometheus_client
-            version = getattr(prometheus_client, "__version__", None)
-            if not version:
-                version = self._get_package_version("prometheus-client") or "unknown"
+            # prometheus_client peut ne pas avoir __version__
+            version = getattr(prometheus_client, '__version__', 'unknown')
             self.results.append(ValidationResult(
                 "prometheus-client",
                 True,
