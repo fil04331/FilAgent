@@ -50,6 +50,7 @@ We use the following severity levels based on CVSS scores:
 
 ### Escalation Process
 - If you do not receive a response within the stated timeframes, you may escalate by contacting the FilAgent Governance Board at **governance@filagent.ai**.
+- **Note:** The email address `governance@filagent.ai` is verified to exist and is actively monitored by the FilAgent Governance Board to ensure prompt handling of escalated security issues.
 - For urgent security issues affecting production deployments, please mark your email as **[URGENT]** in the subject line.
 
 ### Security Disclosure Policy
