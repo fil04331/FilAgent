@@ -1,0 +1,34 @@
+[flake8]
+# Longueur maximale des lignes
+max-line-length = 127
+
+# Complexité maximale
+max-complexity = 10
+
+# Exclure les dossiers et fichiers suivants
+exclude =
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .venv,
+    venv,
+    env,
+    ENV,
+    build,
+    dist,
+    *.egg-info,
+    .eggs,
+    audit/CURSOR TODOS,
+    memory/semantic/*/,
+    memory/working_set/*/,
+    tools/code_exec/*/,
+    tools/connectors/*/,
+    tools/python_sandbox/*/,
+    tools/shell_sandbox/*/,
+    models/weights,
+    logs,
+    provenance/signatures,
+    provenance/snapshots
+
+# Ignorer certains codes d'erreur spécifiques si nécessaire
+# ignore = 

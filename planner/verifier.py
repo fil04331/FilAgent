@@ -224,7 +224,7 @@ class TaskVerifier:
             metrics.record_verification(
                 level=level.value,
                 passed=passed,
-                confidence_score=confidence_score,
+                confidence_score=confidence,
             )
             
             # Construire résultat
