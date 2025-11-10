@@ -32,6 +32,11 @@ try:
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
+    # Print a clear message for missing dependency
+    print("⚠️  Warning: Dependency 'requests' is missing!")
+    print("   Some validation checks will be skipped.")
+    print("   Install with: pip install requests")
+    print()
 
 # Import yaml (optionnel, avec fallback)
 try:

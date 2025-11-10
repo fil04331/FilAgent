@@ -423,6 +423,7 @@ class TaskExecutor:
             result = action_func(task.params)
             return result
         except Exception as e:
+            # Preserve original exception type in error message for traceability
             raise ExecutionError(
                 f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}"
             ) from e
