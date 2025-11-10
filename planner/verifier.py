@@ -22,22 +22,22 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Optional, Any, Callable
 from datetime import datetime
-import json
 from .metrics import get_metrics
 
 
 class VerificationLevel(str, Enum):
     """Niveaux de rigueur de vérification"""
-    BASIC = "basic"          # Minimal (rapide)
-    STRICT = "strict"        # Standard (équilibré)
-    PARANOID = "paranoid"    # Maximal (lent mais sûr)
+
+    BASIC = "basic"  # Minimal (rapide)
+    STRICT = "strict"  # Standard (équilibré)
+    PARANOID = "paranoid"  # Maximal (lent mais sûr)
 
 
 @dataclass
 class VerificationResult:
     """
     Résultat d'une vérification de tâche
-    
+
     Attributes:
         passed: True si toutes les vérifications passent
         level: Niveau de vérification utilisé
@@ -47,6 +47,7 @@ class VerificationResult:
         confidence_score: Score de confiance (0-1)
         metadata: Métadonnées de traçabilité
     """
+
     passed: bool
     level: VerificationLevel
     checks: Dict[str, bool] = field(default_factory=dict)
@@ -54,12 +55,12 @@ class VerificationResult:
     warnings: List[str] = field(default_factory=list)
     confidence_score: float = 1.0
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self):
         """Initialise métadonnées de traçabilité"""
         if "verified_at" not in self.metadata:
             self.metadata["verified_at"] = datetime.utcnow().isoformat()
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Sérialise pour logging"""
         return {
@@ -76,20 +77,20 @@ class VerificationResult:
 class TaskVerifier:
     """
     Vérificateur de résultats de tâches HTN
-    
+
     Responsabilités:
         - Valider les résultats selon le niveau requis
         - Exécuter self-checks automatiques
         - Détecter anomalies et incohérences
         - Tracer toutes les vérifications
-    
+
     Usage:
         verifier = TaskVerifier(level=VerificationLevel.STRICT)
         result = verifier.verify_task(task, expected_schema)
         if not result.passed:
             print(f"Errors: {result.errors}")
     """
-    
+
     def __init__(
         self,
         default_level: VerificationLevel = VerificationLevel.STRICT,
@@ -97,34 +98,34 @@ class TaskVerifier:
     ):
         """
         Initialise le vérificateur
-        
+
         Args:
             default_level: Niveau de vérification par défaut
             enable_tracing: Active traçabilité complète
         """
         self.default_level = default_level
         self.enable_tracing = enable_tracing
-        
+
         # Registre des vérificateurs personnalisés par action
         self._custom_verifiers: Dict[str, Callable] = {}
-        
+
         # Statistiques
         self._stats = {
             "total_verifications": 0,
             "passed": 0,
             "failed": 0,
         }
-    
+
     def register_custom_verifier(self, action: str, verifier: Callable):
         """
         Enregistre un vérificateur personnalisé pour une action
-        
+
         Args:
             action: Nom de l'action
             verifier: Fonction de vérification (signature: func(task, result) -> VerificationResult)
         """
         self._custom_verifiers[action] = verifier
-    
+
     def verify_task(
         self,
         task: Any,  # Task object
@@ -133,12 +134,12 @@ class TaskVerifier:
     ) -> VerificationResult:
         """
         Vérifie le résultat d'une tâche
-        
+
         Args:
             task: Tâche dont le résultat doit être vérifié
             level: Niveau de vérification (override default)
             expected_schema: Schéma attendu pour le résultat
-            
+
         Returns:
             VerificationResult avec détails des vérifications
         """
@@ -150,11 +151,11 @@ class TaskVerifier:
             "level": level.value,
             "started_at": datetime.utcnow().isoformat(),
         }
-        
+
         checks = {}
         errors = []
         warnings = []
-        
+
         try:
             # Vérification 1: Résultat existe
             if task.result is None:
@@ -162,21 +163,21 @@ class TaskVerifier:
                 errors.append("Task result is None")
             else:
                 checks["result_exists"] = True
-            
+
             # Vérification 2: Pas d'erreur reportée
             if task.error:
                 checks["no_error"] = False
                 errors.append(f"Task reported error: {task.error}")
             else:
                 checks["no_error"] = True
-            
+
             # Vérification 3: Statut cohérent
             if task.status.value not in ["completed", "failed"]:
                 checks["status_coherent"] = False
                 warnings.append(f"Unexpected status: {task.status.value}")
             else:
                 checks["status_coherent"] = True
-            
+
             # Vérifications selon le niveau
             if level in [VerificationLevel.STRICT, VerificationLevel.PARANOID]:
                 # Vérification 4: Schéma (si fourni)
@@ -185,13 +186,13 @@ class TaskVerifier:
                     checks["schema_valid"] = schema_valid
                     if not schema_valid:
                         errors.append("Result does not match expected schema")
-                
+
                 # Vérification 5: Cohérence temporelle
                 temporal_ok = self._verify_temporal_coherence(task)
                 checks["temporal_coherent"] = temporal_ok
                 if not temporal_ok:
                     warnings.append("Temporal metadata inconsistent")
-            
+
             if level == VerificationLevel.PARANOID:
                 # Vérification 6: Sémantique (vérificateur custom)
                 if task.action in self._custom_verifiers:
@@ -199,37 +200,37 @@ class TaskVerifier:
                     checks["custom_verification"] = custom_result.passed
                     errors.extend(custom_result.errors)
                     warnings.extend(custom_result.warnings)
-                
+
                 # Vérification 7: Cohérence avec dépendances
                 # (à implémenter si graph disponible)
                 pass
-            
+
             # Calculer score de confiance
             passed_checks = sum(1 for v in checks.values() if v)
             total_checks = len(checks)
             confidence = passed_checks / total_checks if total_checks > 0 else 0.0
-            
+
             # Déterminer succès global
             passed = len(errors) == 0
-            
+
             # Mettre à jour statistiques
             self._stats["total_verifications"] += 1
             if passed:
                 self._stats["passed"] += 1
             else:
                 self._stats["failed"] += 1
-            
+
             # Métriques: enregistrer vérification
             metrics = get_metrics()
             metrics.record_verification(
                 level=level.value,
                 passed=passed,
-                confidence_score=confidence_score,
+                confidence_score=confidence,
             )
-            
+
             # Construire résultat
             metadata["completed_at"] = datetime.utcnow().isoformat()
-            
+
             return VerificationResult(
                 passed=passed,
                 level=level,
@@ -239,12 +240,12 @@ class TaskVerifier:
                 confidence_score=confidence,
                 metadata=metadata,
             )
-            
+
         except Exception as e:
             # Traçabilité: échec de vérification
             metadata["verification_error"] = str(e)
             metadata["completed_at"] = datetime.utcnow().isoformat()
-            
+
             return VerificationResult(
                 passed=False,
                 level=level,
@@ -254,7 +255,7 @@ class TaskVerifier:
                 confidence_score=0.0,
                 metadata=metadata,
             )
-    
+
     def verify_graph_results(
         self,
         graph: Any,  # TaskGraph
@@ -262,43 +263,54 @@ class TaskVerifier:
     ) -> Dict[str, VerificationResult]:
         """
         Vérifie tous les résultats d'un graphe
-        
+
         Args:
             graph: TaskGraph avec tâches complétées
             level: Niveau de vérification
-            
+
         Returns:
             Dict mapping task_id -> VerificationResult
         """
         results = {}
-        
+
         for task_id, task in graph.tasks.items():
             if task.status.value == "completed":
                 result = self.verify_task(task, level)
                 results[task_id] = result
-        
+
         return results
-    
+
     def _verify_schema(self, result: Any, schema: Dict[str, Any]) -> bool:
         """
         Vérifie que le résultat correspond au schéma attendu
-        
-        Schéma simple:
-        {
-            "type": "dict" | "list" | "str" | "int" | "float" | "bool",
-            "required_keys": ["key1", "key2"],  # Pour dict
-            "min_length": 1,  # Pour list/str
-        }
-        
+
+        Supporte deux formats de schéma:
+        1. Format simple avec types Python: {"name": str, "value": int}
+        2. Format structuré: {"type": "dict", "required_keys": [...]}
+
         Args:
             result: Résultat à vérifier
             schema: Schéma attendu
-            
+
         Returns:
             True si le résultat correspond au schéma
         """
+        # Format 1: Schéma avec types Python ({"name": str, "value": int})
+        # Vérifier si toutes les valeurs sont des types Python (sauf les strings qui sont des valeurs)
+        schema_values = list(schema.values())
+        if schema_values and all(isinstance(v, type) for v in schema_values):
+            if not isinstance(result, dict):
+                return False
+            for key, expected_type in schema.items():
+                if key not in result:
+                    return False  # Clé manquante
+                if not isinstance(result[key], expected_type):
+                    return False  # Type incorrect
+            return True
+
+        # Format 2: Schéma structuré
         expected_type = schema.get("type")
-        
+
         # Vérifier le type
         type_map = {
             "dict": dict,
@@ -308,35 +320,35 @@ class TaskVerifier:
             "float": float,
             "bool": bool,
         }
-        
+
         if expected_type in type_map:
             if not isinstance(result, type_map[expected_type]):
                 return False
-        
+
         # Vérifications spécifiques selon le type
         if expected_type == "dict" and "required_keys" in schema:
             required = schema["required_keys"]
             if not all(key in result for key in required):
                 return False
-        
+
         if expected_type in ["list", "str"] and "min_length" in schema:
             if len(result) < schema["min_length"]:
                 return False
-        
+
         return True
-    
+
     def _verify_temporal_coherence(self, task: Any) -> bool:
         """
         Vérifie la cohérence temporelle des métadonnées
-        
+
         Conditions:
         - created_at <= updated_at
         - updated_at <= completed_at (si existe)
         - Pas de timestamps futurs
-        
+
         Args:
             task: Tâche à vérifier
-            
+
         Returns:
             True si cohérent
         """
@@ -344,62 +356,60 @@ class TaskVerifier:
             created = datetime.fromisoformat(task.metadata.get("created_at", ""))
             updated = datetime.fromisoformat(task.metadata.get("updated_at", ""))
             now = datetime.utcnow()
-            
+
             # Vérifier ordre chronologique
             if created > updated:
                 return False
-            
+
             # Vérifier pas de futur
             if created > now or updated > now:
                 return False
-            
+
             # Vérifier completed_at si existe
             if "completed_at" in task.metadata:
                 completed = datetime.fromisoformat(task.metadata["completed_at"])
                 if updated > completed or completed > now:
                     return False
-            
+
             return True
-            
+
         except (ValueError, KeyError):
             # Métadonnées manquantes ou invalides
             return False
-    
+
     def self_check(self) -> Dict[str, Any]:
         """
         Self-check du vérificateur lui-même
-        
+
         Vérifie:
         - Statistiques cohérentes
         - Vérificateurs custom valides
         - État interne sain
-        
+
         Returns:
             Dict avec résultats du self-check
         """
         checks = {}
-        
+
         # Check 1: Statistiques cohérentes
         total = self._stats["total_verifications"]
         passed = self._stats["passed"]
         failed = self._stats["failed"]
-        checks["stats_coherent"] = (passed + failed == total)
-        
+        checks["stats_coherent"] = passed + failed == total
+
         # Check 2: Vérificateurs custom callables
-        checks["custom_verifiers_valid"] = all(
-            callable(v) for v in self._custom_verifiers.values()
-        )
-        
+        checks["custom_verifiers_valid"] = all(callable(v) for v in self._custom_verifiers.values())
+
         # Check 3: Configuration valide
         checks["config_valid"] = self.default_level in VerificationLevel
-        
+
         return {
             "passed": all(checks.values()),
             "checks": checks,
             "stats": self._stats.copy(),
             "timestamp": datetime.utcnow().isoformat(),
         }
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques de vérification"""
         return self._stats.copy()
