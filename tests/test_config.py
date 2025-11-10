@@ -1,207 +1,287 @@
 """
-Tests for runtime.config module
-Focus on configuration serialization and the to_dict() method
+Tests for configuration management and persistence
 """
 import pytest
-from runtime.config import AgentConfig, MemoryConfig, HTNPlanningConfig, HTNExecutionConfig, HTNVerificationConfig
+import yaml
+import tempfile
+import os
+from pathlib import Path
+from runtime.config import (
+    AgentConfig,
+    GenerationConfig,
+    TimeoutConfig,
+    ModelConfig,
+    MemoryConfig,
+    LoggingConfig,
+    ComplianceConfig,
+    AgentRuntimeSettings,
+    HTNPlanningConfig,
+    HTNExecutionConfig,
+    HTNVerificationConfig,
+)
 
 
-class TestMemoryConfigToDictDynamic:
-    """Test the dynamic to_dict() method for AgentConfig"""
+class TestConfigPersistence:
+    """Tests for configuration save/load persistence"""
 
-    def test_to_dict_returns_dict(self):
-        """Test that to_dict() returns a dictionary"""
-        config = AgentConfig()
-        result = config.to_dict()
-        assert isinstance(result, dict)
+    def test_save_and_load_basic_config(self):
+        """Test that a basic config can be saved and loaded back"""
+        # Create a temporary directory for test config
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
 
-    def test_to_dict_has_all_required_keys(self):
-        """Test that to_dict() includes all required top-level keys"""
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        required_keys = ['agent', 'generation', 'timeouts', 'model', 'memory', 'logging', 'compliance']
-        for key in required_keys:
-            assert key in result, f"Missing required key: {key}"
+            # Create a config with specific values
+            original_config = AgentConfig(
+                name="test_agent",
+                version="1.0.0",
+                generation=GenerationConfig(
+                    temperature=0.5,
+                    top_p=0.9,
+                    max_tokens=1000,
+                    seed=123,
+                ),
+                timeouts=TimeoutConfig(
+                    generation=90,
+                    tool_execution=45,
+                    total_request=400,
+                ),
+                runtime_settings=AgentRuntimeSettings(
+                    max_iterations=15,
+                    timeout=400,
+                ),
+            )
 
-    def test_memory_dict_structure(self):
-        """Test that memory is properly structured with episodic and semantic sections"""
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        assert 'memory' in result
-        assert isinstance(result['memory'], dict)
-        assert 'episodic' in result['memory']
-        assert 'semantic' in result['memory']
-        assert isinstance(result['memory']['episodic'], dict)
-        assert isinstance(result['memory']['semantic'], dict)
+            # Save the config
+            original_config.save(str(config_path))
 
-    def test_episodic_fields_mapped_correctly(self):
-        """Test that episodic_* fields are correctly mapped to episodic section"""
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        episodic = result['memory']['episodic']
-        
-        # Check that episodic fields are present without the prefix
-        assert 'ttl_days' in episodic
-        assert 'max_conversations' in episodic
-        
-        # Verify values match the config
-        assert episodic['ttl_days'] == config.memory.episodic_ttl_days
-        assert episodic['max_conversations'] == config.memory.episodic_max_conversations
+            # Verify file was created
+            assert config_path.exists(), "Config file should be created"
 
-    def test_semantic_fields_mapped_correctly(self):
-        """Test that semantic_* fields are correctly mapped to semantic section"""
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        semantic = result['memory']['semantic']
-        
-        # Check that semantic fields are present without the prefix
-        assert 'rebuild_days' in semantic
-        assert 'max_items' in semantic
-        assert 'similarity_threshold' in semantic
-        
-        # Verify values match the config
-        assert semantic['rebuild_days'] == config.memory.semantic_rebuild_days
-        assert semantic['max_items'] == config.memory.semantic_max_items
-        assert semantic['similarity_threshold'] == config.memory.semantic_similarity_threshold
+            # Load it back
+            loaded_config = AgentConfig.load(str(tmpdir))
 
-    def test_agent_section_structure(self):
-        """Test that agent section contains correct fields"""
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        agent = result['agent']
-        assert 'name' in agent
-        assert 'version' in agent
-        assert 'max_iterations' in agent
-        assert 'timeout' in agent
-        
-        # Verify values
-        assert agent['name'] == config.name
-        assert agent['version'] == config.version
-        assert agent['max_iterations'] == config.runtime_settings.max_iterations
-        assert agent['timeout'] == config.runtime_settings.timeout
+            # Verify all values match
+            assert loaded_config.name == original_config.name
+            assert loaded_config.version == original_config.version
+            assert loaded_config.generation.temperature == original_config.generation.temperature
+            assert loaded_config.generation.top_p == original_config.generation.top_p
+            assert loaded_config.generation.max_tokens == original_config.generation.max_tokens
+            assert loaded_config.generation.seed == original_config.generation.seed
+            assert loaded_config.timeouts.generation == original_config.timeouts.generation
+            assert loaded_config.timeouts.tool_execution == original_config.timeouts.tool_execution
+            assert loaded_config.timeouts.total_request == original_config.timeouts.total_request
+            assert loaded_config.runtime_settings.max_iterations == original_config.runtime_settings.max_iterations
+            assert loaded_config.runtime_settings.timeout == original_config.runtime_settings.timeout
 
-    def test_to_dict_adapts_to_new_memory_fields(self):
-        """Test that the dynamic approach would handle new memory fields"""
-        # This test verifies the introspection approach
-        
-        # Get all field names from MemoryConfig class
-        memory_fields = MemoryConfig.model_fields.keys()
-        
-        # Verify we have the expected prefixes
-        episodic_fields = [f for f in memory_fields if f.startswith('episodic_')]
-        semantic_fields = [f for f in memory_fields if f.startswith('semantic_')]
-        
-        assert len(episodic_fields) > 0, "Should have episodic fields"
-        assert len(semantic_fields) > 0, "Should have semantic fields"
-        
-        # Verify to_dict() includes all of them
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        for field_name in episodic_fields:
-            key = field_name.removeprefix('episodic_')
-            assert key in result['memory']['episodic'], f"Missing episodic field: {key}"
-        
-        for field_name in semantic_fields:
-            key = field_name.removeprefix('semantic_')
-            assert key in result['memory']['semantic'], f"Missing semantic field: {key}"
+    def test_save_and_load_with_htn_configs(self):
+        """Test that config with HTN settings can be saved and loaded"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
 
-    def test_htn_configs_included_when_present(self):
-        """Test that optional HTN configurations are included when set"""
-        config = AgentConfig(
-            htn_planning=HTNPlanningConfig(),
-            htn_execution=HTNExecutionConfig(),
-            htn_verification=HTNVerificationConfig()
-        )
-        
-        result = config.to_dict()
-        
-        assert 'htn_planning' in result
-        assert 'htn_execution' in result
-        assert 'htn_verification' in result
+            # Create config with HTN settings
+            original_config = AgentConfig(
+                name="htn_agent",
+                version="2.0.0",
+                htn_planning=HTNPlanningConfig(
+                    enabled=True,
+                    default_strategy="hybrid",
+                    max_decomposition_depth=5,
+                ),
+                htn_execution=HTNExecutionConfig(
+                    default_strategy="parallel",
+                    max_parallel_workers=8,
+                    task_timeout_sec=120,
+                ),
+                htn_verification=HTNVerificationConfig(
+                    default_level="paranoid",
+                    custom_verifiers=["verifier1", "verifier2"],
+                ),
+            )
 
-    def test_htn_configs_excluded_when_none(self):
-        """Test that optional HTN configurations are excluded when None"""
-        config = AgentConfig()
-        result = config.to_dict()
-        
-        # By default, HTN configs should be None
-        if config.htn_planning is None:
-            assert 'htn_planning' not in result
-        if config.htn_execution is None:
-            assert 'htn_execution' not in result
-        if config.htn_verification is None:
-            assert 'htn_verification' not in result
+            # Save and load
+            original_config.save(str(config_path))
+            loaded_config = AgentConfig.load(str(tmpdir))
 
-    def test_custom_memory_values(self):
-        """Test that custom memory values are correctly reflected in to_dict()"""
-        custom_memory = MemoryConfig(
-            episodic_ttl_days=60,
-            episodic_max_conversations=2000,
-            semantic_rebuild_days=7,
-            semantic_max_items=5000,
-            semantic_similarity_threshold=0.85
-        )
-        
-        config = AgentConfig(memory=custom_memory)
-        result = config.to_dict()
-        
-        assert result['memory']['episodic']['ttl_days'] == 60
-        assert result['memory']['episodic']['max_conversations'] == 2000
-        assert result['memory']['semantic']['rebuild_days'] == 7
-        assert result['memory']['semantic']['max_items'] == 5000
-        assert result['memory']['semantic']['similarity_threshold'] == 0.85
+            # Verify HTN configs
+            assert loaded_config.htn_planning is not None
+            assert loaded_config.htn_planning.enabled == original_config.htn_planning.enabled
+            assert loaded_config.htn_planning.default_strategy == original_config.htn_planning.default_strategy
+            assert loaded_config.htn_planning.max_decomposition_depth == original_config.htn_planning.max_decomposition_depth
 
+            assert loaded_config.htn_execution is not None
+            assert loaded_config.htn_execution.default_strategy == original_config.htn_execution.default_strategy
+            assert loaded_config.htn_execution.max_parallel_workers == original_config.htn_execution.max_parallel_workers
+            assert loaded_config.htn_execution.task_timeout_sec == original_config.htn_execution.task_timeout_sec
 
-class TestAgentConfigSave:
-    """Test the save() method implementation"""
+            assert loaded_config.htn_verification is not None
+            assert loaded_config.htn_verification.default_level == original_config.htn_verification.default_level
+            assert loaded_config.htn_verification.custom_verifiers == original_config.htn_verification.custom_verifiers
 
-    def test_save_creates_yaml_file(self, tmp_path):
-        """Test that save() creates a YAML file"""
-        import yaml
-        
-        config = AgentConfig()
-        save_path = tmp_path / "test_config.yaml"
-        
-        config.save(str(save_path))
-        
-        assert save_path.exists()
-        
-        # Verify it's valid YAML
-        with open(save_path, 'r') as f:
-            loaded = yaml.safe_load(f)
-        
-        assert isinstance(loaded, dict)
+    def test_save_and_load_memory_config(self):
+        """Test that memory configuration persists correctly"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
 
-    def test_save_creates_parent_directories(self, tmp_path):
-        """Test that save() creates parent directories if they don't exist"""
-        config = AgentConfig()
-        save_path = tmp_path / "nested" / "dir" / "config.yaml"
-        
-        config.save(str(save_path))
-        
-        assert save_path.exists()
+            # Create config with custom memory settings
+            original_config = AgentConfig(
+                name="memory_test",
+                version="1.0.0",
+                memory=MemoryConfig(
+                    episodic_ttl_days=60,
+                    episodic_max_conversations=2000,
+                    semantic_rebuild_days=7,
+                    semantic_max_items=5000,
+                    semantic_similarity_threshold=0.85,
+                ),
+            )
 
-    def test_saved_yaml_has_correct_structure(self, tmp_path):
+            # Save and load
+            original_config.save(str(config_path))
+            loaded_config = AgentConfig.load(str(tmpdir))
+
+            # Verify memory config
+            assert loaded_config.memory.episodic_ttl_days == 60
+            assert loaded_config.memory.episodic_max_conversations == 2000
+            assert loaded_config.memory.semantic_rebuild_days == 7
+            assert loaded_config.memory.semantic_max_items == 5000
+            assert loaded_config.memory.semantic_similarity_threshold == 0.85
+
+    def test_save_and_load_compliance_config(self):
+        """Test that compliance configuration persists correctly"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
+
+            # Create config with compliance settings
+            original_config = AgentConfig(
+                name="compliance_test",
+                version="1.0.0",
+                compliance=ComplianceConfig(
+                    worm_enabled=False,
+                    dr_required_for=["write_file", "delete_file"],
+                    pii_redaction=True,
+                    provenance_tracking=False,
+                ),
+            )
+
+            # Save and load
+            original_config.save(str(config_path))
+            loaded_config = AgentConfig.load(str(tmpdir))
+
+            # Verify compliance config
+            assert loaded_config.compliance.worm_enabled is False
+            assert loaded_config.compliance.dr_required_for == ["write_file", "delete_file"]
+            assert loaded_config.compliance.pii_redaction is True
+            assert loaded_config.compliance.provenance_tracking is False
+
+    def test_save_creates_directory_if_not_exists(self):
+        """Test that save creates parent directories if needed"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Use a nested path that doesn't exist yet
+            config_path = Path(tmpdir) / "nested" / "config" / "agent.yaml"
+
+            config = AgentConfig(name="test", version="1.0.0")
+
+            # Save should create the directories
+            config.save(str(config_path))
+
+            # Verify directory was created and file exists
+            assert config_path.parent.exists()
+            assert config_path.exists()
+
+    def test_save_overwrites_existing_file(self):
+        """Test that save overwrites existing config file"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
+
+            # Create and save first config
+            config1 = AgentConfig(
+                name="first_agent",
+                version="1.0.0",
+                runtime_settings=AgentRuntimeSettings(max_iterations=5),
+            )
+            config1.save(str(config_path))
+
+            # Create and save second config with different values
+            config2 = AgentConfig(
+                name="second_agent",
+                version="2.0.0",
+                runtime_settings=AgentRuntimeSettings(max_iterations=20),
+            )
+            config2.save(str(config_path))
+
+            # Load and verify it has the second config's values
+            loaded_config = AgentConfig.load(str(tmpdir))
+            assert loaded_config.name == "second_agent"
+            assert loaded_config.version == "2.0.0"
+            assert loaded_config.runtime_settings.max_iterations == 20
+
+    def test_yaml_structure_is_valid(self):
         """Test that saved YAML has the correct structure"""
-        import yaml
-        
-        config = AgentConfig()
-        save_path = tmp_path / "test_config.yaml"
-        
-        config.save(str(save_path))
-        
-        with open(save_path, 'r') as f:
-            loaded = yaml.safe_load(f)
-        
-        # Verify structure matches to_dict()
-        expected = config.to_dict()
-        
-        assert loaded['agent'] == expected['agent']
-        assert loaded['memory']['episodic'] == expected['memory']['episodic']
-        assert loaded['memory']['semantic'] == expected['memory']['semantic']
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
+
+            config = AgentConfig(
+                name="test_agent",
+                version="1.0.0",
+                htn_planning=HTNPlanningConfig(enabled=True),
+            )
+            config.save(str(config_path))
+
+            # Load the raw YAML and verify structure
+            with open(config_path, 'r') as f:
+                yaml_data = yaml.safe_load(f)
+
+            # Verify top-level keys exist
+            assert 'agent' in yaml_data
+            assert 'generation' in yaml_data
+            assert 'timeouts' in yaml_data
+            assert 'model' in yaml_data
+            assert 'memory' in yaml_data
+            assert 'logging' in yaml_data
+            assert 'compliance' in yaml_data
+            assert 'htn_planning' in yaml_data
+
+            # Verify memory has nested structure
+            assert 'episodic' in yaml_data['memory']
+            assert 'semantic' in yaml_data['memory']
+            assert 'ttl_days' in yaml_data['memory']['episodic']
+            assert 'max_conversations' in yaml_data['memory']['episodic']
+            assert 'rebuild_days' in yaml_data['memory']['semantic']
+            assert 'max_items' in yaml_data['memory']['semantic']
+            assert 'similarity_threshold' in yaml_data['memory']['semantic']
+
+    def test_config_without_optional_htn_configs(self):
+        """Test that configs without HTN settings save and load correctly"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "test_agent.yaml"
+
+            # Create config without HTN settings (all None)
+            original_config = AgentConfig(
+                name="no_htn",
+                version="1.0.0",
+                htn_planning=None,
+                htn_execution=None,
+                htn_verification=None,
+            )
+
+            # Save and load
+            original_config.save(str(config_path))
+
+            # Load the raw YAML and verify HTN keys are not present
+            with open(config_path, 'r') as f:
+                yaml_data = yaml.safe_load(f)
+
+            assert 'htn_planning' not in yaml_data
+            assert 'htn_execution' not in yaml_data
+            assert 'htn_verification' not in yaml_data
+
+            # Load and verify
+            loaded_config = AgentConfig.load(str(tmpdir))
+            assert loaded_config.name == "no_htn"
+            assert loaded_config.htn_planning is None
+            assert loaded_config.htn_execution is None
+            assert loaded_config.htn_verification is None
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

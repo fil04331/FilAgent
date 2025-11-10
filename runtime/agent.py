@@ -2,6 +2,7 @@
 Agent core : Intègre le modèle et les outils
 Gère les boucles de raisonnement et les appels d'outils
 """
+
 import json
 import re
 import hashlib
@@ -10,10 +11,10 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 
 from .config import get_config
-from .model_interface import GenerationConfig, GenerationResult, init_model as _init_model
+from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry
-from tools.base import BaseTool, ToolResult, ToolStatus
+from tools.base import ToolResult, ToolStatus
 
 # Import des middlewares de conformité
 from .middleware.logging import get_logger
@@ -36,26 +37,26 @@ class Agent:
     """
     Agent LLM avec capacités d'appel d'outils
     """
-    
+
     def __init__(self, config=None):
         self.config = config or get_config()
         self.model = None  # Sera initialisé plus tard
         self.tool_registry = get_registry()
         self.conversation_history: List[Dict[str, str]] = []
-        
+
         # Initialiser les middlewares de conformité avec fallbacks
         try:
             self.logger = get_logger()
         except Exception as e:
             print(f"⚠ Failed to initialize logger: {e}")
             self.logger = None
-        
+
         try:
             self.dr_manager = get_dr_manager()
         except Exception as e:
             print(f"⚠ Failed to initialize DR manager: {e}")
             self.dr_manager = None
-        
+
         try:
             self.tracker = get_tracker()
         except Exception as e:
@@ -64,12 +65,12 @@ class Agent:
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
-        
+
         # Initialiser le planificateur HTN (sera configuré après initialisation du modèle)
         self.planner = None
         self.executor = None
         self.verifier = None
-    
+
     @staticmethod
     def _is_mock(obj: Any) -> bool:
         """Déterminer si l'objet est un mock unittest."""
@@ -105,35 +106,42 @@ class Agent:
     def initialize_model(self):
         """Initialiser le modèle"""
         from .model_interface import init_model
-        
-        model_config = {
-            'context_size': self.config.model.context_size,
-            'n_gpu_layers': self.config.model.n_gpu_layers
-        }
-        
+
+        model_config = {"context_size": self.config.model.context_size, "n_gpu_layers": self.config.model.n_gpu_layers}
+
         self.model = init_model(
-            backend=self.config.model.backend,
-            model_path=self.config.model.path,
-            config=model_config
+            backend=self.config.model.backend, model_path=self.config.model.path, config=model_config
         )
         print("✓ Model initialized")
-        
+
         # Initialiser le planificateur HTN après l'initialisation du modèle
         self._initialize_htn()
-    
+
     def _initialize_htn(self):
         """Initialiser le système HTN (planificateur, exécuteur, vérificateur)"""
         # Récupérer la configuration HTN depuis config
-        htn_config = getattr(self.config, 'htn_planning', None)
-        exec_config = getattr(self.config, 'htn_execution', None)
-        verif_config = getattr(self.config, 'htn_verification', None)
-        
+        htn_config = getattr(self.config, "htn_planning", None)
+        exec_config = getattr(self.config, "htn_execution", None)
+        verif_config = getattr(self.config, "htn_verification", None)
+
         # Valeurs par défaut si configuration non présente
         max_depth = htn_config.max_decomposition_depth if htn_config else 3
         max_workers = exec_config.max_parallel_workers if exec_config else 4
         task_timeout = exec_config.task_timeout_sec if exec_config else 60
-        verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
-        
+        # Vérifier que default_level est une string valide avant conversion
+        if verif_config and hasattr(verif_config, "default_level"):
+            default_level = verif_config.default_level
+            # Si ce n'est pas une string (y compris Mock ou autre objet), on utilise STRICT par défaut
+            if isinstance(default_level, str):
+                try:
+                    verif_level = VerificationLevel(default_level)
+                except (ValueError, TypeError):
+                    verif_level = VerificationLevel.STRICT
+            else:
+                verif_level = VerificationLevel.STRICT
+        else:
+            verif_level = VerificationLevel.STRICT
+
         # Ajouter le planificateur HTN
         self.planner = HierarchicalPlanner(
             model_interface=self.model,
@@ -141,7 +149,7 @@ class Agent:
             max_decomposition_depth=max_depth,
             enable_tracing=True,
         )
-        
+
         # Ajouter l'exécuteur
         self.executor = TaskExecutor(
             action_registry=self._build_action_registry(),
@@ -150,7 +158,7 @@ class Agent:
             timeout_per_task_sec=task_timeout,
             enable_tracing=True,
         )
-        
+
         # Ajouter le vérificateur
         self.verifier = TaskVerifier(
             default_level=verif_level,
@@ -158,16 +166,43 @@ class Agent:
         )
         print("✓ HTN system initialized")
 
+    def _resolve_verification_level(self, verif_config: Any) -> VerificationLevel:
+        """Normalise le niveau de vérification issu de la configuration."""
+        if not verif_config or self._is_mock(verif_config):
+            return VerificationLevel.STRICT
+
+        level_value = getattr(verif_config, "default_level", None)
+
+        if isinstance(level_value, VerificationLevel):
+            return level_value
+
+        if isinstance(level_value, str):
+            try:
+                return VerificationLevel(level_value.lower())
+            except ValueError:
+                pass
+
+        # Certains objets de config utilisent .value pour stocker l'enum
+        if hasattr(level_value, "value"):
+            try:
+                return VerificationLevel(str(level_value.value).lower())
+            except ValueError:
+                pass
+
+        # Gestion des mocks ou valeurs inattendues
+        return VerificationLevel.STRICT
+
     def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Analyser un message utilisateur et orchestrer la réponse de l'agent."""
-        
+
         # Métriques: compter requête totale
         from planner.metrics import get_metrics
+
         metrics = get_metrics()
-        
+
         # NOUVEAU: Détecter si la requête nécessite HTN
         requires_htn = self._requires_planning(message)
-        
+
         if requires_htn:
             # Métriques: requête HTN
             metrics.htn_requests_total.labels(strategy="auto", status="requested").inc()
@@ -179,39 +214,51 @@ class Agent:
     def _requires_planning(self, query: str) -> bool:
         """
         Détermine si HTN est nécessaire
-        
+
         Critères:
         - Mots-clés multi-étapes: "puis", "ensuite", "après"
         - Requêtes complexes: "analyse... génère... crée..."
         - Nombre de verbes d'action > 2
         """
         # Vérifier si HTN est activé
-        htn_config = getattr(self.config, 'htn_planning', None)
-        if htn_config and not getattr(htn_config, 'enabled', True):
+        htn_config = getattr(self.config, "htn_planning", None)
+        if htn_config and not getattr(htn_config, "enabled", True):
             return False
-        
+
         # Si le planificateur n'est pas initialisé, ne pas utiliser HTN
         if self.planner is None:
             return False
-        
+
         keywords = ["puis", "ensuite", "après", "finalement", "et"]
-        action_verbs = ["lis", "analyse", "génère", "crée", "calcule", "read", "analyze", "generate", "create", "calculate"]
-        
+        action_verbs = [
+            "lis",
+            "analyse",
+            "génère",
+            "crée",
+            "calcule",
+            "read",
+            "analyze",
+            "generate",
+            "create",
+            "calculate",
+        ]
+
         has_multi_step = any(kw in query.lower() for kw in keywords)
         num_actions = sum(1 for verb in action_verbs if verb in query.lower())
-        
+
         return has_multi_step or num_actions >= 2
 
     def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécution avec planification HTN"""
-        
+
         # Rafraîchir les middlewares patchables
         self._refresh_middlewares()
-        
+
         # Métriques: enregistrer requête HTN
         from planner.metrics import get_metrics
-        metrics = get_metrics()
-        
+
+        get_metrics()  # Initialiser les métriques
+
         # Logger le début de la conversation HTN
         if self.logger:
             try:
@@ -224,22 +271,22 @@ class Agent:
                 )
             except Exception as e:
                 print(f"⚠ Failed to log conversation.start.htn event: {e}")
-        
+
         # 1. Planifier
-        htn_config = getattr(self.config, 'htn_planning', None)
+        htn_config = getattr(self.config, "htn_planning", None)
         strategy_str = htn_config.default_strategy if htn_config else "hybrid"
         strategy = PlanningStrategy.HYBRID
         if strategy_str == "rule_based":
             strategy = PlanningStrategy.RULE_BASED
         elif strategy_str == "llm_based":
             strategy = PlanningStrategy.LLM_BASED
-        
+
         plan_result = self.planner.plan(
             query=user_query,
             strategy=strategy,
             context={"conversation_id": conversation_id, "task_id": task_id},
         )
-        
+
         # Log decision record (conformité Loi 25)
         if self.dr_manager:
             try:
@@ -260,43 +307,60 @@ class Agent:
                 )
             except Exception as e:
                 print(f"⚠ Failed to create decision record for planning: {e}")
-        
+
         # 2. Exécuter
         exec_result = self.executor.execute(
             graph=plan_result.graph,
             context={"conversation_id": conversation_id, "task_id": task_id},
         )
-        
+
         # 3. Vérifier
-        verif_config = getattr(self.config, 'htn_verification', None)
+        verif_config = getattr(self.config, "htn_verification", None)
         verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
         verifications = self.verifier.verify_graph_results(
             graph=plan_result.graph,
             level=verif_level,
         )
-        
+
         # 4. Construire la réponse
         if exec_result.success:
             # Toutes les tâches critiques réussies
-            response = self._format_htn_response(
-                plan_result, exec_result, verifications, conversation_id, task_id
-            )
+            response = self._format_htn_response(plan_result, exec_result, verifications, conversation_id, task_id)
         else:
             # Échec critique: fallback sur mode simple
             print("⚠ HTN execution failed, falling back to simple mode")
             response = self._run_simple(user_query, conversation_id, task_id)
-        
+
         # Métriques: calculer et mettre à jour métriques agrégées
         # (calculées périodiquement, pas à chaque requête pour performance)
         # Ces métriques peuvent être calculées via PromQL ou dans un job séparé
-        
+
         return response
 
     def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
-        
+
         # Rafraîchir les middlewares patchables (important pour les tests)
         self._refresh_middlewares()
+
+        # COMPLIANCE: Valider la requête avant exécution
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.validate_queries:
+                    context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                        'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
+                    }
+                    self.compliance_guardian.validate_query(message, context)
+            except Exception as e:
+                # En mode strict, propager l'erreur
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.strict_mode:
+                    raise
+                else:
+                    print(f"⚠ Compliance validation warning: {e}")
 
         # Logger le début de la conversation (avec fallback)
         if self.logger:
@@ -413,7 +477,11 @@ class Agent:
                     if self.tracker:
                         try:
                             input_hash = hashlib.sha256(str(arguments).encode()).hexdigest()
-                            output_payload = execution_result.output if execution_result.is_success() else execution_result.error or ""
+                            output_payload = (
+                                execution_result.output
+                                if execution_result.is_success()
+                                else execution_result.error or ""
+                            )
                             output_hash = hashlib.sha256(str(output_payload).encode()).hexdigest()
                             self.tracker.track_tool_execution(
                                 tool_name=tool_name,
@@ -494,10 +562,7 @@ class Agent:
 
         if self.dr_manager and (
             unique_tools
-            or any(
-                keyword in final_response.lower()
-                for keyword in ["execute", "write", "delete", "create"]
-            )
+            or any(keyword in final_response.lower() for keyword in ["execute", "write", "delete", "create"])
         ):
             try:
                 dr = self.dr_manager.create_dr(
@@ -529,6 +594,48 @@ class Agent:
                         print(f"⚠ Failed to log dr.created event: {e}")
             except Exception as e:
                 print(f"⚠ Failed to create decision record: {e}")
+
+        # COMPLIANCE: Auditer l'exécution et générer Decision Record
+        if self.compliance_guardian:
+            try:
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                
+                # Auditer l'exécution
+                if cg_config and cg_config.audit_executions:
+                    exec_result = {
+                        'success': final_response is not None and "Erreur" not in final_response,
+                        'errors': [] if final_response is not None else ['No response generated']
+                    }
+                    audit_context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.audit_execution(exec_result, audit_context)
+                
+                # Générer Decision Record
+                if cg_config and cg_config.auto_generate_dr:
+                    plan = {
+                        'actions': [{'tool': tool, 'params': {}} for tool in unique_tools],
+                        'tools_used': unique_tools
+                    }
+                    exec_result = {
+                        'success': final_response is not None and "Erreur" not in final_response,
+                        'errors': [] if final_response is not None else ['No response generated']
+                    }
+                    dr_context = {
+                        'actor': 'agent.core',
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                    }
+                    self.compliance_guardian.generate_decision_record(
+                        decision_type='simple_execution',
+                        query=message,
+                        plan=plan,
+                        execution_result=exec_result,
+                        context=dr_context
+                    )
+            except Exception as e:
+                print(f"⚠ Compliance audit/DR generation warning: {e}")
 
         if self.logger:
             try:
@@ -598,18 +705,18 @@ class Agent:
         }
         serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-    
+
     def _get_system_prompt(self) -> str:
         """Retourner le prompt système avec les outils disponibles"""
         tools = self.tool_registry.list_all()
         tool_descriptions = []
-        
+
         for tool_name, tool in tools.items():
             schema = tool.get_schema()
             tool_descriptions.append(
                 f"- {tool_name}: {schema['description']}\n  Paramètres: {json.dumps(schema['parameters'])}"
             )
-        
+
         raw_prompt = f"""Tu es un assistant IA capable d'utiliser des outils.
 
 Outils disponibles:
@@ -631,7 +738,7 @@ Format pour appeler un outil:
 Réponds naturellement et utilise les outils quand c'est nécessaire."""
 
         return textwrap.dedent(raw_prompt).strip()
-    
+
     def _parse_tool_calls(self, text: str) -> List[Dict[str, Any]]:
         """
         Parser le texte pour détecter les appels d'outils
@@ -640,38 +747,34 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
         {{"tool": "nom", "arguments": {{}}}}
         </tool_call>
         """
-        pattern = r'<tool_call>(.*?)</tool_call>'
+        pattern = r"<tool_call>(.*?)</tool_call>"
         matches = re.findall(pattern, text, re.DOTALL)
-        
+
         tool_calls = []
         for match in matches:
             try:
                 tool_json = json.loads(match.strip())
-                if 'tool' in tool_json and 'arguments' in tool_json:
+                if "tool" in tool_json and "arguments" in tool_json:
                     tool_calls.append(tool_json)
             except json.JSONDecodeError:
                 continue
-        
+
         return tool_calls
-    
+
     def _execute_tool(self, tool_call: Dict[str, Any]) -> ToolResult:
         """Exécuter un outil"""
-        tool_name = tool_call.get('tool')
-        arguments = tool_call.get('arguments', {})
-        
+        tool_name = tool_call.get("tool")
+        arguments = tool_call.get("arguments", {})
+
         tool = self.tool_registry.get_tool(tool_name)
-        
+
         if not tool:
-            return ToolResult(
-                status=ToolStatus.ERROR,
-                output="",
-                error=f"Tool not found: {tool_name}"
-            )
-        
+            return ToolResult(status=ToolStatus.ERROR, output="", error=f"Tool not found: {tool_name}")
+
         # Exécuter l'outil
         result = tool.execute(arguments)
         return result
-    
+
     def _format_tool_results(self, results: List[ToolResult]) -> str:
         """Formatter les résultats des outils pour le contexte"""
         formatted = []
@@ -681,17 +784,18 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
             else:
                 formatted.append(f"Outil {i}: ERROR\n{result.error}")
         return "\n---\n".join(formatted)
-    
+
     def _build_action_registry(self) -> Dict[str, Any]:
         """
         Mappe les actions HTN aux outils FilAgent
-        
+
         Returns:
             Dict[action_name, fonction_executable]
         """
         from typing import Callable
+
         registry: Dict[str, Callable] = {}
-        
+
         # Mapper chaque outil du registre
         tools = self.tool_registry.list_all()
         for tool_name, tool in tools.items():
@@ -699,13 +803,14 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
             def make_tool_wrapper(t):
                 def wrapper(params: Dict):
                     return t.execute(params)
+
                 return wrapper
-            
+
             registry[tool_name] = make_tool_wrapper(tool)
-        
+
         # Actions génériques
         registry["generic_execute"] = self._generic_execute
-        
+
         return registry
 
     def _generic_execute(self, params: Dict) -> Any:
@@ -726,22 +831,26 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
         task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Formate la réponse finale"""
-        
+
         # Agréger les résultats
         results = []
         sorted_tasks = plan_result.graph.topological_sort()
         for task in sorted_tasks:
             if task.status == TaskStatus.COMPLETED:
                 verification = verifications.get(task.task_id, None) if isinstance(verifications, dict) else None
-                results.append({
-                    "task": task.name,
-                    "result": task.result,
-                    "verified": verification.to_dict() if verification and hasattr(verification, 'to_dict') else None,
-                })
-        
+                results.append(
+                    {
+                        "task": task.name,
+                        "result": task.result,
+                        "verified": (
+                            verification.to_dict() if verification and hasattr(verification, "to_dict") else None
+                        ),
+                    }
+                )
+
         # Générer le texte de réponse
         response_text = self._generate_response_from_results(results)
-        
+
         # Enregistrer la réponse dans la mémoire
         try:
             add_message(
@@ -752,7 +861,7 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
             )
         except Exception as e:
             print(f"⚠ Failed to persist assistant message: {e}")
-        
+
         # Logger la fin de la conversation HTN
         if self.logger:
             try:
@@ -770,14 +879,12 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
                 )
             except Exception as e:
                 print(f"⚠ Failed to log conversation.end.htn event: {e}")
-        
+
         return {
             "response": response_text,
             "plan": plan_result.to_dict(),
             "execution": exec_result.to_dict(),
-            "verifications": {
-                k: v.to_dict() for k, v in verifications.items()
-            },
+            "verifications": {k: v.to_dict() for k, v in verifications.items()},
             "metadata": {
                 "planning_strategy": plan_result.strategy_used.value,
                 "execution_strategy": ExecutionStrategy.ADAPTIVE.value,
@@ -798,45 +905,45 @@ Réponds naturellement et utilise les outils quand c'est nécessaire."""
         """Génère un texte de réponse à partir des résultats des tâches"""
         if not results:
             return "Aucun résultat disponible."
-        
+
         response_parts = []
         response_parts.append("J'ai complété les tâches suivantes:\n")
-        
+
         for i, result in enumerate(results, 1):
             task_name = result.get("task", "Tâche inconnue")
             task_result = result.get("result", "")
             verified = result.get("verified", None)
-            
+
             response_parts.append(f"{i}. {task_name}")
             if verified and verified.get("passed", False):
                 response_parts.append("   ✓ Vérifié")
             elif verified:
                 response_parts.append(f"   ⚠ Vérification: {verified.get('reason', 'Échec')}")
-            
+
             if task_result:
                 # Tronquer si trop long
                 result_str = str(task_result)
                 if len(result_str) > 200:
                     result_str = result_str[:200] + "..."
                 response_parts.append(f"   Résultat: {result_str}")
-        
+
         return "\n".join(response_parts)
 
 
 # Classe helper pour l'intégration avec le serveur
 class AgentManager:
     """Gestionnaire de l'agent (singleton)"""
-    
+
     def __init__(self):
         self.agent: Optional[Agent] = None
-    
+
     def get_agent(self) -> Agent:
         """Récupérer ou créer l'instance de l'agent"""
         if self.agent is None:
             self.agent = Agent()
             self.agent.initialize_model()
         return self.agent
-    
+
     def reload_agent(self):
         """Recharger l'agent (utile pour les tests)"""
         self.agent = None
