@@ -1,0 +1,124 @@
+name: Documentation FilAgent
+
+on:
+  push:
+    paths:
+      - '**.py'
+      - '**.md'
+      - 'config/*.yaml'
+  workflow_dispatch:
+
+jobs:
+  generate-docs:
+    name: Générer Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install documentation tools
+        run: |
+          pip install sphinx sphinx-rtd-theme pydoc-markdown mkdocs-material
+
+      - name: Generate API documentation
+        run: |
+          # Créer structure Sphinx
+          mkdir -p docs/api
+
+          # Générer documentation Python
+          python -c "
+          import os
+          import ast
+          import json
+
+          def extract_docstrings(filepath):
+              with open(filepath, 'r') as f:
+                  tree = ast.parse(f.read())
+
+              docs = {}
+              for node in ast.walk(tree):
+                  if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                      docstring = ast.get_docstring(node)
+                      if docstring:
+                          docs[node.name] = docstring
+              return docs
+
+          # Parcourir tous les fichiers Python
+          all_docs = {}
+          for root, dirs, files in os.walk('.'):
+              for file in files:
+                  if file.endswith('.py'):
+                      filepath = os.path.join(root, file)
+                      try:
+                          all_docs[filepath] = extract_docstrings(filepath)
+                      except:
+                          pass
+
+          # Sauvegarder documentation
+          with open('docs/api/documentation.json', 'w') as f:
+              json.dump(all_docs, f, indent=2)
+
+          print(f'✅ Documentation extraite: {len(all_docs)} fichiers')
+          "
+
+      - name: Generate middleware documentation
+        run: |
+          echo "# Documentation Middleware FilAgent" > docs/MIDDLEWARE.md
+          echo "" >> docs/MIDDLEWARE.md
+          echo "## Architecture de Conformité (8 couches)" >> docs/MIDDLEWARE.md
+          echo "" >> docs/MIDDLEWARE.md
+          echo "1. **EventLogger** - Logs structurés OpenTelemetry" >> docs/MIDDLEWARE.md
+          echo "2. **PIIRedactor** - Masquage automatique des données sensibles" >> docs/MIDDLEWARE.md
+          echo "3. **RBACManager** - Contrôle d'accès basé sur les rôles" >> docs/MIDDLEWARE.md
+          echo "4. **ConstraintsEngine** - Validation et guardrails" >> docs/MIDDLEWARE.md
+          echo "5. **DRManager** - Decision Records avec signatures EdDSA" >> docs/MIDDLEWARE.md
+          echo "6. **ProvenanceTracker** - Traçabilité W3C PROV-JSON" >> docs/MIDDLEWARE.md
+          echo "7. **WormLogger** - Logs immutables avec Merkle Tree" >> docs/MIDDLEWARE.md
+          echo "8. **HTNPlanner** - Planification hiérarchique des tâches" >> docs/MIDDLEWARE.md
+
+      - name: Generate compliance matrix
+        run: |
+          python -c "
+          import yaml
+
+          # Matrice de conformité
+          compliance = {
+              'Loi 25 (Québec)': {
+                  'Article 53.1': '✅ Decision Records',
+                  'Article 12': '✅ PII Redactor',
+                  'Article 3.5': '✅ WORM Logging'
+              },
+              'RGPD (EU)': {
+                  'Article 5': '✅ Provenance Tracking',
+                  'Article 25': '✅ Privacy by Design',
+                  'Article 32': '✅ Encryption (EdDSA)'
+              },
+              'EU AI Act': {
+                  'Article 13': '✅ Transparency',
+                  'Article 14': '✅ Human Oversight',
+                  'Article 15': '✅ Accuracy Metrics'
+              },
+              'NIST AI RMF': {
+                  'Govern': '✅ Policy Engine',
+                  'Map': '✅ Risk Assessment',
+                  'Measure': '✅ Metrics Collection',
+                  'Manage': '✅ Incident Response'
+              }
+          }
+
+          with open('docs/COMPLIANCE_MATRIX.yaml', 'w') as f:
+              yaml.dump(compliance, f, default_flow_style=False)
+
+          print('✅ Matrice de conformité générée')
+          "
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: docs/

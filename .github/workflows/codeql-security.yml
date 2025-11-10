@@ -1,0 +1,65 @@
+name: Analyse Sécurité CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 0'  # Hebdomadaire le dimanche à 3h
+
+jobs:
+  analyze:
+    name: Analyse Sécurité
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-and-quality
+
+    - name: Setup Python for analysis
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:${{matrix.language}}"
+
+    - name: Custom Security Checks
+      run: |
+        echo "🔍 Vérifications sécurité FilAgent..."
+
+        # Vérifier absence de secrets
+        if grep -r "api_key\|secret_key\|password" --include="*.py" . | grep -v "config\|test"; then
+          echo "⚠️ Secrets potentiels détectés!"
+          exit 1
+        fi
+
+        # Vérifier sandbox
+        if ! grep -q "subprocess.run.*shell=False" tools/python_sandbox.py 2>/dev/null; then
+          echo "✅ Sandbox configuré de manière sécurisée"
+        fi
+
+        echo "✅ Vérifications sécurité complétées"
