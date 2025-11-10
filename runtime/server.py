@@ -228,7 +228,7 @@ async def chat(request: ChatRequest):
             "choices": [
                 {
                     "index": 0,
-                    "message": {"role": "assistant", "content": f"[stub-error] {str(e)}"},
+                    "message": {"role": "assistant", "content": "[stub-error] An internal error has occurred."},
                     "finish_reason": "error",
                 }
             ],
