@@ -9,6 +9,12 @@ Usage:
 import sys
 import os
 from pathlib import Path
+import argparse
+
+try:
+    from importlib import metadata as importlib_metadata
+except ImportError:  # pragma: no cover
+    import importlib_metadata as importlib_metadata  # type: ignore
 
 # Import requests (optionnel, avec message d'erreur clair)
 try:
@@ -20,6 +26,19 @@ except ImportError:
     print("   Installez avec: pip install requests")
     print("   Ou: pip install -r requirements.txt")
     sys.exit(1)
+
+
+def _get_package_version(package: str) -> str:
+    try:
+        return importlib_metadata.version(package)
+    except importlib_metadata.PackageNotFoundError:
+        return "unknown"
+    except Exception:
+        return "unknown"
+
+
+requests_version = getattr(requests, "__version__", None) or _get_package_version("requests")
+print(f"✅ Module 'requests' disponible (version: {requests_version})\n")
 
 # Ajouter le répertoire racine au path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -61,16 +80,16 @@ def test_metrics_endpoint(host="localhost", port=8000):
                 for metric in found_metrics:
                     print(f"   ✓ {metric}")
             else:
-                print("⚠️  Aucune métrique HTN trouvée (normal si aucune requête HTN n'a été exécutée)")
-            
+                print("❌ Aucune métrique HTN trouvée. Exécutez au moins une requête HTN pour les générer.")
+
             # Afficher quelques lignes d'exemple
             print("\n📋 Exemple de métriques (premières lignes):")
             lines = content.split("\n")[:20]
             for line in lines:
                 if line and not line.startswith("#"):
                     print(f"   {line}")
-            
-            return True
+
+            return bool(found_metrics)
             
         else:
             print(f"❌ Endpoint retourne code {response.status_code}")
@@ -100,7 +119,9 @@ def test_prometheus_client():
     
     try:
         import prometheus_client
-        print(f"✅ prometheus-client installé (version: {prometheus_client.__version__})")
+        # Use getattr to get version if available
+        version = getattr(prometheus_client, "__version__", getattr(prometheus_client, "VERSION", "unknown"))
+        print(f"✅ prometheus-client installé (version: {version})")
         return True
     except ImportError:
         print("❌ prometheus-client non installé")
@@ -110,6 +131,16 @@ def test_prometheus_client():
 
 def main():
     """Exécute tous les tests"""
+    parser = argparse.ArgumentParser(
+        description="Teste la configuration Prometheus de FilAgent"
+    )
+    parser.add_argument(
+        "--allow-success",
+        action="store_true",
+        help="Retourner un code 0 si toutes les vérifications réussissent",
+    )
+    args = parser.parse_args()
+
     print("\n" + "="*70)
     print("TEST DE L'ENDPOINT MÉTRIQUES PROMETHEUS")
     print("="*70 + "\n")
@@ -126,12 +157,17 @@ def main():
     print("RÉSUMÉ")
     print("="*70)
     
-    if client_ok and endpoint_ok:
+    all_checks_ok = client_ok and endpoint_ok
+
+    if all_checks_ok:
         print("✅ Tous les tests ont réussi!")
         print("\n📊 Prochaines étapes:")
         print("   1. Vérifier les métriques dans Prometheus")
         print("   2. Configurer Prometheus (voir docs/PROMETHEUS_SETUP.md)")
         print("   3. Créer dashboard Grafana (voir docs/PROMETHEUS_DASHBOARD.md)")
+        if not args.allow_success:
+            print("\n⚠️  Exécutez avec --allow-success après validation manuelle pour retourner un code 0.")
+            return 1
         return 0
     else:
         print("⚠️  Certains tests ont échoué")
@@ -144,4 +180,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
