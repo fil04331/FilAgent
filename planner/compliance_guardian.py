@@ -126,13 +126,10 @@ class ComplianceGuardian:
         # Vérifier les patterns interdits
         forbidden_patterns = self.rules['validation']['forbidden_patterns']
         for pattern in forbidden_patterns:
-            pattern_triggered = False
-            for match in re.finditer(pattern, query):
-                # Ignorer les occurrences faisant partie d'un identifiant (ex: email)
-                if match.end() < len(query) and query[match.end()] == "@":
-                    continue
-                pattern_triggered = True
-                break
+            pattern_triggered = any(
+                match.end() >= len(query) or query[match.end()] != "@"
+                for match in re.finditer(pattern, query)
+            )
 
             if pattern_triggered:
                 validation_result['valid'] = False
