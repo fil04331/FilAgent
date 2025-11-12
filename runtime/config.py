@@ -151,6 +151,7 @@ class AgentConfig(BaseModel):
         htn_planning_data = raw_config.get("htn_planning", {})
         htn_execution_data = raw_config.get("htn_execution", {})
         htn_verification_data = raw_config.get("htn_verification", {})
+        compliance_guardian_data = raw_config.get("compliance_guardian", {})
 
         # Adapter la configuration mémoire pour supporter les structures imbriquées
         memory_kwargs: Dict[str, Any] = {}
@@ -192,6 +193,9 @@ class AgentConfig(BaseModel):
         htn_planning_config = HTNPlanningConfig(**htn_planning_data) if htn_planning_data else None
         htn_execution_config = HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
         htn_verification_config = HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
+        
+        # Configuration ComplianceGuardian optionnelle
+        compliance_guardian_config = ComplianceGuardianConfig(**compliance_guardian_data) if compliance_guardian_data else None
 
         return cls(
             name=agent_data.get("name", "llmagenta"),

@@ -63,6 +63,18 @@ class Agent:
             print(f"⚠ Failed to initialize tracker: {e}")
             self.tracker = None
 
+        # Initialiser le ComplianceGuardian si activé dans la configuration
+        try:
+            from planner.compliance_guardian import ComplianceGuardian
+            cg_config = getattr(self.config, 'compliance_guardian', None)
+            if cg_config and cg_config.enabled:
+                self.compliance_guardian = ComplianceGuardian(config_path=cg_config.rules_path)
+            else:
+                self.compliance_guardian = None
+        except Exception as e:
+            print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+            self.compliance_guardian = None
+
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
 
