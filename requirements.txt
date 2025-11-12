@@ -2,54 +2,54 @@
 # Phase 0-1 : MVP Agent fonctionnel
 
 # Core dependencies
-pyyaml>=6.0.1
-pydantic>=2.5.0
-python-dotenv>=1.0.0
+pyyaml~=6.0.1
+pydantic~=2.5.0
+python-dotenv~=1.0.0
 
 # LLM integration
-llama-cpp-python>=0.2.0  # Pour llama.cpp
+llama-cpp-python~=0.2.0  # Pour llama.cpp
 # transformers>=4.35.0  # Optionnel pour vLLM
 # vllm>=0.2.0  # Optionnel pour vLLM
 
 # API Server
-fastapi>=0.104.0
-uvicorn>=0.24.0
-pydantic-settings>=2.0.0
+fastapi~=0.104.0
+uvicorn~=0.24.0
+pydantic-settings~=2.0.0
 
 # Database & Memory
-aiosqlite>=0.19.0  # Async SQLite
-faiss-cpu>=1.7.4  # Pour mémoire sémantique (Phase 3)
-# faiss-gpu>=1.7.4  # Utiliser à la place de faiss-cpu si GPU disponible
-sentence-transformers>=2.2.2  # Pour embeddings (Phase 3)
+aiosqlite~=0.19.0  # Async SQLite
+faiss-cpu~=1.7.4  # Pour mémoire sémantique (Phase 3)
+# faiss-gpu~=1.7.4  # Utiliser à la place de faiss-cpu si GPU disponible
+sentence-transformers~=2.2.2  # Pour embeddings (Phase 3)
 
 # Sandboxing & Execution
 # Docker (optionnel, pour isolation avancée)
 
 # Logging & Observability
-structlog>=23.2.0
-prometheus-client>=0.19.0  # Pour métriques Prometheus
+structlog~=23.2.0
+prometheus-client~=0.19.0  # Pour métriques Prometheus
 
 # Security
-cryptography>=41.0.0  # Pour signatures EdDSA
-pyopenssl>=23.3.0
+cryptography~=41.0.0  # Pour signatures EdDSA
+pyopenssl~=23.3.0
 
 # Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.1.0
-pytest-mock>=3.12.0
+pytest~=7.4.0
+pytest-asyncio~=0.21.0
+pytest-cov~=4.1.0
+pytest-mock~=3.12.0
 
 # OpenAPI validation & contract testing
-openapi-spec-validator>=0.7.1
-schemathesis>=3.19.0
+openapi-spec-validator~=0.7.1
+schemathesis~=3.19.0
 
 # Development
-black>=23.11.0
-flake8>=6.1.0
-mypy>=1.7.0
+black~=23.11.0
+flake8~=6.1.0
+mypy~=1.7.0
 
 # Data handling
-pandas>=2.1.0
-pyarrow>=14.0.0
+pandas~=2.1.0
+pyarrow~=14.0.0
 datasets
-filelock>=3.13.0  # For atomic dataset downloading in benchmarks
+filelock~=3.13.0  # For atomic dataset downloading in benchmarks
