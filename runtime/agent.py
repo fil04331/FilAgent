@@ -21,6 +21,9 @@ from .middleware.logging import get_logger
 from .middleware.audittrail import get_dr_manager
 from .middleware.provenance import get_tracker
 
+# Import du ComplianceGuardian
+from planner.compliance_guardian import ComplianceGuardian
+
 # Import du planificateur HTN
 from planner import (
     HierarchicalPlanner,
@@ -62,6 +65,18 @@ class Agent:
         except Exception as e:
             print(f"⚠ Failed to initialize tracker: {e}")
             self.tracker = None
+
+        # Initialiser le ComplianceGuardian si activé dans la configuration
+        try:
+            cg_config = getattr(self.config, 'compliance_guardian', None)
+            if cg_config and getattr(cg_config, 'enabled', True):
+                rules_path = getattr(cg_config, 'rules_path', 'config/compliance_rules.yaml')
+                self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
+            else:
+                self.compliance_guardian = None
+        except Exception as e:
+            print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+            self.compliance_guardian = None
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
