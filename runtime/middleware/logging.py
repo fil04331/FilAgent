@@ -2,6 +2,7 @@
 
 import json
 import os
+import traceback
 from copy import deepcopy
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -56,6 +57,34 @@ class EventLogger:
                 f.flush()  # Force l'écriture immédiate
                 os.fsync(f.fileno())
 
+    def _apply_pii_redaction(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Appliquer le masquage PII sur les métadonnées si configuré."""
+
+        try:
+            from .redaction import get_pii_redactor
+
+            redactor = get_pii_redactor()
+        except Exception as exc:
+            print(f"⚠ Failed to initialize PII redactor: {exc}")
+            return metadata
+
+        def _redact(value: Any, path: str) -> Any:
+            if isinstance(value, str):
+                try:
+                    scan_result = redactor.scan_and_log(value, context={"field": path})
+                    if scan_result.get("has_pii"):
+                        return redactor.redact(value)
+                except Exception as exc:
+                    print(f"⚠ Failed to redact PII for {path}: {exc}")
+                return value
+            if isinstance(value, dict):
+                return {key: _redact(val, f"{path}.{key}") for key, val in value.items()}
+            if isinstance(value, list):
+                return [_redact(item, f"{path}[{idx}]") for idx, item in enumerate(value)]
+            return value
+
+        return _redact(metadata, "metadata")
+
     def log_event(
         self,
         actor: str,
@@ -80,6 +109,13 @@ class EventLogger:
         trace_id = self._generate_trace_id()
         span_id = self._generate_span_id()
 
+        # Préparer les métadonnées (copie pour éviter les mutations externes)
+        safe_metadata = deepcopy(metadata or {})
+
+        # Appliquer le masquage PII (sauf pour les événements du redactor)
+        if actor != "pii.redactor" and safe_metadata:
+            safe_metadata = self._apply_pii_redaction(safe_metadata)
+
         # Construire l'événement
         event_data = {
             "ts": datetime.now().isoformat(),
@@ -91,7 +127,7 @@ class EventLogger:
             "event": event,
             "conversation_id": conversation_id,
             "task_id": task_id,
-            "metadata": metadata or {},
+            "metadata": safe_metadata,
         }
 
         # Alias pour compatibilité avec certains consommateurs
@@ -167,6 +203,31 @@ class EventLogger:
             conversation_id=conversation_id,
             task_id=task_id,
             metadata=metadata,
+        )
+
+    def error(self, message: str, *, exc_info: Optional[Any] = None, metadata: Optional[Dict[str, Any]] = None):
+        """Journaliser un message d'erreur structurel."""
+
+        error_metadata = deepcopy(metadata or {})
+
+        if exc_info:
+            try:
+                if exc_info is True:
+                    stack = traceback.format_exc()
+                elif isinstance(exc_info, BaseException):
+                    stack = "".join(traceback.format_exception(exc_info))
+                else:
+                    stack = str(exc_info)
+                error_metadata.setdefault("exception", stack)
+            except Exception as exc:
+                error_metadata.setdefault("exception", f"<failed to format exception: {exc}>")
+
+        error_metadata.setdefault("message", message)
+        self.log_event(
+            actor="logger.system",
+            event="error",
+            level="ERROR",
+            metadata=error_metadata,
         )
 
 

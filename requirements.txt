@@ -1,55 +1,58 @@
 # Dépendances pour FilAgent / llmagenta
 # Phase 0-1 : MVP Agent fonctionnel
+#
+# Les bornes supérieures (<) évitent les ruptures majeures lors de mises à jour
+# tout en autorisant les patchs mineurs. Les modules marqués comme optionnels
+# disposent de fallbacks dans le code pour permettre l'exécution des tests sans
+# installation GPU/ML lourde.
 
 # Core dependencies
-pyyaml>=6.0.1
-pydantic>=2.5.0
-python-dotenv>=1.0.0
-
-# LLM integration
-llama-cpp-python>=0.2.0  # Pour llama.cpp
-# transformers>=4.35.0  # Optionnel pour vLLM
-# vllm>=0.2.0  # Optionnel pour vLLM
+pyyaml>=6.0.1,<7
+pydantic>=2.6.0,<3
+python-dotenv>=1.0.0,<2
+pydantic-settings>=2.0.3,<3
 
 # API Server
-fastapi>=0.104.0
-uvicorn>=0.24.0
-pydantic-settings>=2.0.0
+fastapi>=0.104.0,<0.111
+uvicorn>=0.24.0,<0.31
 
 # Database & Memory
-aiosqlite>=0.19.0  # Async SQLite
-faiss-cpu>=1.7.4  # Pour mémoire sémantique (Phase 3)
-# faiss-gpu>=1.7.4  # Utiliser à la place de faiss-cpu si GPU disponible
-sentence-transformers>=2.2.2  # Pour embeddings (Phase 3)
-
-# Sandboxing & Execution
-# Docker (optionnel, pour isolation avancée)
+aiosqlite>=0.19.0,<0.20  # Async SQLite
 
 # Logging & Observability
-structlog>=23.2.0
-prometheus-client>=0.19.0  # Pour métriques Prometheus
+structlog>=23.2.0,<24
+prometheus-client>=0.19.0,<0.21  # Pour métriques Prometheus
 
 # Security
-cryptography>=41.0.0  # Pour signatures EdDSA
-pyopenssl>=23.3.0
+cryptography>=41.0.0,<43  # Pour signatures EdDSA
+pyopenssl>=23.3.0,<24
+
+# Validation & Guardrails
+jsonschema>=4.19.0,<5
+openapi-spec-validator>=0.7.1,<0.8
+schemathesis>=3.19.0,<4
+
+# HTTP clients & intégration
+requests>=2.31.0,<3
 
 # Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.1.0
-pytest-mock>=3.12.0
+pytest>=7.4.0,<9
+pytest-asyncio>=0.21.0,<0.25
+pytest-cov>=4.1.0,<5
+pytest-mock>=3.12.0,<4
 
-# OpenAPI validation & contract testing
-openapi-spec-validator>=0.7.1
-schemathesis>=3.19.0
-
-# Development
-black>=23.11.0
-flake8>=6.1.0
-mypy>=1.7.0
+# Development tooling
+black>=23.11.0,<25
+flake8>=6.1.0,<7
+mypy>=1.7.0,<1.11
 
 # Data handling
-pandas>=2.1.0
-pyarrow>=14.0.0
-datasets
-filelock>=3.13.0  # For atomic dataset downloading in benchmarks
+pandas>=2.1.0,<3
+pyarrow>=14.0.0,<16
+datasets>=2.14.0,<3
+filelock>=3.13.0,<4  # For atomic dataset downloading in benchmarks
+
+# LLM integration (optionnel : voir requirements-optional.txt)
+# - llama-cpp-python (backend llama.cpp)
+# - faiss-cpu / faiss-gpu (mémoire vectorielle)
+# - sentence-transformers (génération d'embeddings)

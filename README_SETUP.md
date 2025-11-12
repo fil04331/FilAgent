@@ -28,6 +28,12 @@ source venv/bin/activate  # Sur Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+> ℹ️ **Dépendances optionnelles** : les modules lourds comme `llama-cpp-python`,
+> `faiss-cpu` ou `sentence-transformers` disposent d'un mode dégradé dans le
+> code. Ils ne sont nécessaires que si vous activez la mémoire sémantique ou un
+> backend LLM local. Installez-les uniquement si votre environnement le permet
+> via `pip install -r requirements-optional.txt`.
+
 ### 4. Télécharger un modèle
 
 Voir `models/weights/README.md` pour les instructions détaillées.
