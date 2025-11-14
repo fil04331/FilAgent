@@ -145,7 +145,7 @@ distribution = false  # Don't build distributions by default
 [tool.pdm.scripts]
 # Development scripts
 test = "pytest"
-test-cov = "pytest --cov=. --cov-report=html --cov-report=term"
+test-cov = "pytest --cov=. --cov-branch --cov-report=html --cov-report=term"
 test-unit = "pytest -m unit"
 test-integration = "pytest -m integration"
 test-compliance = "pytest -m compliance"
