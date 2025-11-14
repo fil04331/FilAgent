@@ -1,24 +1,75 @@
+# ===========================================================================
+# FilAgent - Configuration Dependabot
+# ===========================================================================
+# Automatise les mises à jour de sécurité et de dépendances
+# Les PRs sont créées automatiquement pour les vulnérabilités et mises à jour
+# ===========================================================================
+
 version: 2
 updates:
-  # Dépendances Python
+  # Python dependencies via pip/PDM
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-    reviewers:
-      - "fil04331"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Montreal"
+    open-pull-requests-limit: 5
+    # Grouper les mises à jour mineures et patches
+    groups:
+      python-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Labels pour les PRs
     labels:
       - "dependencies"
+      - "python"
+      - "automated"
       - "security"
+    # Stratégie de commit
     commit-message:
-      prefix: "deps"
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    # Reviewers automatiques
+    reviewers:
+      - "fil04331"
+    # Ignorer certaines mises à jour
+    ignore:
+      # Ne pas mettre à jour automatiquement les versions majeures
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Exceptions pour packages critiques (mise à jour manuelle uniquement)
+      - dependency-name: "cryptography"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
 
-  # Actions GitHub
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Montreal"
+    open-pull-requests-limit: 3
+    # Grouper toutes les mises à jour GitHub Actions
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci/cd"
+      - "automated"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
     reviewers:
       - "fil04331"
-    labels:
-      - "ci/cd"

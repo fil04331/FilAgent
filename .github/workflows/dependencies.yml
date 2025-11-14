@@ -1,0 +1,266 @@
+name: Dependency Security & Validation
+
+on:
+  push:
+    paths:
+      - 'pyproject.toml'
+      - 'pdm.lock'
+      - 'requirements*.txt'
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'pdm.lock'
+      - 'requirements*.txt'
+  schedule:
+    # Weekly security scan
+    - cron: '0 9 * * 1'  # Every Monday at 9 AM UTC
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: read
+  security-events: write  # For uploading SARIF files
+
+jobs:
+  validate-lock-file:
+    name: Validate PDM Lock File
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: false  # Don't cache for validation
+
+      - name: Validate lock file integrity
+        run: |
+          echo "🔍 Validating pdm.lock integrity..."
+          pdm lock --check
+          if [ $? -eq 0 ]; then
+            echo "✅ Lock file is valid and up-to-date"
+          else
+            echo "❌ Lock file is outdated or corrupted"
+            echo "Run 'pdm lock' locally to regenerate"
+            exit 1
+          fi
+
+      - name: Check for dependency conflicts
+        run: |
+          echo "🔍 Checking for dependency conflicts..."
+          pdm install --dry-run --check
+          if [ $? -eq 0 ]; then
+            echo "✅ No dependency conflicts found"
+          else
+            echo "❌ Dependency conflicts detected"
+            exit 1
+          fi
+
+  security-audit:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: validate-lock-file
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          pdm install --prod --no-lock
+          pdm add --dev pip-audit safety bandit
+
+      - name: Run pip-audit
+        run: |
+          echo "🔍 Running pip-audit security scan..."
+          pdm run pip-audit --format json --output pip-audit-report.json || true
+          pdm run pip-audit --format markdown --output pip-audit-report.md || true
+
+          # Display summary
+          pdm run pip-audit || true
+
+      - name: Run safety check
+        run: |
+          echo "🔍 Running safety vulnerability scan..."
+          pdm run safety check --json --output safety-report.json || true
+          pdm run safety check || true
+
+      - name: Run bandit security linter
+        run: |
+          echo "🔍 Running bandit security linter..."
+          pdm run bandit -r runtime/ planner/ tools/ -f json -o bandit-report.json || true
+          pdm run bandit -r runtime/ planner/ tools/ -f csv -o bandit-report.csv || true
+          pdm run bandit -r runtime/ planner/ tools/ || true
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            pip-audit-report.*
+            safety-report.json
+            bandit-report.*
+
+      - name: Create security summary
+        if: always()
+        run: |
+          echo "## 🔒 Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "### pip-audit Results" >> security-summary.md
+          if [ -f pip-audit-report.md ]; then
+            cat pip-audit-report.md >> security-summary.md
+          else
+            echo "No pip-audit report generated" >> security-summary.md
+          fi
+          echo "" >> security-summary.md
+          echo "---" >> security-summary.md
+          echo "Generated on: $(date)" >> security-summary.md
+
+      - name: Upload summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+
+  dependency-review:
+    name: Dependency License & Quality Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0  # Incompatible with MIT
+          allow-licenses: MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause, ISC, Python-2.0
+
+  outdated-check:
+    name: Check for Outdated Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Check outdated dependencies
+        run: |
+          echo "📦 Checking for outdated dependencies..."
+          pdm list --outdated > outdated-report.txt || true
+
+          if [ -s outdated-report.txt ]; then
+            echo "⚠️ Found outdated dependencies:"
+            cat outdated-report.txt
+
+            # Create markdown report
+            echo "# Outdated Dependencies Report" > outdated-report.md
+            echo "" >> outdated-report.md
+            echo "Generated on: $(date)" >> outdated-report.md
+            echo "" >> outdated-report.md
+            echo '```' >> outdated-report.md
+            cat outdated-report.txt >> outdated-report.md
+            echo '```' >> outdated-report.md
+            echo "" >> outdated-report.md
+            echo "To update all dependencies, run: \`pdm update\`" >> outdated-report.md
+          else
+            echo "✅ All dependencies are up to date!"
+            echo "# Dependencies Status" > outdated-report.md
+            echo "" >> outdated-report.md
+            echo "✅ All dependencies are up to date!" >> outdated-report.md
+            echo "" >> outdated-report.md
+            echo "Generated on: $(date)" >> outdated-report.md
+          fi
+
+      - name: Upload outdated report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-dependencies
+          path: outdated-report.md
+
+  update-requirements:
+    name: Sync requirements.txt files
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [validate-lock-file, security-audit]
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Export requirements files
+        run: |
+          echo "📝 Exporting requirements files from PDM..."
+
+          # Export production requirements only
+          pdm export -f requirements --without-hashes --prod -o requirements.txt
+          echo "✅ Created requirements.txt (production only)"
+
+          # Export production + dev requirements
+          pdm export -f requirements --without-hashes --dev -o requirements-dev.txt
+          echo "✅ Created requirements-dev.txt (production + dev)"
+
+          # Export production + ML requirements
+          pdm export -f requirements --without-hashes --with ml -o requirements-ml.txt 2>/dev/null || echo "⚠️ No ML dependencies to export"
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --exit-code requirements*.txt; then
+            echo "No changes to requirements files"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Requirements files have been updated"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add requirements*.txt
+          git commit -m "chore: Auto-update requirements.txt files from pdm.lock [skip ci]"
+          git push

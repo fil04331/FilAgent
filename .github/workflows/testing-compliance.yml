@@ -16,52 +16,57 @@ jobs:
   test-core:
     name: Tests Core & Middlewares
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11']
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.12'
 
-      - name: Cache dependencies
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Cache PDM packages
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          path: |
+            __pypackages__
+            .pdm-build
+          key: ${{ runner.os }}-pdm-${{ hashFiles('pdm.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pdm-
 
-      - name: Install dependencies
+      - name: Install dependencies with PDM
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt 2>/dev/null || true
+          pdm install --no-lock
 
       - name: Initialize database
         run: |
-          python -c "from memory.episodic import create_tables; create_tables()"
+          pdm run python -c "from memory.episodic import create_tables; create_tables()"
 
       - name: Run unit tests
         run: |
-          pytest tests/ -v -m unit --cov=. --cov-report=xml --cov-report=html
+          pdm run pytest tests/ -v -m unit --cov=. --cov-report=xml --cov-report=html
 
       - name: Run integration tests
         run: |
-          pytest tests/ -v -m integration
+          pdm run pytest tests/ -v -m integration
 
       - name: Test middleware stack
         run: |
-          pytest tests/ -v -m "memory or tools"
+          pdm run pytest tests/ -v -m "memory or tools"
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
           flags: unittests
-          name: codecov-${{ matrix.python-version }}
+          name: codecov-python312
 
   # 2. Tests de conformité légale
   compliance-tests:
@@ -75,15 +80,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies with PDM
         run: |
-          pip install -r requirements.txt
+          pdm install --prod --no-lock
 
       - name: Test WORM Logger
         run: |
-          python -c "
+          pdm run python -c "
           from runtime.middleware.worm import get_worm_logger
           worm = get_worm_logger()
           worm.append('test_event', {'test': 'data'})
@@ -93,7 +104,7 @@ jobs:
 
       - name: Test Decision Records
         run: |
-          python -c "
+          pdm run python -c "
           from runtime.middleware.audittrail import get_dr_manager
           dr = get_dr_manager()
           record = dr.create_record('test_task', 'test_decision', {'test': 'data'})
@@ -103,7 +114,7 @@ jobs:
 
       - name: Test PII Redactor
         run: |
-          python -c "
+          pdm run python -c "
           from runtime.middleware.redaction import get_pii_redactor
           pii = get_pii_redactor()
           text = 'Contact: john@example.com ou 555-1234'
@@ -114,7 +125,7 @@ jobs:
 
       - name: Test RBAC
         run: |
-          python -c "
+          pdm run python -c "
           from runtime.middleware.rbac import get_rbac_manager
           rbac = get_rbac_manager()
           assert rbac.has_permission('user', 'execute_safe_tools'), 'RBAC failed'
@@ -148,30 +159,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install quality tools
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies with quality tools
         run: |
-          pip install black flake8 mypy bandit
+          pdm install --no-lock
 
       - name: Black formatting check
         run: |
-          black --check . --exclude='/(\.git|\.venv|venv|build|dist)/'
+          pdm run black --check . --exclude='/(\.git|\.venv|venv|build|dist|__pypackages__)/'
         continue-on-error: true
 
       - name: Flake8 linting
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          pdm run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          pdm run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
 
       - name: MyPy type checking
         run: |
-          mypy . --ignore-missing-imports --no-strict-optional
+          pdm run mypy . --ignore-missing-imports --no-strict-optional
         continue-on-error: true
 
       - name: Bandit security scan
         run: |
-          bandit -r . -f json -o bandit_report.json
+          pdm run bandit -r . -f json -o bandit_report.json
         continue-on-error: true
 
       - name: Upload security report
@@ -193,18 +210,23 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies with PDM
         run: |
-          pip install -r requirements.txt
-          pip install openapi-spec-validator schemathesis
+          pdm install --prod --no-lock
 
       - name: Find and validate OpenAPI spec
         run: |
           if [ -f "openapi.yaml" ]; then
             echo "📋 Validation du spec OpenAPI principal..."
-            python -c "
+            pdm run python -c "
           from openapi_spec_validator import validate_spec
           from openapi_spec_validator.readers import read_from_filename
           spec_dict, _ = read_from_filename('openapi.yaml')
@@ -213,7 +235,7 @@ jobs:
           "
           elif [ -f "audit/CURSOR TODOS/openapi.yaml" ]; then
             echo "📋 Validation du spec OpenAPI (audit)..."
-            python -c "
+            pdm run python -c "
           from openapi_spec_validator import validate_spec
           from openapi_spec_validator.readers import read_from_filename
           spec_dict, _ = read_from_filename('audit/CURSOR TODOS/openapi.yaml')
@@ -226,7 +248,7 @@ jobs:
 
       - name: Start API server
         run: |
-          python runtime/server.py &
+          pdm run python runtime/server.py &
           sleep 5
 
       - name: Test API endpoints
@@ -247,16 +269,22 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies with PDM
         run: |
-          pip install -r requirements.txt
-          pip install locust pytest-benchmark
+          pdm install --prod --no-lock
+          pdm add --dev locust pytest-benchmark
 
       - name: Memory stress test
         run: |
-          python -c "
+          pdm run python -c "
           from memory.episodic import add_message, get_messages
           import time
 
@@ -272,7 +300,7 @@ jobs:
 
       - name: Middleware pipeline test
         run: |
-          python -c "
+          pdm run python -c "
           import time
           from runtime.middleware.logging import get_logger
           from runtime.middleware.worm import get_worm_logger
