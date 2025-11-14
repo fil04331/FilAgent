@@ -3,7 +3,14 @@
     "allow": [
       "Bash(./scripts/manage_prs.sh:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr reopen:*)",
+      "Bash(cut:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\" && grep -E \"\"\"\"^name:|^on:\"\"\"\" {}')"
     ],
     "deny": [],
     "ask": []

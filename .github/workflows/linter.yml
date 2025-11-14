@@ -3,8 +3,12 @@ name: Python Linter
 permissions:
   contents: read
 
-# Déclencheurs : l'agent se lancera à chaque 'push' et 'pull request'
-on: [push, pull_request]
+# Déclencheurs : l'agent se lancera sur pull requests et pushes vers main
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   lint:
