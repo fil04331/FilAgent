@@ -96,6 +96,8 @@ dev = [
     "pytest-cov>=4.1.0,<6",
     "pytest-mock>=3.12.0,<4",
     "pytest-timeout>=2.2.0,<3",
+    "pytest-subtests>=0.12.0,<0.15",
+    "psutil>=5.9.0,<7",  # For performance/load testing
 
     # Development tooling
     "black>=23.11.0,<25",
@@ -148,6 +150,7 @@ test-unit = "pytest -m unit"
 test-integration = "pytest -m integration"
 test-compliance = "pytest -m compliance"
 test-e2e = "pytest -m e2e"
+test-performance = "pytest -m performance"
 
 # Formatting and linting
 format = "black ."
@@ -245,6 +248,7 @@ markers = [
     "compliance: Compliance/conformity tests",
     "e2e: End-to-end tests (slowest)",
     "slow: Tests that take more than 5 seconds",
+    "performance: Performance and load tests",
 ]
 asyncio_mode = "auto"
 
