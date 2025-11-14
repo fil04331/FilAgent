@@ -76,6 +76,7 @@ Thumbs.db
 # Tests
 .pytest_cache/
 .coverage
+coverage.json
 htmlcov/
 
 # Divers
