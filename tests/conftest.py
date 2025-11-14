@@ -486,22 +486,175 @@ def test_config(tmp_path) -> AgentConfig:
 
 
 @pytest.fixture(scope="function")
-def patched_middlewares(isolated_fs, isolated_logging) -> Generator[Dict[str, Any], None, None]:
+def isolated_pii_redactor(tmp_path) -> Generator[Any, None, None]:
+    """
+    Fixture pour un PII redactor isolé avec configuration de test
+
+    Scope: function (new redactor per test)
+
+    Args:
+        tmp_path: pytest's temporary directory fixture
+
+    Returns:
+        PIIRedactor: PII redactor isolé
+
+    Example:
+        def test_pii_masking(isolated_pii_redactor):
+            redacted = isolated_pii_redactor.redact("Email: test@example.com")
+            assert "[REDACTED]" in redacted
+    """
+    from runtime.middleware.redaction import PIIRedactor
+
+    # Create test config file
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "policies.yaml"
+
+    # Minimal PII config for testing
+    test_config = {
+        'policies': {
+            'pii': {
+                'enabled': True,
+                'replacement_pattern': '[REDACTED]',
+                'fields_to_mask': ['email', 'phone', 'ssn', 'credit_card'],
+                'scan_before_logging': True
+            }
+        }
+    }
+
+    import yaml
+    with open(config_file, 'w') as f:
+        yaml.dump(test_config, f)
+
+    redactor = PIIRedactor(config_path=str(config_file))
+    yield redactor
+
+
+@pytest.fixture(scope="function")
+def isolated_rbac_manager(tmp_path) -> Generator[Any, None, None]:
+    """
+    Fixture pour un RBAC manager isolé avec rôles de test
+
+    Scope: function (new RBAC manager per test)
+
+    Args:
+        tmp_path: pytest's temporary directory fixture
+
+    Returns:
+        RBACManager: RBAC manager isolé
+
+    Example:
+        def test_permissions(isolated_rbac_manager):
+            has_perm = isolated_rbac_manager.has_permission('admin', 'execute_code')
+            assert has_perm == True
+    """
+    from runtime.middleware.rbac import RBACManager
+
+    # Create test config file
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "policies.yaml"
+
+    # Test RBAC config with standard roles
+    test_config = {
+        'policies': {
+            'rbac': {
+                'roles': [
+                    {
+                        'name': 'admin',
+                        'permissions': ['execute_code', 'read_files', 'write_files', 'network_access'],
+                        'description': 'Administrator with full access'
+                    },
+                    {
+                        'name': 'user',
+                        'permissions': ['read_files'],
+                        'description': 'Regular user with read-only access'
+                    },
+                    {
+                        'name': 'guest',
+                        'permissions': [],
+                        'description': 'Guest with no permissions'
+                    }
+                ]
+            }
+        }
+    }
+
+    import yaml
+    with open(config_file, 'w') as f:
+        yaml.dump(test_config, f)
+
+    rbac_manager = RBACManager(config_path=str(config_file))
+    yield rbac_manager
+
+
+@pytest.fixture(scope="function")
+def isolated_constraints_engine(tmp_path) -> Generator[Any, None, None]:
+    """
+    Fixture pour un constraints engine isolé avec guardrails de test
+
+    Scope: function (new constraints engine per test)
+
+    Args:
+        tmp_path: pytest's temporary directory fixture
+
+    Returns:
+        ConstraintsEngine: Constraints engine isolé
+
+    Example:
+        def test_output_validation(isolated_constraints_engine):
+            is_valid, errors = isolated_constraints_engine.validate_output("Safe output")
+            assert is_valid == True
+    """
+    from runtime.middleware.constraints import ConstraintsEngine
+
+    # Create test config file
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "policies.yaml"
+
+    # Test guardrails config
+    test_config = {
+        'policies': {
+            'guardrails': {
+                'enabled': True,
+                'blocklist_keywords': ['malicious', 'dangerous', 'exploit'],
+                'max_prompt_length': 10000,
+                'max_response_length': 50000
+            }
+        }
+    }
+
+    import yaml
+    with open(config_file, 'w') as f:
+        yaml.dump(test_config, f)
+
+    constraints_engine = ConstraintsEngine(config_path=str(config_file))
+    yield constraints_engine
+
+
+@pytest.fixture(scope="function")
+def patched_middlewares(isolated_fs, isolated_logging, isolated_pii_redactor,
+                        isolated_rbac_manager, isolated_constraints_engine) -> Generator[Dict[str, Any], None, None]:
     """
     Fixture pour patcher tous les middlewares avec des versions isolées
 
     Utilise unittest.mock.patch pour remplacer les singletons.
     All patches are automatically stopped after the test.
-    
+
     Scope: function (new patches per test)
 
     Args:
         isolated_fs: isolated filesystem fixture
         isolated_logging: isolated logging fixture
-    
+        isolated_pii_redactor: isolated PII redactor fixture
+        isolated_rbac_manager: isolated RBAC manager fixture
+        isolated_constraints_engine: isolated constraints engine fixture
+
     Yields:
-        Dict: Middlewares isolés (event_logger, worm_logger, dr_manager, tracker)
-        
+        Dict: Middlewares isolés (event_logger, worm_logger, dr_manager, tracker,
+              pii_redactor, rbac_manager, constraints_engine)
+
     Example:
         def test_with_middleware(patched_middlewares):
             logger = patched_middlewares['event_logger']
@@ -549,17 +702,102 @@ def patched_middlewares(isolated_fs, isolated_logging) -> Generator[Dict[str, An
     patches.append(tracker_patch)
     tracker_patch.start()
 
+    # Patcher PII redactor
+    pii_patch = patch(
+        'runtime.middleware.redaction.get_pii_redactor',
+        return_value=isolated_pii_redactor
+    )
+    patches.append(pii_patch)
+    pii_patch.start()
+
+    # Patcher RBAC manager
+    rbac_patch = patch(
+        'runtime.middleware.rbac.get_rbac_manager',
+        return_value=isolated_rbac_manager
+    )
+    patches.append(rbac_patch)
+    rbac_patch.start()
+
+    # Patcher Constraints engine
+    constraints_patch = patch(
+        'runtime.middleware.constraints.get_constraints_engine',
+        return_value=isolated_constraints_engine
+    )
+    patches.append(constraints_patch)
+    constraints_patch.start()
+
     yield {
         'event_logger': isolated_logging['event_logger'],
         'worm_logger': isolated_logging['worm_logger'],
         'dr_manager': dr_manager,
         'tracker': tracker,
+        'pii_redactor': isolated_pii_redactor,
+        'rbac_manager': isolated_rbac_manager,
+        'constraints_engine': isolated_constraints_engine,
         'isolated_fs': isolated_fs
     }
 
     # Cleanup: arrêter tous les patches
     for p in patches:
         p.stop()
+
+
+@pytest.fixture(scope="function")
+def mock_middleware_stack(patched_middlewares) -> Dict[str, Any]:
+    """
+    Complete middleware stack for integration testing
+
+    This is the main fixture requested in the task description. It provides a
+    fully configured and isolated middleware stack with all components:
+    - Event logging (structured JSONL)
+    - WORM logging (append-only with Merkle trees)
+    - Decision Records (DR) with EdDSA signatures
+    - Provenance tracking (W3C PROV-JSON)
+    - PII redaction (automatic masking)
+    - RBAC (role-based access control)
+    - Constraints engine (output validation)
+
+    Scope: function (new stack per test for complete isolation)
+
+    Args:
+        patched_middlewares: The patched_middlewares fixture with all components
+
+    Returns:
+        Dict[str, Any]: Complete middleware stack with all components
+
+    Example:
+        def test_full_compliance_flow(mock_middleware_stack):
+            # Access any middleware component
+            logger = mock_middleware_stack['event_logger']
+            dr_manager = mock_middleware_stack['dr_manager']
+            pii_redactor = mock_middleware_stack['pii_redactor']
+
+            # Log an event
+            logger.log_event(actor="test", event="test.start")
+
+            # Create a decision record
+            dr = dr_manager.create_dr(
+                actor="test",
+                task_id="task-123",
+                decision="test_decision",
+                prompt_hash="abc123"
+            )
+
+            # Redact PII
+            safe_text = pii_redactor.redact("Email: test@example.com")
+            assert "[REDACTED]" in safe_text
+
+    Available components:
+        - event_logger: EventLogger for structured logging
+        - worm_logger: WormLogger for append-only logs
+        - dr_manager: DRManager for Decision Records
+        - tracker: ProvenanceTracker for W3C PROV-JSON
+        - pii_redactor: PIIRedactor for PII masking
+        - rbac_manager: RBACManager for access control
+        - constraints_engine: ConstraintsEngine for output validation
+        - isolated_fs: Dict of isolated filesystem paths
+    """
+    return patched_middlewares
 
 
 # ============================================================================
