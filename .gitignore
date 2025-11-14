@@ -25,6 +25,7 @@ venv/
 env/
 ENV/
 .venv/
+venv_new/
 
 # PDM
 __pypackages__/
@@ -80,6 +81,11 @@ htmlcov/
 # Divers
 *.log
 temp/
+pids/
+diagnostic_report.json
+.python-version
+*_backup.py
+memory/episodic/
 
 # Données et secrets (compliance)
 /data/
