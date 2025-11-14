@@ -1,71 +1,130 @@
-# 🎯 TASK CARD: Configuration HTN Planning
+```Analyse du dépôt FilAgent et recommandations sur les Pull Requests
+1. Compréhension du fonctionnement de FilAgent
+1.1 Architecture et logique de l’agent
 
-**ID Task**: HTN-INT-002  
-**Titre**: Créer fichier de configuration config/agent.yaml  
-**Phase**: Phase 1 - Configuration Infrastructure  
-**Priorité**: 🟠 P1 - HAUTE  
-**Estimation**: 30-60 minutes  
-**Dépendances**: Aucune (peut être exécuté en parallèle de HTN-INT-001)  
-**Assigné à**: Agent/Développeur  
+L’agent est construit autour de la classe Agent (fichier runtime/agent.py). Lors de l’instanciation, l’agent :
 
----
+Charge la configuration via la classe AgentConfig (fichier runtime/config.py) en lisant un fichier YAML. Celle‑ci regroupe les hyper‑paramètres du modèle, la gestion des temps limites, la mémoire, la journalisation, l’activation des options de conformité et, dans les PRs récentes, la configuration du ComplianceGuardian.
 
-## 🔄 MISE À JOUR 2025-11-07
+Instancie le modèle LLM selon la configuration (adapte à plusieurs backends).
 
-- ✅ Scan de secrets `detect-secrets 1.5.0` exécuté — aucun secret actif détecté (rapport dans `audit/reports/`).
-- ✅ Journalisation : ajout d'un masquage automatique PII avant écriture + test unitaire `tests/test_logging_pii.py`.
-- 📌 Prochaine étape liée : surveiller les prochaines exécutions de scan et étendre la couverture PII si de nouveaux champs apparaissent.
+Enregistre et initialise les outils disponibles dans le registre (tools/registry.py).
 
-## 📋 CONTEXTE DU PROJET
+Charge la mémoire conversationnelle et sémantique. La mémoire épisodique persiste les conversations en SQLite et la mémoire sémantique utilise FAISS/Parquet pour rechercher des passages pertinents.
 
-### Situation Actuelle
-FilAgent nécessite un fichier de configuration structuré pour gérer les paramètres du système HTN Planning. La configuration doit être:
-- **Externalisée** - Séparation code/config (12-factor app)
-- **Versionnée** - Traçabilité des changements de config
-- **Validable** - Schema YAML pour éviter erreurs de typage
-- **Documentée** - Commentaires inline pour chaque paramètre
+Configure des middlewares de conformité (journalisation, audit trail, provenance). Chaque appel d’outil ou génération de texte est logué et la traçabilité est renforcée.
 
-### Objectif Global
-Créer un fichier `config/agent.yaml` contenant tous les paramètres de configuration du système HTN avec:
-- Valeurs par défaut sécuritaires (Safety by Design)
-- Feature flags pour activation progressive
-- Paramètres de performance ajustables
-- Niveaux de validation configurables
+Initialise le ComplianceGuardian (dans la branche principale, cette variable est absente et provoque un NameError lorsqu’on tente de valider des requêtes) afin de valider les questions et le plan d’exécution, de détecter des patterns interdits et de masquer les PII. Cette fonctionnalité est fournie par planner/compliance_guardian.py.
 
-### Valeurs Fondamentales du Projet
-1. **Safety by Design** - Valeurs par défaut sécuritaires
-2. **Separation of Concerns** - Config séparée du code
-3. **Documentation** - Chaque paramètre expliqué
-4. **Traçabilité** - Versioning et changelog
+Exécute la planification : l’agent tente d’utiliser un plan de type HTN (hierarchical task network) pour décomposer une tâche en étapes. Si la planification échoue ou est désactivée, l’agent passe en exécution simple en interrogeant le LLM et en appelant des outils. Chaque appel est enregistré et validé par le ComplianceGuardian.
 
----
+L’agent est donc conçu autour de quatre axes : gouvernance, traçabilité, sécurité et reproductibilité, conformément à la description plus exhaustive du projet accessible sur Notion. La page Notion intitulée « FilAgent – Agent LLM Gouvernance & Traçabilité » présente le projet comme un agent local axé sur la conformité aux lois (Loi 25, RGPD, AI Act, NIST AI RMF) et énumère les fonctionnalités attendues : moteur de politiques, sandboxing, journalisation WORM, décision records, mémoire hybride, redaction PII et RBAC
+notion.so
+. Cette vision de haut niveau confirme que l’intégration d’un ComplianceGuardian et de mécanismes de redaction est prioritaire pour garantir la conformité et la sécurité.
 
-## 🎯 OBJECTIF DE CE TASK
+1.2 Bug et dette technique identifiés
 
-### Mission
-Créer le fichier `config/agent.yaml` contenant la configuration complète du système HTN avec:
-- ✅ Feature flags (activation/désactivation modules)
-- ✅ Paramètres planificateur (stratégies, profondeur)
-- ✅ Paramètres exécuteur (workers, timeouts)
-- ✅ Paramètres vérificateur (niveaux validation)
-- ✅ Paramètres logging et traçabilité
-- ✅ Configurations par environnement (dev, prod)
+Le code actuel présente un bug majeur : dans runtime/agent.py, l’attribut self.compliance_guardian est utilisé pour valider les requêtes et masquer les PII mais n’est jamais initialisé. Ceci entraîne une erreur d’exécution (NameError). Plusieurs PRs tentent d’y remédier en ajoutant l’instanciation du ComplianceGuardian et la lecture de la configuration associée.
 
-### Résultat Attendu
-Après ce task:
-- Fichier config/agent.yaml créé et documenté
-- Tous les paramètres HTN définis avec valeurs par défaut
-- Documentation inline complète
-- Exemples de configurations pour différents cas d'usage
-- Validable via schema YAML (optionnel)
+D’après la page Notion, d’autres tâches en cours concernent l’intégration de jeux de données de benchmark, l’amélioration des performances d’inférence et l’extension des outils
+notion.so
+. Cependant, ces aspects ne sont pas couverts par les PRs actuelles et relèvent de développements futurs.
 
----
+2. État des Pull Requests ouvertes
 
-## 📂 FICHIERS À CRÉER
+Onze Pull Requests étaient ouvertes sur le dépôt fil04331/FilAgent au moment de l’analyse. Elles se répartissent en trois catégories :
 
-### Fichier Principal
-```
-📁 /Volumes/DevSSD/FilAgent/
+Correctifs et refactor du cœur (Core / sécurité) : visent à corriger le bug ComplianceGuardian et à refactorer la gestion des dépendances.
+
+Prise en charge de versions de dépendances (pinning) et nettoyage de scripts.
+
+Mises à jour des actions GitHub (Dependabot).
+
+Le tableau ci‑dessous synthétise les modifications principales :
+
+#	Objet de la PR (titre abrégé)	Files modifiés	Contenu clé	Remarques
+#118	Refine dependency and compliance integrations	7 fichiers (README_SETUP.md, planner/compliance_guardian.py, requirements*.txt, runtime/agent.py, runtime/config.py, runtime/middleware/logging.py)	Initialise ComplianceGuardian dans l’agent, charge compliance_guardian_data depuis la config, améliore la détection des fichiers YAML, ajoute des fonctionnalités de redaction PII dans le logger et un mode error() de journalisation, sépare les dépendances lourdes dans requirements-optional.txt et met à jour les requirements avec des bornes supérieures【435389333327370†L4-L40】.	PR majeure qui répare le bug NameError, renforce la gouvernance et améliore la sécurité. Conforme à la vision Notion (redaction PII, audit)
+notion.so
+.
+#117	Pin datasets package version for reproducible builds	requirements.txt	Pins datasets>=2.15.0,<3.0.0【551067689411243†L4-L6】.	Doublon de #116, inutile car #118 gère déjà les dépendances.
+#116	Pin datasets version (draft)	Aucun fichier modifié	PR vide ; doublon de #117.	
+#114	Initialize ComplianceGuardian	runtime/agent.py, runtime/config.py	Ajoute la lecture de compliance_guardian_data et l’instanciation du ComplianceGuardian.	Dépassé par #118 qui intègre la même logique avec d’autres améliorations.
+#112	Supprimer CLOSE_OUTDATED_PRS	Supprime CLOSE_OUTDATED_PRS.md et close_outdated_prs.sh (177 lignes)【675678540512160†L4-L15】	Nettoyage de scripts inactifs destinés à fermer automatiquement des PR : cosmétique, n’affecte pas l’agent.	
+#110	ComplianceGuardian init (draft)	2 fichiers modifiés	Même correctif que #114.	Doublon à fermer.
+#108	Pin all dependencies with ~= and commenter faiss-cpu	requirements.txt	Ajoute ~= version pour toutes les dépendances et commente faiss-cpu en raison de problèmes d’installation【188499053772541†L4-L7】.	Dépassé par #118 qui propose une approche plus fine avec un fichier requirements-optional.txt.
+#107	Debug codebase and add test coverage	916 ajouts (tests et docs)	Ajoute un document de PR de 273 lignes, des tests unitaires, un script de vérification. Reproduit le correctif ComplianceGuardian mais sans l’intégration fine du logger.	PR très volumineuse, redondante avec #118; les tests et docs devraient plutôt aller dans des issues.
+#106	Dependabot – bump actions/download-artifact	.github/workflows/deploy.yml	Met à jour la version de l’action GitHub download-artifact【335458144751862†L4-L6】.	
+#105	Dependabot – bump actions/upload-artifact	Plusieurs workflows	Met à jour actions/upload-artifact et d’autres actions.	
+#104	Bug fix – load compliance_guardian_data	runtime/config.py	Charge compliance_guardian_data et instancie ComplianceGuardianConfig si présent.	Doublon plus simple de #114.
+3. Analyse des PR selon les priorités et critères
+
+Les instructions fournies définissent un ordre de merge clair :
+
+PRs de refactor / core / sécurité (coeur de l’agent, gestion des secrets, structure).
+
+PRs “client-facing” (démos ou workflows utilisant le nouveau core).
+
+Cosmétique / qualité de vie.
+
+Elles spécifient également des critères : sécurité et conformité avant tout, expérience client, maintenabilité, puis ROI rapide.
+
+3.1 PR #118 – Refactor compliance et dépendances
+
+Cette PR est la seule qui réunit l’ensemble des améliorations nécessaires : elle corrige le bug du ComplianceGuardian, améliore la gestion des fichiers YAML, introduit la redaction PII dans le logger (une exigence de la Loi 25 et du RGPD
+notion.so
+), et rationalise les dépendances en distinguant les packages lourds. Elle s’aligne parfaitement sur les critères de sécurité et conformité et diminue la dette technique. Elle doit être la première fusionnée.
+
+3.2 PRs #114, #110, #104 – Correctifs partiels du ComplianceGuardian
+
+Ces PRs se contentent d’instancier ComplianceGuardian sans gérer le logger ni les dépendances. Elles sont dépassées par #118 et, si fusionnées, entraîneraient des conflits futurs. Conformément à la règle « si une PR augmente énormément le risque de conflits futurs sans impact proportionnel, elle va dans la pile “plus tard/issue” », ces PRs doivent être fermées.
+
+3.3 PRs #117 et #116 – Pin de datasets
+
+Ces PRs visent à fixer la version de la bibliothèque datasets pour des builds reproductibles. Toutefois, #118 introduit déjà des bornes supérieures pour datasets et place les dépendances facultatives dans un fichier séparé, ce qui rend #117 et #116 obsolètes. À fermer.
+
+3.4 PR #107 – Debug codebase et tests
+
+Cette PR ajoute des tests et de la documentation expliquant comment reproduire et corriger le bug du ComplianceGuardian. Bien qu’elle apporte une couverture de tests, elle réimplémente le correctif et gonfle beaucoup l’historique. Les tests peuvent être utiles mais devraient être intégrés après la fusion de #118 et non mêlés au code source principal. Selon la logique du ménage, fermer ou convertir cette PR en issue et planifier l’ajout de tests dans une branche dédiée.
+
+3.5 PR #108 – Pin des dépendances avec ~=
+
+Cette PR propose de verrouiller toutes les dépendances en utilisant ~=, et commente faiss-cpu pour Python 3.12. Cette approche gèle trop fortement le stack et pourrait compliquer la maintenance. #118 propose une approche plus flexible : déplacer les dépendances lourdes dans requirements-optional.txt et définir des bornes supérieures raisonnables. Conformément aux critères de maintenabilité et ROI rapide, fermer #108.
+
+3.6 PR #112 – Nettoyage de scripts obsolètes
+
+Cette PR supprime un script et un fichier de documentation destinés à fermer automatiquement des PRs obsolètes【675678540512160†L4-L15】. Elle n’impacte pas le core et peut être fusionnée une fois les PRs critiques réglées. À fusionner en dernier, après #118 et avant les mises à jour d’actions.
+
+3.7 PRs #105 et #106 – Mises à jour Dependabot
+
+Ces PRs mettent à jour des actions GitHub dans les workflows CI/CD. Elles n’ont pas d’impact sur le code de l’agent et peuvent être fusionnées après la stabilisation du core. À fusionner après #118 et #112.
+
+4. Recommandations finales
+
+Fusionner immédiatement la PR #118. Elle corrige le bug ComplianceGuardian, améliore la sécurité (redaction PII, logs d’erreurs), clarifie la configuration et rationalise les dépendances. Elle répond aux critères de sécurité/conformité et à la vision long terme du projet【435389333327370†L4-L40】
+notion.so
+.
+
+Fermer les PRs #114, #110, #104, #117, #116, #108 et #107. Elles sont soit des doublons du correctif, soit des modifications de dépendances dépassées, soit des ajouts de tests/docs qui devraient être gérés séparément. Créer des issues si des parties des tests ou docs de #107 doivent être conservées.
+
+Fusionner la PR #112 après #118 afin de nettoyer les scripts obsolètes.
+
+Fusionner ensuite les PRs Dependabot #105 et #106 pour mettre à jour les actions GitHub. Vérifier qu’aucun conflit n’est créé après la fusion de #118.
+
+Créer des issues pour les sujets suivants :
+
+Ajout de tests automatisés inspirés de #107 afin de renforcer la couverture sans alourdir la PR principale.
+
+Intégration des benchmarks (HumanEval, MBPP, SWE-bench) et optimisation de la performance, comme décrit dans la page Notion
+notion.so
+.
+
+Extension du policy engine et implémentation d’un moteur RBAC complet avec redaction PII et règles JSONSchema, conformément à la vision du projet
+notion.so
+.
+
+5. Conclusion
+
+Le désordre actuel des Pull Requests est principalement dû à la duplication de correctifs pour le ComplianceGuardian. En suivant l’ordre de merge recommandé (core → client-facing → cosmétique) et en adoptant une priorité absolue pour la sécurité et la conformité, la PR #118 doit être fusionnée en premier. Les autres PRs deviennent redondantes ou trop coûteuses par rapport au bénéfice et doivent être fermées. Une fois le core stabilisé, des améliorations (tests, benchmarks, nouvelles fonctionnalités) pourront être développées dans des branches dédiées et évaluées séparément.📁 /Volumes/DevSSD/FilAgent/
 └── config/
     └── agent.yaml  ← CRÉER CE FICHIER
 ```
