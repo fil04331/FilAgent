@@ -35,7 +35,7 @@ jobs:
       # Étape 4: Installe les dépendances avec PDM
       - name: Install dependencies
         run: |
-          pdm install --dev --no-lock
+          pdm install --no-lock
 
       # Étape 5: Exécute flake8 sur votre code pour trouver des erreurs
       - name: Lint with flake8

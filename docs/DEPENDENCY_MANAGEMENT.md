@@ -206,14 +206,14 @@ pdm install --no-lock
 For backward compatibility:
 
 ```bash
-# Export to requirements.txt
-pdm export -f requirements -o requirements.txt
+# Export production dependencies only
+pdm export -f requirements --without-hashes --prod -o requirements.txt
 
-# Export with dev dependencies
-pdm export -f requirements --dev -o requirements-dev.txt
+# Export production + dev dependencies
+pdm export -f requirements --without-hashes --dev -o requirements-dev.txt
 
-# Export without hashes (for better compatibility)
-pdm export -f requirements --without-hashes -o requirements.txt
+# Export production + ML dependencies
+pdm export -f requirements --without-hashes --with ml -o requirements-ml.txt
 ```
 
 ---
@@ -282,8 +282,7 @@ Our workflows are configured to use PDM:
 
 - name: Install dependencies
   run: |
-    pdm install --prod --no-lock
-    pdm install --dev --no-lock
+    pdm install --no-lock  # Installs all dependencies from lock file
 
 - name: Run tests
   run: pdm run pytest

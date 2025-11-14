@@ -216,17 +216,17 @@ pdm lock
 
 log_info "Étape 5: Export des requirements pour compatibilité..."
 
-# Exporter requirements.txt standard
-pdm export -f requirements --without-hashes -o requirements.txt
-log_success "requirements.txt généré"
+# Exporter requirements.txt standard (production seulement)
+pdm export -f requirements --without-hashes --prod -o requirements.txt
+log_success "requirements.txt généré (production)"
 
-# Exporter requirements avec dev
+# Exporter requirements avec dev (production + dev)
 pdm export -f requirements --without-hashes --dev -o requirements-dev.txt
-log_success "requirements-dev.txt généré"
+log_success "requirements-dev.txt généré (production + dev)"
 
-# Exporter requirements avec ML optionnel
+# Exporter requirements avec ML optionnel (production + ML)
 pdm export -f requirements --without-hashes --with ml -o requirements-ml.txt
-log_success "requirements-ml.txt généré"
+log_success "requirements-ml.txt généré (production + ML)"
 
 # ===========================================================================
 # ÉTAPE 6: Vérification

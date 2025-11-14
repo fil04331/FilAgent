@@ -46,8 +46,7 @@ jobs:
       # Étape 5: Installe les dépendances avec PDM
       - name: Install dependencies
         run: |
-          pdm install --prod --no-lock
-          pdm install --dev --no-lock
+          pdm install --no-lock
 
       # Étape 6: Exécute les tests avec pytest via PDM
       - name: Test with pytest

@@ -199,15 +199,15 @@ log_success "Dépendances mises à jour"
 
 log_info "Étape 6: Régénération des fichiers requirements..."
 
-# Exporter requirements.txt standard
-pdm export -f requirements --without-hashes -o requirements.txt
-log_success "requirements.txt régénéré"
+# Exporter requirements.txt standard (production seulement)
+pdm export -f requirements --without-hashes --prod -o requirements.txt
+log_success "requirements.txt régénéré (production)"
 
-# Exporter requirements avec dev
+# Exporter requirements avec dev (production + dev)
 pdm export -f requirements --without-hashes --dev -o requirements-dev.txt
-log_success "requirements-dev.txt régénéré"
+log_success "requirements-dev.txt régénéré (production + dev)"
 
-# Exporter requirements avec ML optionnel
+# Exporter requirements avec ML optionnel (production + ML)
 pdm export -f requirements --without-hashes --with ml -o requirements-ml.txt 2>/dev/null || true
 
 # ===========================================================================

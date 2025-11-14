@@ -43,8 +43,7 @@ jobs:
 
       - name: Install dependencies with PDM
         run: |
-          pdm install --prod --no-lock
-          pdm install --dev --no-lock
+          pdm install --no-lock
 
       - name: Initialize database
         run: |
@@ -170,7 +169,7 @@ jobs:
 
       - name: Install dependencies with quality tools
         run: |
-          pdm install --dev --no-lock
+          pdm install --no-lock
 
       - name: Black formatting check
         run: |

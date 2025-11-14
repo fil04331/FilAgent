@@ -234,15 +234,15 @@ jobs:
         run: |
           echo "📝 Exporting requirements files from PDM..."
 
-          # Export production requirements
-          pdm export -f requirements --without-hashes -o requirements.txt
-          echo "✅ Created requirements.txt"
+          # Export production requirements only
+          pdm export -f requirements --without-hashes --prod -o requirements.txt
+          echo "✅ Created requirements.txt (production only)"
 
-          # Export dev requirements
+          # Export production + dev requirements
           pdm export -f requirements --without-hashes --dev -o requirements-dev.txt
-          echo "✅ Created requirements-dev.txt"
+          echo "✅ Created requirements-dev.txt (production + dev)"
 
-          # Export ML requirements
+          # Export production + ML requirements
           pdm export -f requirements --without-hashes --with ml -o requirements-ml.txt 2>/dev/null || echo "⚠️ No ML dependencies to export"
 
       - name: Check for changes
