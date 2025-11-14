@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.x' # Utilise la dernière version de Python 3
+          python-version: '3.12' # Utilise Python 3.12 stable
 
       # Étape 3: Installe l'outil de linting 'flake8' et les dépendances
       - name: Install dependencies
