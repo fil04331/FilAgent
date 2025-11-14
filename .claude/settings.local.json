@@ -10,7 +10,8 @@
       "Bash(gh pr close:*)",
       "Bash(gh pr reopen:*)",
       "Bash(cut:*)",
-      "Bash(xargs -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\" && grep -E \"\"\"\"^name:|^on:\"\"\"\" {}')"
+      "Bash(xargs -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\" && grep -E \"\"\"\"^name:|^on:\"\"\"\" {}')",
+      "Bash(pdm export:*)"
     ],
     "deny": [],
     "ask": []
