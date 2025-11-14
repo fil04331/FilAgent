@@ -20,6 +20,7 @@ from tools.base import ToolResult, ToolStatus
 from .middleware.logging import get_logger
 from .middleware.audittrail import get_dr_manager
 from .middleware.provenance import get_tracker
+from planner.compliance_guardian import ComplianceGuardian
 
 # Import du planificateur HTN
 from planner import (
@@ -63,6 +64,17 @@ class Agent:
             print(f"⚠ Failed to initialize tracker: {e}")
             self.tracker = None
 
+        # Initialiser le ComplianceGuardian si activé
+        self.compliance_guardian = None
+        try:
+            cg_config = getattr(self.config, "compliance_guardian", None)
+            if cg_config and getattr(cg_config, "enabled", False):
+                rules_path = getattr(cg_config, "rules_path", "config/compliance_rules.yaml")
+                self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
+        except Exception as e:
+            print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+            self.compliance_guardian = None
+
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
 
@@ -102,6 +114,18 @@ class Agent:
                 self.tracker = current_tracker
         except Exception as e:
             print(f"⚠ Failed to refresh tracker: {e}")
+
+        # Rafraîchir le ComplianceGuardian si la configuration change
+        try:
+            cg_config = getattr(self.config, "compliance_guardian", None)
+            if cg_config and getattr(cg_config, "enabled", False):
+                if self.compliance_guardian is None:
+                    rules_path = getattr(cg_config, "rules_path", "config/compliance_rules.yaml")
+                    self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
+            else:
+                self.compliance_guardian = None
+        except Exception as e:
+            print(f"⚠ Failed to refresh ComplianceGuardian: {e}")
 
     def initialize_model(self):
         """Initialiser le modèle"""

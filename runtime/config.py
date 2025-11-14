@@ -132,10 +132,18 @@ class AgentConfig(BaseModel):
     @classmethod
     def load(cls, config_dir: str = "config") -> "AgentConfig":
         """Charger la configuration depuis les fichiers YAML"""
-        config_path = Path(config_dir) / "agent.yaml"
+        base_path = Path(config_dir)
 
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        if base_path.is_file():
+            config_path = base_path
+        else:
+            config_path = base_path / "agent.yaml"
+            if not config_path.exists():
+                yaml_candidates = sorted(base_path.glob("*.yaml"))
+                if len(yaml_candidates) == 1:
+                    config_path = yaml_candidates[0]
+                else:
+                    raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
         with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
@@ -148,6 +156,7 @@ class AgentConfig(BaseModel):
         memory_data = raw_config.get("memory", {})
         logging_data = raw_config.get("logging", {})
         compliance_data = raw_config.get("compliance", {})
+        compliance_guardian_data = raw_config.get("compliance_guardian", {})
         htn_planning_data = raw_config.get("htn_planning", {})
         htn_execution_data = raw_config.get("htn_execution", {})
         htn_verification_data = raw_config.get("htn_verification", {})
@@ -192,6 +201,9 @@ class AgentConfig(BaseModel):
         htn_planning_config = HTNPlanningConfig(**htn_planning_data) if htn_planning_data else None
         htn_execution_config = HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
         htn_verification_config = HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
+        compliance_guardian_config = (
+            ComplianceGuardianConfig(**compliance_guardian_data) if compliance_guardian_data else None
+        )
 
         return cls(
             name=agent_data.get("name", "llmagenta"),
@@ -252,6 +264,8 @@ class AgentConfig(BaseModel):
             config_dict['htn_execution'] = self.htn_execution.model_dump()
         if self.htn_verification is not None:
             config_dict['htn_verification'] = self.htn_verification.model_dump()
+        if self.compliance_guardian is not None:
+            config_dict['compliance_guardian'] = self.compliance_guardian.model_dump()
 
         return config_dict
 
@@ -295,6 +309,8 @@ class AgentConfig(BaseModel):
             config_dict['htn_execution'] = self.htn_execution.model_dump()
         if self.htn_verification is not None:
             config_dict['htn_verification'] = self.htn_verification.model_dump()
+        if self.compliance_guardian is not None:
+            config_dict['compliance_guardian'] = self.compliance_guardian.model_dump()
 
         # Save to YAML file
         with open(config_file, 'w') as f:
