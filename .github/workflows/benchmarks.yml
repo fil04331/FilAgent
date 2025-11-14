@@ -1,4 +1,6 @@
 name: Benchmarks
+permissions:
+  contents: read
 
 on:
   # Run weekly on Sundays at 2 AM UTC
@@ -29,6 +31,8 @@ on:
 
 jobs:
   run-benchmarks:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 120  # 2 hours max
 
@@ -138,6 +142,8 @@ jobs:
 
   # Optional: Publish results to GitHub Pages
   publish-results:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs: run-benchmarks
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
