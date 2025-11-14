@@ -217,16 +217,63 @@ FilAgent/
 │   └── reports/                # Benchmark reports
 │
 ├── tests/                       # Test suite
-│   ├── conftest.py             # Pytest fixtures
-│   ├── test_agent.py           # Agent tests
-│   ├── test_compliance_flow.py # Compliance tests
-│   ├── test_integration_e2e.py # E2E tests
-│   ├── test_planner/           # HTN planner tests
-│   │   ├── test_task_graph.py
-│   │   ├── test_planner.py
-│   │   ├── test_executor.py
-│   │   └── test_verifier.py
-│   └── contract/               # Contract tests (OpenAPI)
+│   ├── conftest.py             # Pytest fixtures (shared)
+│   ├── __init__.py             # Package marker
+│   ├── unit/                   # Pure unit tests
+│   │   ├── test_middleware/    # Middleware tests
+│   │   │   ├── test_middleware_audittrail.py
+│   │   │   ├── test_middleware_constraints.py
+│   │   │   ├── test_middleware_logging.py
+│   │   │   ├── test_middleware_provenance.py
+│   │   │   ├── test_middleware_rbac.py
+│   │   │   ├── test_middleware_redaction.py
+│   │   │   ├── test_middleware_worm.py
+│   │   │   ├── test_constraints.py
+│   │   │   ├── test_rbac.py
+│   │   │   └── test_logging_pii.py
+│   │   ├── test_memory/        # Memory tests
+│   │   │   ├── test_memory.py
+│   │   │   └── test_semantic_memory.py
+│   │   ├── test_planner/       # HTN planner tests
+│   │   │   ├── test_task_graph.py
+│   │   │   ├── test_planner.py
+│   │   │   ├── test_executor.py
+│   │   │   ├── test_verifier.py
+│   │   │   ├── test_plan_cache.py
+│   │   │   ├── test_work_stealing.py
+│   │   │   └── run_validation.py
+│   │   ├── test_tools/         # Tool tests
+│   │   │   ├── test_tools.py
+│   │   │   ├── test_tools_base.py
+│   │   │   └── test_tool_registry.py
+│   │   ├── test_config/        # Configuration tests
+│   │   │   ├── test_config.py
+│   │   │   └── test_config_persistence_simple.py
+│   │   ├── test_model/         # Model interface tests
+│   │   │   └── test_model_interface.py
+│   │   ├── test_server/        # Server tests
+│   │   │   ├── test_server.py
+│   │   │   └── test_server_health.py
+│   │   ├── test_data_generators.py
+│   │   ├── test_retention.py
+│   │   ├── test_scripts_prometheus.py
+│   │   ├── test_fixtures.py
+│   │   └── test_performance.py
+│   ├── integration/            # Component integration tests
+│   │   ├── test_compliance_flow.py
+│   │   ├── test_compliance_guardian.py
+│   │   ├── test_compliance_integration.py
+│   │   ├── test_agent_exception_handling.py
+│   │   ├── test_agent_improvements.py
+│   │   ├── test_agent_htn_integration.py
+│   │   ├── test_document_analyzer_pme.py
+│   │   └── test_codeql_workflows.py
+│   ├── e2e/                    # End-to-end tests
+│   │   └── test_integration_e2e.py
+│   ├── contract/               # Contract tests (OpenAPI)
+│   │   └── test_openapi_contract.py
+│   └── utils/                  # Test utilities
+│       └── test_data_generators.py
 │
 ├── docs/                        # Documentation
 │   ├── ADRs/                   # Architecture Decision Records
@@ -471,6 +518,11 @@ python runtime/server.py
 # All tests
 pytest
 
+# By test type (directory)
+pytest tests/unit/              # All unit tests
+pytest tests/integration/       # All integration tests
+pytest tests/e2e/              # All end-to-end tests
+
 # Specific markers
 pytest -m unit              # Unit tests only
 pytest -m integration       # Integration tests
@@ -481,7 +533,13 @@ pytest -m e2e              # End-to-end tests
 pytest --cov=. --cov-report=html
 
 # Specific module
-pytest tests/test_planner/
+pytest tests/unit/test_planner/         # Planner unit tests
+pytest tests/unit/test_middleware/      # Middleware tests
+pytest tests/unit/test_tools/           # Tool tests
+pytest tests/integration/               # Integration tests
+
+# Specific test file
+pytest tests/unit/test_planner/test_task_graph.py
 ```
 
 ### Code Quality
@@ -614,19 +672,51 @@ print("WARN: CPU")
 
 ### Test Organization
 
+Tests are organized by type (unit/integration/e2e) for better maintainability:
+
 ```
 tests/
 ├── conftest.py                    # Shared fixtures
-├── test_agent.py                  # Agent core tests
-├── test_tools.py                  # Tool tests
-├── test_memory.py                 # Memory tests
-├── test_compliance_flow.py        # Compliance tests
-├── test_integration_e2e.py        # E2E tests
-└── test_planner/                  # HTN planner tests
-    ├── test_task_graph.py
-    ├── test_planner.py
-    ├── test_executor.py
-    └── test_verifier.py
+├── unit/                          # Pure unit tests (fast, isolated)
+│   ├── test_middleware/           # Middleware tests
+│   │   ├── test_middleware_audittrail.py
+│   │   ├── test_middleware_constraints.py
+│   │   ├── test_middleware_logging.py
+│   │   ├── test_middleware_provenance.py
+│   │   ├── test_middleware_rbac.py
+│   │   ├── test_middleware_redaction.py
+│   │   └── test_middleware_worm.py
+│   ├── test_memory/               # Memory tests
+│   │   ├── test_memory.py
+│   │   └── test_semantic_memory.py
+│   ├── test_planner/              # HTN planner tests
+│   │   ├── test_task_graph.py
+│   │   ├── test_planner.py
+│   │   ├── test_executor.py
+│   │   ├── test_verifier.py
+│   │   ├── test_plan_cache.py
+│   │   └── test_work_stealing.py
+│   ├── test_tools/                # Tool tests
+│   │   ├── test_tools.py
+│   │   ├── test_tools_base.py
+│   │   └── test_tool_registry.py
+│   ├── test_config/               # Configuration tests
+│   ├── test_model/                # Model interface tests
+│   └── test_server/               # Server tests
+├── integration/                   # Component integration tests
+│   ├── test_compliance_flow.py
+│   ├── test_compliance_guardian.py
+│   ├── test_compliance_integration.py
+│   ├── test_agent_exception_handling.py
+│   ├── test_agent_improvements.py
+│   ├── test_agent_htn_integration.py
+│   └── test_document_analyzer_pme.py
+├── e2e/                           # End-to-end tests
+│   └── test_integration_e2e.py
+├── contract/                      # Contract tests (OpenAPI)
+│   └── test_openapi_contract.py
+└── utils/                         # Test utilities
+    └── test_data_generators.py
 ```
 
 ### Test Markers
