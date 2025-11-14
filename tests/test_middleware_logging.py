@@ -286,7 +286,7 @@ class TestPIIRedactionIntegration:
         """Test fallback gracieux si redactor échoue"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        with patch('runtime.middleware.logging.get_pii_redactor', side_effect=Exception("Redactor failed")):
+        with patch('runtime.middleware.redaction.get_pii_redactor', side_effect=Exception("Redactor failed")):
             metadata = {"email": "test@example.com"}
 
             # Should not raise exception
