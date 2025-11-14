@@ -25,16 +25,31 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Étape 3: Installe les dépendances du projet et de test
+      # Étape 3: Installe et configure PDM
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      # Étape 4: Cache des dépendances PDM
+      - name: Cache PDM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            __pypackages__
+            .pdm-build
+          key: ${{ runner.os }}-pdm-${{ hashFiles('pdm.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pdm-
+
+      # Étape 5: Installe les dépendances avec PDM
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          # Installe pytest et toutes les librairies listées dans requirements.txt
-          # Assurez-vous que pytest est bien dans ce fichier !
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
+          pdm install --prod --no-lock
+          pdm install --dev --no-lock
 
-      # Étape 4: Exécute les tests avec pytest
+      # Étape 6: Exécute les tests avec pytest via PDM
       - name: Test with pytest
         run: |
-          pytest
+          pdm run pytest

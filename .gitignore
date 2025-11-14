@@ -24,6 +24,12 @@ wheels/
 venv/
 env/
 ENV/
+.venv/
+
+# PDM
+__pypackages__/
+.pdm-build/
+.pdm.toml
 
 # IDE
 .vscode/
