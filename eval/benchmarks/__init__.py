@@ -11,9 +11,14 @@ Includes:
   - Tool Orchestration: Multi-tool coordination
 """
 
+from .custom import (
+    ComplianceHarness,
+    HTNPlanningHarness,
+    ToolOrchestrationHarness,
+)
+from .swe_bench import SWEBenchHarness
+
 __all__ = [
-    'HumanEvalHarness',
-    'MBPPHarness',
     'SWEBenchHarness',
     'ComplianceHarness',
     'HTNPlanningHarness',
