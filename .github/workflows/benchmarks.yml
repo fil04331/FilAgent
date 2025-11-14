@@ -1,0 +1,165 @@
+name: Benchmarks
+
+on:
+  # Run weekly on Sundays at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * 0'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      benchmark_name:
+        description: 'Specific benchmark to run (leave empty for all)'
+        required: false
+        default: ''
+      num_tasks:
+        description: 'Number of tasks per benchmark (leave empty for all)'
+        required: false
+        default: ''
+
+  # Run on push to main (optional, can be removed)
+  push:
+    branches:
+      - main
+    paths:
+      - 'eval/**'
+      - 'runtime/**'
+      - 'planner/**'
+      - 'tools/**'
+
+jobs:
+  run-benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hours max
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Initialize database
+        run: |
+          python -c "from memory.episodic import create_tables; create_tables()"
+
+      - name: Create necessary directories
+        run: |
+          mkdir -p eval/reports
+          mkdir -p eval/runs
+          mkdir -p logs/events
+          mkdir -p logs/decisions
+
+      - name: Run HumanEval benchmark
+        if: github.event.inputs.benchmark_name == '' || github.event.inputs.benchmark_name == 'humaneval'
+        run: |
+          python eval/runner.py --benchmark humaneval --num-tasks ${{ github.event.inputs.num_tasks || '10' }} --verbose
+        continue-on-error: true
+
+      - name: Run MBPP benchmark
+        if: github.event.inputs.benchmark_name == '' || github.event.inputs.benchmark_name == 'mbpp'
+        run: |
+          python eval/runner.py --benchmark mbpp --num-tasks ${{ github.event.inputs.num_tasks || '10' }} --verbose
+        continue-on-error: true
+
+      - name: Run SWE-bench benchmark
+        if: github.event.inputs.benchmark_name == '' || github.event.inputs.benchmark_name == 'swe_bench'
+        run: |
+          python eval/runner.py --benchmark swe_bench --num-tasks ${{ github.event.inputs.num_tasks || '5' }} --verbose
+        continue-on-error: true
+
+      - name: Run Compliance benchmark
+        if: github.event.inputs.benchmark_name == '' || github.event.inputs.benchmark_name == 'compliance'
+        run: |
+          python eval/runner.py --benchmark compliance --verbose
+        continue-on-error: true
+
+      - name: Run HTN Planning benchmark
+        if: github.event.inputs.benchmark_name == '' || github.event.inputs.benchmark_name == 'htn_planning'
+        run: |
+          python eval/runner.py --benchmark htn_planning --verbose
+        continue-on-error: true
+
+      - name: Run Tool Orchestration benchmark
+        if: github.event.inputs.benchmark_name == '' || github.event.inputs.benchmark_name == 'tool_orchestration'
+        run: |
+          python eval/runner.py --benchmark tool_orchestration --verbose
+        continue-on-error: true
+
+      - name: Generate metrics dashboard
+        run: |
+          python eval/metrics.py --days 30
+
+      - name: Check for regressions
+        id: regression_check
+        run: |
+          python eval/metrics.py --check-regressions > regression_report.txt
+          cat regression_report.txt
+        continue-on-error: true
+
+      - name: Upload benchmark reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-reports
+          path: |
+            eval/reports/*.json
+          retention-days: 90
+
+      - name: Upload regression report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: regression-report
+          path: regression_report.txt
+          retention-days: 30
+
+      - name: Comment on commit (if regression detected)
+        if: failure() && github.event_name == 'push'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('regression_report.txt', 'utf8');
+
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `⚠️ **Benchmark Regression Detected**\n\n\`\`\`\n${report}\n\`\`\``
+            });
+
+  # Optional: Publish results to GitHub Pages
+  publish-results:
+    runs-on: ubuntu-latest
+    needs: run-benchmarks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download benchmark reports
+        uses: actions/download-artifact@v3
+        with:
+          name: benchmark-reports
+          path: eval/reports
+
+      - name: Generate static HTML dashboard
+        run: |
+          python scripts/generate_benchmark_dashboard.py
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./benchmark-dashboard
+          destination_dir: benchmarks
