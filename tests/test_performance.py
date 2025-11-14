@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
 from datetime import datetime
 from planner import HierarchicalPlanner, TaskExecutor, TaskVerifier, PlanningStrategy
-from planner.task_graph import TaskGraph, TaskNode
+from planner.task_graph import TaskGraph, Task
 
 
 # ============================================================================
@@ -593,23 +593,24 @@ def test_htn_executor_parallel_performance(mock_model, performance_tracker):
     graph = TaskGraph()
 
     # Root task
-    root = TaskNode(
+    root = Task(
         task_id="root",
         name="Root task",
         action="noop",
-        parameters={}
+        params={}
     )
     graph.add_task(root)
 
     # Add 5 independent parallel tasks
     for i in range(5):
-        task = TaskNode(
+        task = Task(
             task_id=f"task_{i}",
             name=f"Parallel task {i}",
             action="calculator",
-            parameters={"expression": f"{i} + {i}"}
+            params={"expression": f"{i} + {i}"}
         )
-        graph.add_task(task, depends_on=["root"])
+        task.depends_on = ["root"]
+        graph.add_task(task)
 
     # Create executor
     from planner import ExecutionStrategy
@@ -715,11 +716,11 @@ def test_htn_verifier_performance(performance_tracker):
     graph = TaskGraph()
 
     for i in range(10):
-        task = TaskNode(
+        task = Task(
             task_id=f"task_{i}",
             name=f"Task {i}",
             action="calculator",
-            parameters={"expression": "2 + 2"},
+            params={"expression": "2 + 2"},
             result={"output": "4", "status": "success"}
         )
         graph.add_task(task)
