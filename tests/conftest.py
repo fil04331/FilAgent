@@ -33,7 +33,15 @@ from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
 
 import pytest
-from fastapi.testclient import TestClient
+
+# Optional imports for API testing
+try:
+    from fastapi.testclient import TestClient
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    FASTAPI_AVAILABLE = False
+    TestClient = None
+
 # =========================================================================
 # TEST SERVER BOOTSTRAP (utile pour les tests de contrat HTTP)
 # =========================================================================
@@ -81,9 +89,21 @@ def start_fastapi_server() -> Generator[None, None, None]:
 # Ajouter le répertoire parent au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from runtime.model_interface import GenerationResult, GenerationConfig
-from runtime.config import AgentConfig
-from tools.base import ToolResult, ToolStatus
+# Optional runtime imports
+try:
+    from runtime.model_interface import GenerationResult, GenerationConfig
+    from runtime.config import AgentConfig
+    from tools.base import ToolResult, ToolStatus
+    RUNTIME_AVAILABLE = True
+except ImportError as e:
+    RUNTIME_AVAILABLE = False
+    # Create mock classes for type hints
+    GenerationResult = None
+    GenerationConfig = None
+    AgentConfig = None
+    ToolResult = None
+    ToolStatus = None
+    print(f"⚠ Runtime modules not available: {e}")
 
 
 # ============================================================================
