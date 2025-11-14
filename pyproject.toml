@@ -7,7 +7,7 @@ name = "filagent"
 version = "2.0.0"
 description = "LLM Agent with Enterprise Governance, Legal Traceability & HTN Planning"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Proprietary" }
 authors = [
     { name = "FilAgent Team", email = "contact@filagent.ai" },
 ]
@@ -18,7 +18,7 @@ keywords = ["llm", "agent", "governance", "compliance", "htn", "ai", "quebec", "
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

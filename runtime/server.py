@@ -3,14 +3,16 @@ Serveur API pour l'agent LLM
 Compatible avec le format OpenAI pour faciliter l'intégration
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
 import yaml
 import traceback
+import re
+import uuid
 from .config import get_config
 from .agent import get_agent
 from memory.episodic import get_messages, get_connection
@@ -49,12 +51,32 @@ class ChatRequest(BaseModel):
     """Requête de chat"""
 
     messages: List[Message]
-    conversation_id: Optional[str] = None
-    task_id: Optional[str] = None
+    conversation_id: Optional[str] = Field(None, max_length=128, pattern=r'^[a-zA-Z0-9\-_]+$')
+    task_id: Optional[str] = Field(None, max_length=128, pattern=r'^[a-zA-Z0-9\-_]+$')
     # Compatibilité OpenAI
-    model: Optional[str] = None
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    model: Optional[str] = Field(None, max_length=256)
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(None, ge=1, le=10000)
+
+    @validator('conversation_id')
+    def validate_conversation_id(cls, v):
+        """Valider le format du conversation_id"""
+        if v is not None:
+            if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
+                raise ValueError('conversation_id must contain only alphanumeric, dash, and underscore')
+            if len(v) > 128:
+                raise ValueError('conversation_id too long (max 128 characters)')
+        return v
+
+    @validator('task_id')
+    def validate_task_id(cls, v):
+        """Valider le format du task_id"""
+        if v is not None:
+            if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
+                raise ValueError('task_id must contain only alphanumeric, dash, and underscore')
+            if len(v) > 128:
+                raise ValueError('task_id too long (max 128 characters)')
+        return v
 
 
 class ChatResponse(BaseModel):
@@ -164,7 +186,8 @@ async def chat(request: ChatRequest):
         except Exception:
             agent = None
 
-        conversation_id = request.conversation_id or f"conv-{int(datetime.now().timestamp())}"
+        # Générer un conversation_id unique avec UUID (évite les collisions)
+        conversation_id = request.conversation_id or f"conv-{uuid.uuid4().hex[:16]}"
 
         # Trouver le dernier message utilisateur
         user_messages = [msg for msg in request.messages if msg.role == "user"]
@@ -239,8 +262,22 @@ async def chat(request: ChatRequest):
 
 
 @app.get("/conversations/{conversation_id}")
-async def get_conversation(conversation_id: str):
+async def get_conversation(
+    conversation_id: str = FastAPIPath(
+        ...,
+        max_length=128,
+        regex=r'^[a-zA-Z0-9\-_]+$',
+        description="Identifiant unique de la conversation"
+    )
+):
     """Récupérer l'historique d'une conversation"""
+    # Validation supplémentaire du conversation_id
+    if not re.match(r'^[a-zA-Z0-9\-_]+$', conversation_id):
+        raise HTTPException(status_code=400, detail="Invalid conversation_id format")
+
+    if len(conversation_id) > 128:
+        raise HTTPException(status_code=400, detail="conversation_id too long")
+
     messages = get_messages(conversation_id)
 
     if not messages:
