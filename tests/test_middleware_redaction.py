@@ -413,7 +413,7 @@ class TestScanAndLog:
 
     def test_scan_and_log_with_pii(self, temp_config_file):
         """Test scan avec PII présent"""
-        with patch('runtime.middleware.redaction.get_logger') as mock_logger:
+        with patch('runtime.middleware.logging.get_logger') as mock_logger:
             mock_logger_instance = MagicMock()
             mock_logger.return_value = mock_logger_instance
 
@@ -442,7 +442,7 @@ class TestScanAndLog:
 
     def test_scan_and_log_with_context(self, temp_config_file):
         """Test scan avec contexte"""
-        with patch('runtime.middleware.redaction.get_logger') as mock_logger:
+        with patch('runtime.middleware.logging.get_logger') as mock_logger:
             mock_logger_instance = MagicMock()
             mock_logger.return_value = mock_logger_instance
 
@@ -573,7 +573,7 @@ class TestGracefulFallbacks:
 
     def test_logger_failure_graceful(self, temp_config_file):
         """Test gestion gracieuse d'échec du logger"""
-        with patch('runtime.middleware.redaction.get_logger', side_effect=Exception("Logger failed")):
+        with patch('runtime.middleware.logging.get_logger', side_effect=Exception("Logger failed")):
             redactor = PIIRedactor(config_path=str(temp_config_file))
 
             text = "Contact john@example.com"
@@ -627,7 +627,7 @@ class TestComplianceRequirements:
 
     def test_pii_logged_before_redaction(self, temp_config_file):
         """Test que la détection de PII est loggée"""
-        with patch('runtime.middleware.redaction.get_logger') as mock_logger:
+        with patch('runtime.middleware.logging.get_logger') as mock_logger:
             mock_logger_instance = MagicMock()
             mock_logger.return_value = mock_logger_instance
 
