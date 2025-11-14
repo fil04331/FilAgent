@@ -39,7 +39,8 @@ dependencies = [
     "pydantic-settings>=2.0.3,<3",
 
     # API Server
-    "fastapi>=0.104.0,<0.111",
+    "fastapi>=0.121.0,<0.122",
+    "starlette>=0.47.2,<0.50",  # Explicit constraint for security fixes
     "uvicorn>=0.24.0,<0.31",
 
     # Database & Memory
@@ -50,7 +51,7 @@ dependencies = [
     "prometheus-client>=0.19.0,<0.21",
 
     # Security
-    "cryptography>=41.0.0,<43",
+    "cryptography>=44.0.1,<45",  # Security fix for CVE-2024-6119, CVE-2024-12797
     "pyopenssl>=23.3.0,<25",
 
     # Validation & Guardrails
