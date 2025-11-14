@@ -293,5 +293,6 @@ Your response should contain the patch in unified diff format.
             # Compute similarity
             matcher = SequenceMatcher(None, p1_lines, p2_lines)
             return matcher.ratio()
-        except Exception:
+        except Exception as e:
+            print(f"Warning: Failed to compute patch similarity: {e}")
             return 0.0
