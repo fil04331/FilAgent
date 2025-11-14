@@ -3,7 +3,7 @@
 # mémoire vectorielle. Les tests et le mode stub fonctionnent sans ces modules.
 
 llama-cpp-python>=0.2.0,<0.3
-faiss-cpu>=1.8.0,<1.9
+faiss-cpu>=1.8.0,<1.13
 sentence-transformers>=2.2.2,<3
 # faiss-gpu>=1.8.0,<1.9  # Alternative GPU
 # transformers>=4.35.0  # Optionnel pour vLLM
