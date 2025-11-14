@@ -145,15 +145,19 @@ class PIIRedactor:
 
         # Logger si PII trouvé
         if result["has_pii"]:
-            from runtime.middleware.logging import get_logger
+            try:
+                from runtime.middleware.logging import get_logger
 
-            logger = get_logger()
-            logger.log_event(
-                actor="pii.redactor",
-                event="pii.detected",
-                level="WARNING",
-                metadata={"pii_count": len(detected), "pii_types": list(pii_types), "context": context},
-            )
+                logger = get_logger()
+                logger.log_event(
+                    actor="pii.redactor",
+                    event="pii.detected",
+                    level="WARNING",
+                    metadata={"pii_count": len(detected), "pii_types": list(pii_types), "context": context},
+                )
+            except Exception:
+                # Graceful fallback if logger is unavailable
+                pass
 
         return result
 
