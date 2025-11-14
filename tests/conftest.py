@@ -1131,7 +1131,7 @@ def performance_tracker():
 def pytest_configure(config):
     """
     Configuration pytest personnalisée
-    
+
     Registers custom markers for test categorization:
     - e2e: End-to-end tests
     - compliance: Compliance and validation tests
@@ -1154,6 +1154,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "fixtures: Tests validating fixture functionality"
     )
+
+    # Register metrics plugin
+    pytest_plugins = ["pytest_metrics_plugin"]
 
 
 # ============================================================================

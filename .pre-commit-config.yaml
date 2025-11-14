@@ -1,0 +1,89 @@
+# Pre-commit hooks for FilAgent
+# See https://pre-commit.com for more information
+
+repos:
+  # General code quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: detect-private-key
+        name: Detect private keys
+
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        name: Format code with Black
+        language_version: python3.10
+        args: ['--line-length=100']
+
+  # Python import sorting
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Sort imports with isort
+        args: ['--profile=black', '--line-length=100']
+
+  # Python linting
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: Lint code with flake8
+        args: ['--max-line-length=100', '--extend-ignore=E203,W503']
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        name: Security check with Bandit
+        args: ['-c', 'pyproject.toml']
+        additional_dependencies: ['bandit[toml]']
+
+  # Test coverage check
+  - repo: local
+    hooks:
+      - id: pytest-coverage
+        name: Check test coverage
+        entry: bash -c 'pytest --cov=runtime --cov=planner --cov=tools --cov=memory --cov=policy --cov-report=term --cov-report=json --cov-fail-under=70 -v'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: coverage-regression-check
+        name: Check coverage regression
+        entry: python scripts/check_coverage_regression.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: metrics-collection
+        name: Collect test metrics
+        entry: bash -c 'pytest --metrics --no-regression-check -x'
+        language: system
+        pass_filenames: false
+        always_run: false
+        stages: [push]
+
+# Configuration
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'
