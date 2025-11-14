@@ -23,6 +23,14 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     print("Warning: sentence-transformers not installed. Semantic memory will not work.")
 
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
+    print("Warning: pandas not installed. save/load functionality will not work.")
+
 
 class SemanticMemory:
     """
@@ -65,8 +73,7 @@ class SemanticMemory:
             try:
                 self.index = faiss.read_index(str(self.index_path))
                 # Charger le store (simulé pour l'instant, utiliser pandas parquet en production)
-                if self.store_path.exists():
-                    import pandas as pd
+                if self.store_path.exists() and PANDAS_AVAILABLE:
                     self.store = pd.read_parquet(self.store_path).to_dict('records')
                 print(f"✓ Loaded semantic index with {self.index.ntotal} passages")
             except Exception as e:
@@ -135,9 +142,13 @@ class SemanticMemory:
         
         results = []
         for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
+            # Skip invalid indices (FAISS returns -1 when not enough results)
+            if idx < 0 or idx >= len(self.store):
+                continue
+
             # Convertir la distance en score de similarité (approximatif)
             similarity = 1.0 / (1.0 + distance)  # Transformation simple
-            
+
             if similarity >= similarity_threshold:
                 passage = self.store[idx]
                 results.append({
@@ -193,10 +204,9 @@ class SemanticMemory:
         """Sauvegarder l'index FAISS et le store sur disque"""
         # Sauvegarder l'index FAISS
         faiss.write_index(self.index, str(self.index_path))
-        
+
         # Sauvegarder le store (utiliser pandas parquet)
-        if self.store:
-            import pandas as pd
+        if self.store and PANDAS_AVAILABLE:
             df = pd.DataFrame(self.store)
             df.to_parquet(self.store_path, index=False)
         
