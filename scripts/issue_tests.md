@@ -1,79 +1,78 @@
-## Contexte
+## 📋 Description
 
-Suite à la fermeture de PR #107, extraire les tests utiles pour renforcer la couverture de tests du projet FilAgent.
+Augmenter la couverture de tests pour renforcer la robustesse et la fiabilité du système FilAgent.
 
-## Objectifs
+## 🎯 Objectifs
 
-### Tests Unitaires
-- [ ] Ajouter tests unitaires pour ComplianceGuardian
-  - Validation des règles de conformité
-  - Gestion des erreurs et exceptions
-  - Intégration avec les middlewares
-- [ ] Ajouter tests pour HTN Planning
-  - Planification avec différentes stratégies
-  - Décomposition de tâches complexes
-  - Gestion des dépendances dans le graphe
-- [ ] Améliorer couverture tests middleware
-  - `runtime/middleware/logging.py`
-  - `runtime/middleware/provenance.py`
-  - `runtime/middleware/audittrail.py`
-  - `runtime/middleware/redaction.py`
+- [ ] Atteindre 80% de couverture de code
+- [ ] Ajouter tests unitaires manquants
+- [ ] Créer tests d'intégration pour flux critiques
+- [ ] Implémenter tests de régression
+
+## 📝 Tâches
+
+### Tests Unitaires Prioritaires
+
+- [ ] **Agent Core** (`runtime/agent.py`)
+  - [ ] Test `_requires_planning()` avec différents patterns
+  - [ ] Test `_run_with_htn()` avec mock HTN planner
+  - [ ] Test fallback mechanisms
+
+- [ ] **HTN Planner** (`planner/`)
+  - [ ] Test task decomposition
+  - [ ] Test parallel execution
+  - [ ] Test verification levels
+
+- [ ] **Compliance Guardian**
+  - [ ] Test PII redaction patterns
+  - [ ] Test forbidden query detection
+  - [ ] Test email pattern exclusion
+
+- [ ] **Tools Registry**
+  - [ ] Test tool registration
+  - [ ] Test tool execution with timeouts
+  - [ ] Test sandboxing
 
 ### Tests d'Intégration
-- [ ] Tests end-to-end pour workflows complets
-- [ ] Tests d'intégration ComplianceGuardian + HTN
-- [ ] Tests de conformité (Loi 25, GDPR, AI Act)
 
-### Tests de Régression
-- [ ] Ajouter tests pour bugs connus et corrigés
-- [ ] Tests de non-régression pour ComplianceGuardian
-- [ ] Tests de sécurité (PII redaction, WORM logging)
+- [ ] **Workflow E2E**
+  - [ ] User query → HTN planning → Execution → Response
+  - [ ] Multi-tool orchestration
+  - [ ] Error recovery flows
 
-## Référence
+- [ ] **Compliance Flow**
+  - [ ] Decision Record generation
+  - [ ] WORM logging integrity
+  - [ ] Provenance tracking
 
-- **PR fermée**: #107 (contient des tests à extraire)
-- **Documentation existante**:
-  - `tests/README_E2E_COMPLIANCE.md`
-  - `tests/conftest.py` (fixtures)
-  - `pytest.ini` (configuration)
+### Tests de Performance
 
-## Structure Cible
+- [ ] Benchmark HTN planning time
+- [ ] Memory usage profiling
+- [ ] Concurrent request handling
 
-```
-tests/
-├── test_compliance_guardian/
-│   ├── test_validation.py
-│   ├── test_integration.py
-│   └── test_edge_cases.py
-├── test_htn_planning/
-│   ├── test_strategies.py
-│   ├── test_execution.py
-│   └── test_verification.py
-└── test_middleware/
-    ├── test_logging_edge_cases.py
-    ├── test_provenance_tracking.py
-    └── test_pii_redaction.py
-```
+## 🛠️ Outils Recommandés
 
-## Critères d'Acceptation
+- `pytest-cov` pour coverage
+- `pytest-benchmark` pour performance
+- `hypothesis` pour property-based testing
+- `pytest-mock` pour mocking
 
-- [ ] Couverture de tests globale > 80%
-- [ ] Tous les tests passent en CI (`pytest`)
-- [ ] Documentation des nouveaux tests (docstrings)
-- [ ] Fixtures réutilisables pour tests futurs
-- [ ] Tests marqués correctement (`@pytest.mark.unit`, `@pytest.mark.compliance`, etc.)
+## 📊 Métriques de Succès
 
-## Priorité
+- Coverage > 80%
+- Tous les tests passent en < 5 minutes
+- 0 tests flaky
+- Documentation de test à jour
 
-**MOYENNE** - Améliorer la qualité et la robustesse du code
-
-## Estimation
-
-2-3 semaines (selon volume de tests de #107 à extraire)
-
-## Labels Suggérés
+## 🏷️ Labels
 
 - `testing`
 - `enhancement`
 - `good first issue`
-- `documentation`
+
+## 🔗 Références
+
+- [Normes de codage FilAgent](../NORMES_CODAGE_FILAGENT.md)
+- [Guide de contribution](../CONTRIBUTING.md)
+- [Architecture](../docs/ADRs/)

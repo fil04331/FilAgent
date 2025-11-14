@@ -1,154 +1,126 @@
-## Contexte
+## 📋 Description
 
-Conformément à la vision du projet FilAgent (voir architecture dans `eval/benchmarks/`), intégrer les benchmarks standards pour valider les capacités de l'agent LLM et garantir une performance ≥ aux standards de l'industrie (Codex, ChatGPT-5 Agent).
+Intégrer les benchmarks standards de l'industrie (HumanEval, MBPP, SWE-bench) pour évaluer et suivre les performances de FilAgent.
 
-## Objectifs
+## 🎯 Objectifs
 
-### Phase 1: HumanEval Integration
-- [ ] Configurer harness HumanEval dans `eval/benchmarks/humaneval/`
-- [ ] Implémenter calcul pass@k (pass@1, pass@5, pass@10)
-- [ ] Ajouter timeout et isolation pour exécution sécurisée
-- [ ] Générer rapport automatique dans `eval/reports/`
+- [ ] Établir baseline de performance
+- [ ] Permettre comparaison avec autres agents
+- [ ] Détecter régressions de performance
+- [ ] Valider améliorations du système
 
-### Phase 2: MBPP Integration
-- [ ] Configurer harness MBPP dans `eval/benchmarks/mbpp/`
-- [ ] Adapter prompts pour compatibilité FilAgent
-- [ ] Validation résultats avec tests unitaires
-- [ ] Métriques de performance (temps, tokens, précision)
+## 📝 Tâches d'Implémentation
 
-### Phase 3: SWE-bench-lite Integration
-- [ ] Configurer SWE-bench-lite dans `eval/benchmarks/swe_bench_lite/`
-- [ ] Tests de tâches agentiques: navigation, édition, tests
-- [ ] Intégration avec HTN Planning
-- [ ] Validation end-to-end sur tâches réelles
+### 1. HumanEval Integration
+- [ ] Adapter framework HumanEval pour FilAgent
+- [ ] Implémenter test runner spécifique
+- [ ] Créer métriques pass@k (k=1, 10, 100)
+- [ ] Baseline target: >65% pass@1
 
-### Phase 4: Seuils et CI Integration
-- [ ] Définir seuils d'acceptation dans `config/eval_targets.yaml`
-- [ ] Créer job CI pour exécution automatique
-- [ ] Gates de déploiement basés sur benchmarks
-- [ ] Alertes si régression de performance
+### 2. MBPP (Mostly Basic Python Problems)
+- [ ] Intégrer dataset MBPP
+- [ ] Adapter pour contexte agent
+- [ ] Mesurer accuracy et temps d'exécution
+- [ ] Baseline target: >70% accuracy
 
-## Critères de Succès
+### 3. SWE-bench
+- [ ] Adapter pour tâches d'ingénierie logicielle
+- [ ] Créer environnement de test isolé
+- [ ] Implémenter métriques de résolution
+- [ ] Baseline target: >30% resolution rate
 
-Selon `config/eval_targets.yaml` et vision du projet:
+### 4. Benchmarks Custom FilAgent
+- [ ] **Compliance Benchmark**
+  - Test génération Decision Records
+  - Validation PII masking
+  - Vérification WORM logging
 
-### Code Generation
-- **HumanEval pass@1**: ≥ baseline cible (ex: 85%)
-- **MBPP pass@1**: ≥ baseline cible (ex: 80%)
-- **Temps moyen**: ≤ baseline +10%
+- [ ] **HTN Planning Benchmark**
+  - Décomposition de tâches complexes
+  - Exécution parallèle
+  - Gestion d'erreurs
 
-### Agent Tasks
-- **SWE-bench-lite**: Taux de réussite ≥ baseline (ex: 40%)
-- **Planification + Édition + Tests**: Pipeline complet fonctionnel
-- **Traçabilité**: 100% des exécutions avec Decision Records
+- [ ] **Tool Orchestration Benchmark**
+  - Multi-tool coordination
+  - Timeout handling
+  - Sandboxing efficacy
 
-### Performance
-- **Latence**: p95 < 5 secondes par tâche
-- **Token efficiency**: Minimiser tokens tout en gardant qualité
-- **Parallélisation**: 40%+ des tâches parallélisées (HTN)
+## 🛠️ Infrastructure Requise
 
-## Architecture Technique
-
-```
+```yaml
 eval/
 ├── benchmarks/
 │   ├── humaneval/
-│   │   ├── run.py           # Script exécution
-│   │   ├── harness.py       # Logique pass@k
-│   │   └── README.md
+│   │   ├── runner.py
+│   │   ├── metrics.py
+│   │   └── results/
 │   ├── mbpp/
-│   │   ├── run.py
-│   │   ├── harness.py
-│   │   └── README.md
-│   └── swe_bench_lite/
-│       ├── run.py
-│       ├── tasks.json       # Définition tâches
-│       └── README.md
-├── runs/                    # Résultats exécutions
-│   └── {timestamp}/
-│       ├── humaneval_results.json
-│       ├── mbpp_results.json
-│       └── swe_bench_results.json
-└── reports/                 # Rapports consolidés
-    ├── latest_report.json
-    └── historical_trends.json
+│   │   ├── runner.py
+│   │   ├── metrics.py
+│   │   └── results/
+│   ├── swe_bench/
+│   │   ├── runner.py
+│   │   ├── metrics.py
+│   │   └── results/
+│   └── custom/
+│       ├── compliance/
+│       ├── htn_planning/
+│       └── tool_orchestration/
 ```
 
-## Configuration Exemple
+## 📊 Métriques & Reporting
 
-```yaml
-# config/eval_targets.yaml
-benchmarks:
-  humaneval:
-    enabled: true
-    pass_k: [1, 5, 10]
-    min_pass_1: 0.85
-    timeout_per_task_sec: 30
+### Dashboard Métriques
+- Pass rates par benchmark
+- Temps d'exécution moyen
+- Utilisation mémoire
+- Trends historiques
 
-  mbpp:
-    enabled: true
-    min_pass_1: 0.80
-    timeout_per_task_sec: 30
+### Rapports Automatisés
+- Rapport hebdomadaire de performance
+- Alertes sur régression (>5% drop)
+- Comparaison avec releases précédentes
 
-  swe_bench_lite:
-    enabled: true
-    min_success_rate: 0.40
-    max_execution_time_sec: 300
-
-gates:
-  block_deployment_if_below_threshold: true
-  alert_on_regression: true
-  regression_threshold: 0.05  # 5% drop
-```
-
-## CI/CD Integration
+## 🔄 CI/CD Integration
 
 ```yaml
 # .github/workflows/benchmarks.yml
-name: Benchmarks
-
 on:
-  pull_request:
-    branches: [main]
   schedule:
-    - cron: '0 2 * * 0'  # Weekly on Sunday 2am
+    - cron: '0 2 * * 0'  # Weekly
+  workflow_dispatch:
 
 jobs:
-  run-benchmarks:
+  benchmark:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - name: Run HumanEval
-        run: python eval/benchmarks/humaneval/run.py
       - name: Run MBPP
-        run: python eval/benchmarks/mbpp/run.py
-      - name: Run SWE-bench-lite
-        run: python eval/benchmarks/swe_bench_lite/run.py
-      - name: Check Thresholds
-        run: python scripts/check_benchmark_thresholds.py
+      - name: Run SWE-bench
+      - name: Generate Report
+      - name: Upload Results
 ```
 
-## Référence
+## 📈 Success Metrics
 
-- **Documentation**: `FilAgent.md` (sections eval/benchmarks)
-- **Vision projet**: Capacité ≥ Codex/ChatGPT-5 Agent
-- **Conformité**: Tous les benchmarks avec Decision Records et traçabilité
+| Benchmark | Target | Priority |
+|-----------|--------|----------|
+| HumanEval pass@1 | >65% | High |
+| MBPP accuracy | >70% | High |
+| SWE-bench resolution | >30% | Medium |
+| Compliance tests | 100% | Critical |
+| HTN planning success | >90% | High |
 
-## Priorité
-
-**HAUTE** - Validation objective des capacités de l'agent
-
-## Estimation
-
-3-4 semaines
-- Semaine 1-2: HumanEval + MBPP
-- Semaine 3: SWE-bench-lite
-- Semaine 4: CI integration + optimisation
-
-## Labels Suggérés
+## 🏷️ Labels
 
 - `evaluation`
 - `benchmark`
 - `enhancement`
 - `high priority`
-- `performance`
+
+## 🔗 Références
+
+- [HumanEval Paper](https://arxiv.org/abs/2107.03374)
+- [MBPP Dataset](https://github.com/google-research/google-research/tree/master/mbpp)
+- [SWE-bench](https://www.swebench.com/)
+- [FilAgent Evaluation Strategy](../eval/)
