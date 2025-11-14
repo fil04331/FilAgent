@@ -91,3 +91,4 @@ memory/episodic/
 /data/
 /logs/
 /secrets/
+.hypothesis/
