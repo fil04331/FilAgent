@@ -20,7 +20,7 @@ python-jose[cryptography]==3.3.0
 
 # Base de données et Mémoire
 sqlalchemy==2.0.23
-sqlite-vec==0.1.1
+sqlite-vec==0.1.3
 chromadb==0.4.18
 
 # Monitoring et Logs
