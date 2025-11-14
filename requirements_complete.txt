@@ -8,7 +8,7 @@ python-dotenv==1.0.0
 # LLM et IA
 langchain==0.2.16
 langchain-community==0.2.16
-llama-cpp-python==0.2.90
+llama-cpp-python==0.3.16
 transformers==4.35.2
 sentence-transformers==2.2.2
 faiss-cpu==1.7.4
