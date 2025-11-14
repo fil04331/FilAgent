@@ -70,20 +70,52 @@ class FileReaderTool(BaseTool):
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Failed to read file: {str(e)}")
 
     def _is_path_allowed(self, path: Path) -> bool:
-        """Vérifier si un chemin est dans la liste autorisée"""
+        """
+        Vérifier si un chemin est dans la liste autorisée
+        Inclut protection contre symlinks et path traversal
+        """
+        try:
+            path_resolved = path.resolve(strict=True)  # strict=True vérifie l'existence
+        except (OSError, RuntimeError):
+            return False
+
         # Vérifier chaque chemin autorisé
         for allowed in self.allowed_paths:
-            allowed_path = Path(allowed).resolve()
             try:
-                # Vérifier si le chemin est sous le chemin autorisé
-                path.relative_to(allowed_path)
+                allowed_resolved = Path(allowed).resolve()
+
+                # Vérifier si le chemin est strictement sous le chemin autorisé
+                path_resolved.relative_to(allowed_resolved)
+
+                # Protection supplémentaire: vérifier les symlinks
+                if path.is_symlink():
+                    # Si c'est un symlink, vérifier que la cible est aussi dans l'allowlist
+                    link_target = path.readlink()
+                    if link_target.is_absolute():
+                        # Lien absolu - doit être dans l'allowlist
+                        target_resolved = link_target.resolve()
+                        try:
+                            target_resolved.relative_to(allowed_resolved)
+                        except ValueError:
+                            return False  # Lien pointe hors de l'allowlist
+                    else:
+                        # Lien relatif - résoudre depuis le répertoire du symlink
+                        target_resolved = (path.parent / link_target).resolve()
+                        try:
+                            target_resolved.relative_to(allowed_resolved)
+                        except ValueError:
+                            return False  # Lien pointe hors de l'allowlist
+
                 return True
             except ValueError:
                 continue
         return False
 
     def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Valider les arguments"""
+        """
+        Valider les arguments
+        Note: La validation complète du chemin (allowlist, symlinks) est faite dans _is_path_allowed
+        """
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"
 
@@ -93,9 +125,18 @@ class FileReaderTool(BaseTool):
         if not isinstance(arguments["file_path"], str):
             return False, "Argument 'file_path' must be a string"
 
-        # Vérifier qu'il n'y a pas de path traversal
-        if ".." in arguments["file_path"]:
-            return False, "Path traversal detected (..)"
+        if len(arguments["file_path"]) == 0:
+            return False, "file_path cannot be empty"
+
+        if len(arguments["file_path"]) > 4096:  # Limite raisonnable pour les chemins
+            return False, "file_path too long (max 4096 characters)"
+
+        # Bloquer les caractères NULL (attaque par injection de null byte)
+        if '\0' in arguments["file_path"]:
+            return False, "Null byte detected in path"
+
+        # Note: La vérification ".." n'est plus nécessaire ici car _is_path_allowed
+        # utilise Path.resolve() qui normalise automatiquement les chemins
 
         return True, None
 
