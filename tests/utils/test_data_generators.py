@@ -37,6 +37,9 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 
+# Import planner components for task graph generation
+from planner.task_graph import TaskGraph
+
 # ============================================================================
 # SECTION 1: Conversation Generators
 # ============================================================================

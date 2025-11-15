@@ -36,10 +36,11 @@ class MBPPHarness(BenchmarkHarness):
         return tasks
 
     def evaluate(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
+        test_code = '\n'.join(task.metadata['test_list'])
         full_code = (
             f"{task.metadata['test_setup_code']}\n"
             f"{response}\n"
-            f"{'\\n'.join(task.metadata['test_list'])}\n"
+            f"{test_code}\n"
         )
 
         # Create a new sandbox with modified dangerous_patterns to allow imports
