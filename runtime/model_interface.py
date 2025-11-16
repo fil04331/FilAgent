@@ -77,7 +77,7 @@ class LlamaCppInterface(ModelInterface):
 
     def __init__(self):
         self.model = None
-        self._loaded = False
+        self._loaded: bool = False
 
     def load(self, model_path: str, config: Dict) -> bool:
         """Charger un modèle GGUF"""
@@ -238,7 +238,7 @@ class PerplexityInterface(ModelInterface):
     def __init__(self):
         self.client = None
         self.model_name = None
-        self._loaded = False
+        self._loaded: bool = False
         self._rate_limiter = None
 
     def load(self, model_path: str, config: Dict) -> bool:
