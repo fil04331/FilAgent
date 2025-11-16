@@ -45,7 +45,7 @@ def main():
         print("\nGet your API key from: https://www.perplexity.ai/settings/api")
         sys.exit(1)
 
-    print(f"✓ Found API key: {api_key[:10]}...")
+    print("✓ Found API key: [REDACTED]")
 
     # Initialize Perplexity model
     print("\n" + "=" * 80)
@@ -68,7 +68,12 @@ def main():
             config={"api_key": api_key}  # Optional, uses env var by default
         )
     except Exception as e:
-        print(f"❌ Failed to initialize Perplexity: {e}")
+        # Sanitize error message to avoid leaking sensitive information
+        error_msg = str(e)
+        if "api" in error_msg.lower() or "key" in error_msg.lower():
+            print("❌ Failed to initialize Perplexity: Authentication error. Please check your API key.")
+        else:
+            print("❌ Failed to initialize Perplexity: Connection or configuration error.")
         sys.exit(1)
 
     # Example 1: Simple question

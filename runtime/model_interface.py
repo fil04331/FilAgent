@@ -239,6 +239,7 @@ class PerplexityInterface(ModelInterface):
         self.client = None
         self.model_name = None
         self._loaded = False
+        self._rate_limiter = None
 
     def load(self, model_path: str, config: Dict) -> bool:
         """
@@ -267,11 +268,19 @@ class PerplexityInterface(ModelInterface):
                 base_url="https://api.perplexity.ai"
             )
 
+            # Initialize rate limiter for API protection
+            from runtime.utils.rate_limiter import get_rate_limiter
+            self._rate_limiter = get_rate_limiter(
+                requests_per_minute=10,  # Conservative limit
+                requests_per_hour=500
+            )
+
             # Sauvegarder le nom du modèle
             self.model_name = model_path
 
             self._loaded = True
             print(f"✓ Perplexity client initialized with model: {self.model_name}")
+            print("✓ Rate limiting enabled (10 req/min, 500 req/hour)")
             return True
 
         except ImportError:
@@ -279,7 +288,12 @@ class PerplexityInterface(ModelInterface):
             print("Install with: pdm install --with ml")
             return False
         except Exception as e:
-            print(f"✗ Failed to initialize Perplexity client: {e}")
+            # Sanitize error message to avoid leaking sensitive information
+            error_str = str(e).lower()
+            if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret']):
+                print("✗ Failed to initialize Perplexity client: Authentication error")
+            else:
+                print("✗ Failed to initialize Perplexity client: Configuration error")
             return False
 
     def generate(
@@ -301,15 +315,22 @@ class PerplexityInterface(ModelInterface):
 
             messages.append({"role": "user", "content": prompt})
 
-            # Appel API Perplexity
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=config.temperature,
-                top_p=config.top_p,
-                max_tokens=config.max_tokens,
-                # Perplexity ne supporte pas tous les paramètres
-            )
+            # Appel API Perplexity with rate limiting
+            def api_call():
+                return self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=config.temperature,
+                    top_p=config.top_p,
+                    max_tokens=config.max_tokens,
+                    # Perplexity ne supporte pas tous les paramètres
+                )
+
+            # Use rate limiter if available, otherwise direct call
+            if self._rate_limiter:
+                response = self._rate_limiter.execute_with_backoff(api_call)
+            else:
+                response = api_call()
 
             # Extraire la réponse
             generated_text = response.choices[0].message.content
@@ -329,9 +350,30 @@ class PerplexityInterface(ModelInterface):
             )
 
         except Exception as e:
-            print(f"⚠ Perplexity generation failed: {e}")
+            # Sanitize error message to prevent leaking sensitive information
+            error_str = str(e).lower()
+
+            # Check for sensitive patterns and provide safe error messages
+            # Order matters: check more specific patterns first
+            if 'rate' in error_str and 'limit' in error_str:
+                safe_error = "Rate limit exceeded. Please wait before retrying."
+                print("⚠ Perplexity generation failed: Rate limit exceeded")
+            elif 'timeout' in error_str or 'connection' in error_str:
+                safe_error = "Connection error. Please check your network."
+                print("⚠ Perplexity generation failed: Connection error")
+            elif 'model' in error_str or 'not found' in error_str:
+                safe_error = "Model not available. Please check the model name."
+                print("⚠ Perplexity generation failed: Model error")
+            elif any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret', 'auth']):
+                safe_error = "Authentication or authorization error. Please verify your API credentials."
+                print("⚠ Perplexity generation failed: Authentication error")
+            else:
+                # Generic error without exposing details
+                safe_error = "API request failed. Please try again."
+                print("⚠ Perplexity generation failed: Request error")
+
             return GenerationResult(
-                text=f"[Error] Generation failed: {str(e)}. Check API key and model name.",
+                text=f"[Error] {safe_error}",
                 finish_reason="error",
                 tokens_generated=0,
                 prompt_tokens=0,
