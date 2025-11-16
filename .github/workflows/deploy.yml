@@ -83,7 +83,7 @@ jobs:
           tar -czf filagent-deployment.tar.gz -C dist filagent
 
       - name: Upload package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: deployment-package
           path: filagent-deployment.tar.gz
@@ -98,7 +98,7 @@ jobs:
 
     steps:
       - name: Download package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v6
         with:
           name: deployment-package
 

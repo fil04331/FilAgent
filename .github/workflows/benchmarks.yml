@@ -38,10 +38,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           cache: 'pip'
@@ -110,7 +110,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload benchmark reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-reports
           path: |
@@ -119,7 +119,7 @@ jobs:
 
       - name: Upload regression report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: regression-report
           path: regression_report.txt
@@ -127,7 +127,7 @@ jobs:
 
       - name: Comment on commit (if regression detected)
         if: failure() && github.event_name == 'push'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -150,10 +150,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download benchmark reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v6
         with:
           name: benchmark-reports
           path: eval/reports
@@ -163,7 +163,7 @@ jobs:
           python scripts/generate_benchmark_dashboard.py
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
