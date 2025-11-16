@@ -11,6 +11,7 @@ from pathlib import Path
 __all__ = [
     "ModelInterface",
     "LlamaCppInterface",
+    "PerplexityInterface",
     "ModelFactory",
     "GenerationConfig",
     "GenerationResult",
@@ -218,6 +219,137 @@ class LlamaCppInterface(ModelInterface):
         return self._loaded
 
 
+class PerplexityInterface(ModelInterface):
+    """
+    Interface pour Perplexity API (compatible OpenAI)
+
+    Modèles supportés:
+    - llama-3.1-sonar-small-128k-online
+    - llama-3.1-sonar-large-128k-online
+    - llama-3.1-sonar-huge-128k-online
+    - llama-3.1-8b-instruct
+    - llama-3.1-70b-instruct
+
+    Nécessite:
+    - Variable d'environnement PERPLEXITY_API_KEY
+    - Package openai installé
+    """
+
+    def __init__(self):
+        self.client = None
+        self.model_name = None
+        self._loaded = False
+
+    def load(self, model_path: str, config: Dict) -> bool:
+        """
+        Charger le client Perplexity
+
+        Args:
+            model_path: Nom du modèle Perplexity (ex: "llama-3.1-sonar-large-128k-online")
+            config: Configuration contenant api_key ou utilise PERPLEXITY_API_KEY env var
+
+        Returns:
+            True si succès, False sinon
+        """
+        try:
+            from openai import OpenAI
+            import os
+
+            # Récupérer la clé API
+            api_key = config.get("api_key") or os.getenv("PERPLEXITY_API_KEY")
+            if not api_key:
+                print("✗ PERPLEXITY_API_KEY not found in environment or config")
+                return False
+
+            # Initialiser le client OpenAI avec base URL Perplexity
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.perplexity.ai"
+            )
+
+            # Sauvegarder le nom du modèle
+            self.model_name = model_path
+
+            self._loaded = True
+            print(f"✓ Perplexity client initialized with model: {self.model_name}")
+            return True
+
+        except ImportError:
+            print("✗ openai package not installed")
+            print("Install with: pdm install --with ml")
+            return False
+        except Exception as e:
+            print(f"✗ Failed to initialize Perplexity client: {e}")
+            return False
+
+    def generate(
+        self,
+        prompt: str,
+        config: GenerationConfig,
+        system_prompt: Optional[str] = None
+    ) -> GenerationResult:
+        """Générer du texte avec Perplexity API"""
+        if not self.is_loaded():
+            raise RuntimeError("Perplexity client not loaded. Call load() first.")
+
+        try:
+            # Construire les messages
+            messages = []
+
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+
+            messages.append({"role": "user", "content": prompt})
+
+            # Appel API Perplexity
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=config.temperature,
+                top_p=config.top_p,
+                max_tokens=config.max_tokens,
+                # Perplexity ne supporte pas tous les paramètres
+            )
+
+            # Extraire la réponse
+            generated_text = response.choices[0].message.content
+            finish_reason = response.choices[0].finish_reason
+
+            # Tokens
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            total_tokens = response.usage.total_tokens
+
+            return GenerationResult(
+                text=generated_text.strip(),
+                finish_reason=finish_reason,
+                tokens_generated=completion_tokens,
+                prompt_tokens=prompt_tokens,
+                total_tokens=total_tokens,
+            )
+
+        except Exception as e:
+            print(f"⚠ Perplexity generation failed: {e}")
+            return GenerationResult(
+                text=f"[Error] Generation failed: {str(e)}. Check API key and model name.",
+                finish_reason="error",
+                tokens_generated=0,
+                prompt_tokens=0,
+                total_tokens=0,
+            )
+
+    def unload(self):
+        """Décharger le client (cleanup)"""
+        self.client = None
+        self.model_name = None
+        self._loaded = False
+        print("Perplexity client unloaded")
+
+    def is_loaded(self) -> bool:
+        """Vérifier si le client est initialisé"""
+        return self._loaded
+
+
 class ModelFactory:
     """Factory pour créer des instances de modèles"""
 
@@ -227,18 +359,20 @@ class ModelFactory:
         Créer une instance de modèle selon le backend
 
         Args:
-            backend: "llama.cpp" ou "vllm"
+            backend: "llama.cpp", "perplexity", ou "vllm"
 
         Returns:
             Instance de ModelInterface
         """
         if backend == "llama.cpp":
             return LlamaCppInterface()
+        elif backend == "perplexity":
+            return PerplexityInterface()
         elif backend == "vllm":
             # TODO: Implémenter VLLMInterface quand nécessaire
             raise NotImplementedError("vLLM backend not yet implemented")
         else:
-            raise ValueError(f"Unknown backend: {backend}")
+            raise ValueError(f"Unknown backend: {backend}. Supported: llama.cpp, perplexity, vllm")
 
 
 # Instance globale pour le modèle

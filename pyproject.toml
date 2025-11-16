@@ -78,6 +78,7 @@ ml = [
     "llama-cpp-python>=0.2.0,<0.3",
     "faiss-cpu>=1.8.0,<1.9",
     "sentence-transformers>=2.2.2,<3",
+    "openai>=1.0.0,<2",  # For Perplexity API (OpenAI-compatible)
 ]
 
 # GPU support
@@ -139,7 +140,6 @@ Changelog = "https://github.com/fil04331/FilAgent/blob/main/CHANGELOG.md"
 
 [project.scripts]
 filagent = "runtime.server:main"
-filagent-diagnostic = "diagnostic_filagent:main"
 filagent-mcp = "mcp_server:main"
 
 [tool.pdm]
@@ -164,7 +164,6 @@ check = { composite = ["format", "lint", "typecheck"] }
 # Server commands
 server = "python runtime/server.py"
 server-dev = "uvicorn runtime.server:app --reload"
-diagnostic = "python diagnostic_filagent.py"
 mcp = "python mcp_server.py"
 
 # Security scanning
