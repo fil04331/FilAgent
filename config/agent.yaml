@@ -35,6 +35,10 @@ compliance:
   ai_act:
     enabled: true
     transparency: true
+
+compliance_guardian:
+  enabled: true
+  rules_path: "config/compliance_rules.yaml"
     
 tools:
   enabled:

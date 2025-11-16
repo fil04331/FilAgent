@@ -39,6 +39,9 @@ __pypackages__/
 *.swo
 *~
 
+# Claude Code user agents
+.claude/agents/
+
 # Fichiers de configuration sensibles
 .env
 *.key
