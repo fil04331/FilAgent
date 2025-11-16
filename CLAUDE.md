@@ -10,16 +10,17 @@
 ## 📑 Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Repository Structure](#repository-structure)
-3. [Core Architecture](#core-architecture)
-4. [Development Workflows](#development-workflows)
-5. [Coding Conventions](#coding-conventions)
-6. [Testing Strategy](#testing-strategy)
-7. [Compliance & Governance](#compliance--governance)
-8. [HTN Planning System](#htn-planning-system)
-9. [Configuration Management](#configuration-management)
-10. [Common Tasks](#common-tasks)
-11. [Git Workflows](#git-workflows)
+2. [Licensing & Legal Status](#licensing--legal-status)
+3. [Repository Structure](#repository-structure)
+4. [Core Architecture](#core-architecture)
+5. [Development Workflows](#development-workflows)
+6. [Coding Conventions](#coding-conventions)
+7. [Testing Strategy](#testing-strategy)
+8. [Compliance & Governance](#compliance--governance)
+9. [HTN Planning System](#htn-planning-system)
+10. [Configuration Management](#configuration-management)
+11. [Common Tasks](#common-tasks)
+12. [Git Workflows](#git-workflows)
 
 ---
 
@@ -56,6 +57,85 @@ FilAgent is an LLM-based agent system with **fundamental emphasis on governance,
 - **Validation**: Pydantic, OpenAPI
 - **Monitoring**: Prometheus, Grafana
 - **Security**: cryptography (EdDSA signatures)
+
+---
+
+## ⚖️ Licensing & Legal Status
+
+### Current License Status
+
+**CRITICAL FINDING**: The repository currently has **NO LICENSE file** present.
+
+### Licensing Conflict Detected
+
+There is a **licensing inconsistency** between project metadata files:
+
+**In `pyproject.toml` (Line 10):**
+```toml
+license = { text = "MIT" }
+```
+
+**In `openapi.yaml` (Lines 43-44):**
+```yaml
+license:
+  name: Proprietary
+```
+
+### Implications
+
+1. **Legal Ambiguity**: The project declares itself as MIT licensed in the package metadata but "Proprietary" in the API specification
+2. **Distribution Risk**: PyPI and other distribution channels will see this as MIT licensed
+3. **User Confusion**: Developers consuming the API will see it as proprietary
+4. **Compliance Conflict**: This licensing ambiguity conflicts with the project's stated focus on governance and legal compliance
+
+### Dependency License Policy
+
+From `.github/workflows/dependencies.yml`:
+- **Denied licenses**: GPL-3.0, AGPL-3.0 (incompatible with MIT)
+- **Allowed licenses**: MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause, ISC, Python-2.0
+
+This confirms the project **intends to be MIT licensed**.
+
+### Required Actions
+
+**URGENT - To resolve this critical issue:**
+
+1. **Create LICENSE file**: Add a proper `LICENSE` file at repository root with full MIT license text
+2. **Update OpenAPI spec**: Change `openapi.yaml` license from "Proprietary" to "MIT"
+3. **Add copyright notice**: Include copyright holder and year in LICENSE file
+4. **Optional**: Add SPDX license identifiers to source files (`# SPDX-License-Identifier: MIT`)
+
+### Recommended LICENSE File Content
+
+```text
+MIT License
+
+Copyright (c) 2025 FilAgent Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### Contact Information for Legal Questions
+
+- **Governance**: governance@filagent.ai
+- **Security**: security@filagent.ai
+- **General Support**: Via GitHub issues
 
 ---
 
