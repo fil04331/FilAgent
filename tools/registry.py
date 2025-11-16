@@ -44,6 +44,15 @@ class ToolRegistry:
         """Lister tous les outils disponibles"""
         return self._tools.copy()
 
+    def get_all(self) -> list[BaseTool]:
+        """
+        Retourne une liste de tous les outils disponibles
+
+        Returns:
+            list[BaseTool]: Liste de tous les outils enregistrés
+        """
+        return list(self._tools.values())
+
     def get_schemas(self) -> Dict[str, dict]:
         """Obtenir tous les schémas JSON des outils"""
         return {name: tool.get_schema() for name, tool in self._tools.items()}
