@@ -66,6 +66,9 @@ dependencies = [
     "pyarrow>=17.0.0",  # Version 17+ has Python 3.14 support
     "datasets>=4.0.0,<5",  # Updated to version 4 for better compatibility
     "filelock>=3.13.0,<4",
+
+    # Document processing
+    "PyPDF2>=3.0.0,<4",  # PDF document analysis for DocumentAnalyzerPME tool
 ]
 
 [project.optional-dependencies]
