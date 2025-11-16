@@ -319,32 +319,31 @@ class WorkStealingExecutor:
         """
         # Mettre à jour le statut
         task.status = TaskStatus.RUNNING
-        task.started_at = datetime.now()
-        
+        task.metadata["started_at"] = datetime.now().isoformat()
+
         # Chercher l'action dans le registre
-        action_name = task.action_name
+        action_name = task.action
         if action_name not in self.action_registry:
             raise ValueError(f"Action '{action_name}' non trouvée dans le registre")
-        
+
         action_func = self.action_registry[action_name]
-        
+
         # Exécuter l'action
         try:
-            result = action_func(**task.parameters)
-            task.result = result
+            result = action_func(**task.params)
+            task.set_result(result)
             task.status = TaskStatus.COMPLETED
-            task.completed_at = datetime.now()
         except Exception as e:
             task.status = TaskStatus.FAILED
             task.error = str(e)
-            task.completed_at = datetime.now()
+            task.metadata["completed_at"] = datetime.now().isoformat()
             raise
     
     def _handle_task_error(self, task: Task, error: Exception, worker_id: int):
         """Gère une erreur d'exécution"""
         task.status = TaskStatus.FAILED
         task.error = str(error)
-        task.completed_at = datetime.now()
+        task.metadata["completed_at"] = datetime.now().isoformat()
         
         # Log l'erreur (conformité Loi 25)
         error_trace = traceback.format_exc()
