@@ -26,7 +26,7 @@ class GenerationConfig:
 
     temperature: float = 0.2
     top_p: float = 0.95
-    max_tokens: int = 800
+    max_tokens: int = 2048  # Increased from 800 to allow full responses
     seed: int = 42
     top_k: int = 40
     repetition_penalty: float = 1.1

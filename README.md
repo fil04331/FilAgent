@@ -22,10 +22,45 @@ Ce projet vise à développer un agent basé sur un Grand Modèle de Langage (LL
 
 Le projet est structuré autour d'une arborescence claire, séparant la configuration, les modèles, la mémoire, les logs, les outils et l'évaluation.
 
-* **Inférence Locale :** Le système est conçu pour utiliser des modèles locaux (ex: via llama.cpp ou vLLM) afin de garantir la confidentialité des données.  
-* **Mémoire Hybride :** Combine une mémoire épisodique (SQLite) pour le contexte de la conversation et une mémoire sémantique (FAISS/Parquet) pour la recherche de connaissances à long terme.  
-* **Observabilité :** Les logs sont structurés au format JSONL compatible OpenTelemetry pour une analyse et une surveillance facilitées.  
+* **Inférence Flexible :** Support de multiples backends LLM :
+  - **Local** : llama.cpp ou vLLM pour garantir la confidentialité des données
+  - **Cloud** : Perplexity API avec recherche web en temps réel
+* **Mémoire Hybride :** Combine une mémoire épisodique (SQLite) pour le contexte de la conversation et une mémoire sémantique (FAISS/Parquet) pour la recherche de connaissances à long terme.
+* **Observabilité :** Les logs sont structurés au format JSONL compatible OpenTelemetry pour une analyse et une surveillance facilitées.
 * **Provenance :** Chaque artefact généré est accompagné de métadonnées de provenance suivant le standard W3C PROV-JSON.
+
+### **Choix du Backend LLM**
+
+FilAgent supporte deux modes d'exécution selon vos besoins :
+
+#### **Option 1 : Perplexity API (Cloud)** - Configuration actuelle
+
+**Avantages :**
+- Démarrage rapide sans téléchargement de modèle
+- Recherche web en temps réel intégrée (modèles Sonar)
+- Performance élevée sur tâches complexes
+- Pas de matériel GPU requis
+
+**Prérequis :**
+- Clé API Perplexity (obtenir sur https://www.perplexity.ai/settings/api)
+- Connexion Internet stable
+
+**Statut :** Backend actuellement configuré et fonctionnel avec Perplexity API.
+
+#### **Option 2 : Modèle Local (llama.cpp)** - Privé
+
+**Avantages :**
+- Confidentialité maximale (100% local)
+- Pas de dépendance Internet
+- Conformité stricte pour données sensibles
+- Coûts d'opération réduits
+
+**Prérequis :**
+- Téléchargement modèle GGUF (~4-8 GB selon quantisation)
+- 8+ GB RAM (16GB recommandé)
+- GPU optionnel mais recommandé pour performance
+
+**Note :** Les deux backends garantissent la même conformité (Loi 25, GDPR, AI Act) grâce aux middlewares de gouvernance intégrés.
 
 ## **🚀 Démarrage Rapide (Getting Started)**
 
@@ -50,13 +85,25 @@ source venv/bin/activate  # Sur Windows: venv\Scripts\activate
 # 3. Installer les dépendances
 pip install -r requirements.txt
 
-# 4. Télécharger un modèle
-# Voir models/weights/README.md pour les instructions détaillées
+# 4. Choisir votre backend LLM
+
+# Option A: Perplexity API (RECOMMANDÉ pour démarrage rapide)
+# - Copier le fichier .env.example vers .env
+cp .env.example .env
+# - Éditer .env et ajouter votre clé API Perplexity
+#   LLM_BACKEND=perplexity
+#   PERPLEXITY_API_KEY=pplx-votre-cle-ici
+# - Aucun téléchargement de modèle requis
+# Voir docs/PERPLEXITY_INTEGRATION.md pour configuration détaillée
+
+# Option B: Modèle local llama.cpp (pour confidentialité maximale)
+# - Télécharger un modèle GGUF
 mkdir -p models/weights
-# Exemple avec Llama 3 :
 cd models/weights
 wget https://huggingface.co/TheBloke/Llama-3-8B-Instruct-GGUF/resolve/main/llama-3-8b-instruct.Q4_K_M.gguf -O base.gguf
 cd ../..
+# - Configurer .env avec LLM_BACKEND=llama.cpp
+# Voir models/weights/README.md pour plus de modèles disponibles
 
 # 5. Initialiser la base de données
 python -c "from memory.episodic import create_tables; create_tables()"
@@ -85,15 +132,22 @@ python runtime/server.py
 ### Test rapide
 
 ```bash
+# Test avec Perplexity (backend actuel)
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "messages": [{"role": "user", "content": "Bonjour !"}],
+    "messages": [{"role": "user", "content": "Bonjour ! Peux-tu me confirmer que tu fonctionnes ?"}],
     "conversation_id": "test-123"
   }'
+
+# Test avec modèle local (si configuré)
+# Même commande - le backend est transparent pour l'utilisateur
 ```
 
-Pour plus de détails, voir [README_SETUP.md](README_SETUP.md)
+**Guides additionnels :**
+- [QUICK_TEST.md](QUICK_TEST.md) - Guide complet de tests post-installation
+- [README_DEPLOYMENT.md](README_DEPLOYMENT.md) - Guide de déploiement en production
+- [docs/PERPLEXITY_INTEGRATION.md](docs/PERPLEXITY_INTEGRATION.md) - Configuration détaillée Perplexity
 
 ## **⚖️ Conformité et Gouvernance**
 

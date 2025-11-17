@@ -12,15 +12,18 @@ This index provides a comprehensive overview of all documentation available for 
 ### Getting Started
 
 - [README.md](/README.md) - Project overview, quick start, and installation
+- [QUICK_TEST.md](/QUICK_TEST.md) - **NEW** Quick testing guide post-installation (2025-11-16)
+- [README_DEPLOYMENT.md](/README_DEPLOYMENT.md) - **NEW** Production deployment guide (2025-11-16)
 - [CLAUDE.md](/CLAUDE.md) - Comprehensive guide for AI assistants
 - [GUIDE_COMPLET_FILAGENT.md](/GUIDE_COMPLET_FILAGENT.md) - Complete user guide (French)
 
 ### Configuration & Setup
 
+- [.env.example](/.env.example) - Environment variables template (Updated 2025-11-16)
+- [models/weights/README.md](/models/weights/README.md) - Model download guide (Updated 2025-11-16)
 - [CONFIGURATION_CAPACITES.md](/docs/CONFIGURATION_CAPACITES.md) - Detailed configuration options
 - [DEPENDENCY_MANAGEMENT.md](/docs/DEPENDENCY_MANAGEMENT.md) - PDM and dependency setup
 - [PDM_QUICK_REFERENCE.md](/docs/PDM_QUICK_REFERENCE.md) - Quick reference for PDM commands
-- [.env.example](/.env.example) - Environment variables template
 
 ---
 
@@ -80,6 +83,10 @@ This index provides a comprehensive overview of all documentation available for 
 - [CODEQL_WORKFLOWS.md](/docs/CODEQL_WORKFLOWS.md) - CodeQL workflow documentation
 - [CODEQL_VERIFICATION_SUMMARY.md](/docs/CODEQL_VERIFICATION_SUMMARY.md) - Verification summary
 - [CI_FIX_DOCUMENTATION.md](/docs/CI_FIX_DOCUMENTATION.md) - CI troubleshooting
+
+### Documentation Updates
+
+- [DOCUMENTATION_UPDATE_2025-11-16.md](/docs/DOCUMENTATION_UPDATE_2025-11-16.md) - **NEW** Documentation update report (2025-11-16)
 
 ### Testing
 
@@ -154,9 +161,11 @@ Located in [docs/SOPs/](/docs/SOPs/):
 ### For End Users
 
 1. [README.md](/README.md) - Getting started
-2. [GUIDE_COMPLET_FILAGENT.md](/GUIDE_COMPLET_FILAGENT.md) - Complete guide
-3. [PERPLEXITY_INTEGRATION.md](/docs/PERPLEXITY_INTEGRATION.md) - Perplexity setup
-4. [.env.example](/.env.example) - Configuration template
+2. [QUICK_TEST.md](/QUICK_TEST.md) - **NEW** Quick testing guide
+3. [README_DEPLOYMENT.md](/README_DEPLOYMENT.md) - **NEW** Deployment guide
+4. [GUIDE_COMPLET_FILAGENT.md](/GUIDE_COMPLET_FILAGENT.md) - Complete guide
+5. [PERPLEXITY_INTEGRATION.md](/docs/PERPLEXITY_INTEGRATION.md) - Perplexity setup
+6. [.env.example](/.env.example) - Configuration template
 
 ---
 

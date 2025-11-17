@@ -71,6 +71,8 @@ dependencies = [
     "PyPDF2>=3.0.0,<4",  # PDF document analysis for DocumentAnalyzerPME tool
     "python-docx>=1.1.0,<2",  # Word document analysis (imports as 'docx')
     "openpyxl>=3.0.0,<4",  # Excel document analysis for DocumentAnalyzerPME tool
+    "openai>=2.8.0",
+    "gradio>=5.49.1",
 ]
 
 [project.optional-dependencies]
