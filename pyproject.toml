@@ -40,6 +40,8 @@ dependencies = [
 
     # API Server
     "fastapi>=0.121.0,<0.122",  # Includes starlette 0.47.2+ (CVE-2024-47874, CVE-2025-54121)
+    "starlette>=0.40.0",  # Security: CVE-2024-47874 (DoS multipart/form-data)
+    "python-multipart>=0.0.18",  # Security: CVE-2024-53981, CVE-2024-24762 (DoS, ReDoS)
     "uvicorn>=0.38.0,<0.39",
 
     # Database & Memory
@@ -59,7 +61,7 @@ dependencies = [
     "schemathesis>=3.19.0,<4",
 
     # HTTP clients & integration
-    "requests>=2.31.0,<3",
+    "requests>=2.32.4,<3",  # Security: CVE-2024-47081 (.netrc credentials leak)
 
     # Data handling - Updated for Python 3.14 compatibility
     "pandas>=2.3.3,<3",
