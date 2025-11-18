@@ -15,6 +15,7 @@ Tests cover:
 import pytest
 import tempfile
 import time
+import importlib.util
 from pathlib import Path
 from unittest.mock import MagicMock, patch, Mock
 from typing import Dict, Any
@@ -27,6 +28,15 @@ from runtime.model_interface import (
     ModelFactory,
     init_model,
     get_model,
+)
+
+# Check if llama_cpp is available for conditional test skipping
+_LLAMA_CPP_AVAILABLE = importlib.util.find_spec("llama_cpp") is not None
+
+# Reusable skip decorator for tests requiring llama-cpp-python
+skip_if_no_llama_cpp = pytest.mark.skipif(
+    not _LLAMA_CPP_AVAILABLE,
+    reason="llama-cpp-python not installed (optional ml dependency). Install with: pdm install --with ml"
 )
 
 
@@ -217,6 +227,8 @@ class TestLlamaCppInterface:
         assert interface._loaded is False
         assert interface.is_loaded() is False
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_load_success_with_mock(self, temp_model_path, model_config, mock_llama_class):
         """Test successful model loading with mock"""
         interface = LlamaCppInterface()
@@ -240,6 +252,8 @@ class TestLlamaCppInterface:
         assert interface.is_loaded() is True
         assert interface.model is not None
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_load_with_fallback_path(self, tmp_path, model_config):
         """Test loading with fallback to default model path"""
         interface = LlamaCppInterface()
@@ -274,6 +288,8 @@ class TestLlamaCppInterface:
             assert interface.is_loaded() is True
             assert interface.model is not None
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_load_with_custom_config(self, temp_model_path, mock_llama_class):
         """Test loading with custom configuration parameters"""
         interface = LlamaCppInterface()
@@ -290,6 +306,8 @@ class TestLlamaCppInterface:
             call_args = mock_llama.call_args
             assert call_args is not None
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_unload(self, temp_model_path, model_config, mock_llama_class):
         """Test unloading a loaded model"""
         interface = LlamaCppInterface()
@@ -320,6 +338,8 @@ class TestLlamaCppInterface:
 class TestLlamaCppGeneration:
     """Tests for text generation with LlamaCppInterface"""
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_basic(self, temp_model_path, model_config, generation_config, mock_llama_class):
         """Test basic text generation"""
         interface = LlamaCppInterface()
@@ -337,6 +357,8 @@ class TestLlamaCppGeneration:
             assert result.prompt_tokens > 0
             assert result.total_tokens > 0
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_with_system_prompt(self, temp_model_path, model_config, generation_config, mock_llama_class):
         """Test generation with system prompt"""
         interface = LlamaCppInterface()
@@ -360,6 +382,8 @@ class TestLlamaCppGeneration:
         with pytest.raises(RuntimeError, match="Model not loaded"):
             interface.generate("Test prompt", generation_config)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_with_different_configs(self, temp_model_path, model_config, mock_llama_class):
         """Test generation with various configuration parameters"""
         interface = LlamaCppInterface()
@@ -378,6 +402,8 @@ class TestLlamaCppGeneration:
                 assert isinstance(result, GenerationResult)
                 assert len(result.text) > 0
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_token_counting(self, temp_model_path, model_config, generation_config):
         """Test that token counting is accurate"""
         interface = LlamaCppInterface()
@@ -404,6 +430,8 @@ class TestLlamaCppGeneration:
             assert result.total_tokens == 20
             assert result.prompt_tokens > 0
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_error_handling(self, temp_model_path, model_config, generation_config):
         """Test error handling during generation"""
         interface = LlamaCppInterface()
@@ -423,6 +451,8 @@ class TestLlamaCppGeneration:
             assert "[Error]" in result.text
             assert result.tokens_generated == 0
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_finish_reason_length(self, temp_model_path, model_config, generation_config):
         """Test generation that finishes due to length limit"""
         interface = LlamaCppInterface()
@@ -446,6 +476,8 @@ class TestLlamaCppGeneration:
 
             assert result.finish_reason == "length"
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generate_strips_whitespace(self, temp_model_path, model_config, generation_config):
         """Test that generated text is stripped of leading/trailing whitespace"""
         interface = LlamaCppInterface()
@@ -556,6 +588,8 @@ class TestGlobalSingleton:
         with pytest.raises(RuntimeError, match="Model not initialized"):
             get_model()
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_init_model_creates_singleton(self, temp_model_path, model_config):
         """Test that init_model creates the global singleton"""
         with patch('llama_cpp.Llama', return_value=MagicMock()):
@@ -564,6 +598,8 @@ class TestGlobalSingleton:
             assert model is not None
             assert isinstance(model, ModelInterface)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_get_model_after_init_returns_same_instance(self, temp_model_path, model_config):
         """Test that get_model returns the same instance after init"""
         with patch('llama_cpp.Llama', return_value=MagicMock()):
@@ -572,6 +608,8 @@ class TestGlobalSingleton:
 
             assert model1 is model2
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_init_model_multiple_times_replaces_instance(self, temp_model_path, model_config):
         """Test that calling init_model multiple times replaces the singleton"""
         with patch('llama_cpp.Llama', return_value=MagicMock()):
@@ -603,6 +641,8 @@ class TestGlobalSingleton:
 class TestAdvancedScenarios:
     """Tests for advanced usage scenarios"""
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_multiple_generations_same_model(self, temp_model_path, model_config, generation_config):
         """Test multiple generations using the same model instance"""
         interface = LlamaCppInterface()
@@ -621,6 +661,8 @@ class TestAdvancedScenarios:
             assert len(results) == 5
             assert all(isinstance(r, GenerationResult) for r in results)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_load_unload_reload_cycle(self, temp_model_path, model_config):
         """Test loading, unloading, and reloading a model"""
         interface = LlamaCppInterface()
@@ -640,6 +682,8 @@ class TestAdvancedScenarios:
             assert success2 is True
             assert interface.is_loaded() is True
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generation_with_varying_prompt_lengths(self, temp_model_path, model_config, generation_config):
         """Test generation with prompts of different lengths"""
         interface = LlamaCppInterface()
@@ -663,6 +707,8 @@ class TestAdvancedScenarios:
                 if len(prompt) > 100:
                     assert result.prompt_tokens > 10
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_concurrent_safety_same_instance(self, temp_model_path, model_config, generation_config):
         """Test that the same model instance can handle sequential calls"""
         interface = LlamaCppInterface()
@@ -682,6 +728,8 @@ class TestAdvancedScenarios:
             assert len(results) == 10
             assert all(r.text == "Response" for r in results)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_error_recovery_after_failed_generation(self, temp_model_path, model_config, generation_config):
         """Test that model can recover after a failed generation"""
         interface = LlamaCppInterface()
@@ -720,6 +768,8 @@ class TestAdvancedScenarios:
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions"""
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_empty_prompt(self, temp_model_path, model_config, generation_config):
         """Test generation with empty prompt"""
         interface = LlamaCppInterface()
@@ -735,6 +785,8 @@ class TestEdgeCases:
             assert isinstance(result, GenerationResult)
             assert len(result.text) > 0
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_very_long_system_prompt(self, temp_model_path, model_config, generation_config):
         """Test generation with very long system prompt"""
         interface = LlamaCppInterface()
@@ -754,6 +806,8 @@ class TestEdgeCases:
 
             assert isinstance(result, GenerationResult)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_zero_max_tokens(self, temp_model_path, model_config):
         """Test generation with zero max tokens"""
         interface = LlamaCppInterface()
@@ -769,6 +823,8 @@ class TestEdgeCases:
             result = interface.generate("Test", config)
             assert isinstance(result, GenerationResult)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_extreme_temperature_values(self, temp_model_path, model_config):
         """Test generation with extreme temperature values"""
         interface = LlamaCppInterface()
@@ -788,6 +844,8 @@ class TestEdgeCases:
                 result = interface.generate("Test", config)
                 assert isinstance(result, GenerationResult)
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_special_characters_in_prompt(self, temp_model_path, model_config, generation_config):
         """Test generation with special characters in prompt"""
         interface = LlamaCppInterface()
@@ -812,6 +870,8 @@ class TestEdgeCases:
 class TestComplianceIntegration:
     """Tests for compliance and audit trail integration"""
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_generation_is_deterministic_with_seed(self, temp_model_path, model_config):
         """Test that using same seed produces deterministic results"""
         interface = LlamaCppInterface()
@@ -832,6 +892,8 @@ class TestComplianceIntegration:
             # With same seed and prompt, should get same result (mocked)
             assert result1.text == result2.text
 
+    @pytest.mark.requires_llama_cpp
+    @skip_if_no_llama_cpp
     def test_model_path_is_traceable(self, temp_model_path, model_config, mock_llama_class):
         """Test that model path is stored for audit purposes"""
         interface = LlamaCppInterface()

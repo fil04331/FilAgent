@@ -3,6 +3,10 @@ Serveur API pour l'agent LLM
 Compatible avec le format OpenAI pour faciliter l'intégration
 """
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file at startup
+
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator

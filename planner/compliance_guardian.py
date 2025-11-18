@@ -15,7 +15,38 @@ import hashlib
 from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 from pathlib import Path
+from dataclasses import dataclass
 import yaml
+
+
+__all__ = [
+    "ValidationResult",
+    "ComplianceError",
+    "ComplianceGuardian",
+]
+
+
+@dataclass
+class ValidationResult:
+    """
+    Résultat de validation de conformité pour une tâche ou action
+
+    Utilisé pour auditer les décisions de conformité selon Loi 25/PIPEDA.
+    Tous les champs sont loggables pour traçabilité réglementaire.
+
+    Attributes:
+        is_compliant: True si la tâche/action est conforme aux règles
+        violations: Liste des violations détectées (vide si is_compliant=True)
+        risk_level: Niveau de risque ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+        warnings: Avertissements non-bloquants (optionnel)
+        metadata: Métadonnées additionnelles pour audit (optionnel)
+    """
+
+    is_compliant: bool
+    violations: List[str]
+    risk_level: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    warnings: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class ComplianceError(Exception):
@@ -419,3 +450,91 @@ class ComplianceGuardian:
     def clear_audit_log(self):
         """Effacer le log d'audit (pour tests)"""
         self.audit_log = []
+
+    def validate_task(self, task: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+        """
+        Valider une tâche individuelle avant exécution (pour HTN)
+
+        Args:
+            task: Tâche à valider (doit contenir au minimum 'action' ou 'tool')
+            context: Contexte additionnel (user_id, session_id, etc.)
+
+        Returns:
+            ValidationResult avec résultat de validation
+
+        Raises:
+            ComplianceError: Si la tâche viole gravement les règles de conformité
+        """
+        context = context or {}
+        violations = []
+        warnings = []
+        risk_level = "LOW"
+
+        # Extraire l'action/outil de la tâche
+        action = task.get('action') or task.get('tool') or task.get('name', '')
+        task_params = task.get('parameters', {}) or task.get('arguments', {})
+
+        # Vérifier les outils interdits
+        forbidden_tools = set(self.rules['execution']['forbidden_tools'])
+        if action in forbidden_tools:
+            violations.append(f"Task uses forbidden tool: {action}")
+            risk_level = "CRITICAL"
+
+        # Vérifier les outils nécessitant approbation
+        require_approval = set(self.rules['execution']['require_approval_for'])
+        if action in require_approval:
+            warnings.append(f"Task uses tool requiring approval: {action}")
+            risk_level = "HIGH"
+
+        # Vérifier les patterns dangereux dans les paramètres
+        params_str = str(task_params)
+        forbidden_patterns = self.rules['validation']['forbidden_patterns']
+        for pattern in forbidden_patterns:
+            if re.search(pattern, params_str):
+                violations.append(f"Task parameters contain forbidden pattern: {pattern}")
+                risk_level = "HIGH"
+
+        # Vérifier les patterns PII
+        pii_patterns = self.rules['validation']['pii_patterns']
+        pii_found = []
+        for pattern in pii_patterns:
+            matches = re.findall(pattern, params_str)
+            if matches:
+                pii_found.extend(matches)
+
+        if pii_found:
+            warnings.append(f"Task parameters contain potential PII: {len(pii_found)} instance(s)")
+
+        # Déterminer si la tâche est conforme
+        is_compliant = len(violations) == 0
+
+        # Créer le résultat
+        result = ValidationResult(
+            is_compliant=is_compliant,
+            violations=violations,
+            risk_level=risk_level,
+            warnings=warnings if warnings else None,
+            metadata={
+                'task_action': action,
+                'timestamp': datetime.utcnow().isoformat(),
+                'pii_detected': len(pii_found) > 0,
+                'context': context,
+            }
+        )
+
+        # Logger l'audit
+        self._log_audit('task_validation', {
+            'action': action,
+            'is_compliant': is_compliant,
+            'violations_count': len(violations),
+            'warnings_count': len(warnings),
+            'risk_level': risk_level,
+        })
+
+        # Lever une exception si violation critique
+        if not is_compliant and risk_level == "CRITICAL":
+            raise ComplianceError(
+                f"Task validation failed: {'; '.join(violations)}"
+            )
+
+        return result

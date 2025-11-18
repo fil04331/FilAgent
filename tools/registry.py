@@ -8,6 +8,7 @@ from .base import BaseTool
 from .python_sandbox import PythonSandboxTool
 from .file_reader import FileReaderTool
 from .calculator import CalculatorTool
+from .document_analyzer_pme import DocumentAnalyzerPME
 
 
 class ToolRegistry:
@@ -23,6 +24,7 @@ class ToolRegistry:
             PythonSandboxTool(),
             FileReaderTool(),
             CalculatorTool(),
+            DocumentAnalyzerPME(),  # Analyseur de documents pour PME québécoises
         ]
 
         for tool in default_tools:
@@ -43,6 +45,15 @@ class ToolRegistry:
     def list_all(self) -> Dict[str, BaseTool]:
         """Lister tous les outils disponibles"""
         return self._tools.copy()
+
+    def get_all(self) -> list[BaseTool]:
+        """
+        Retourne une liste de tous les outils disponibles
+
+        Returns:
+            list[BaseTool]: Liste de tous les outils enregistrés
+        """
+        return list(self._tools.values())
 
     def get_schemas(self) -> Dict[str, dict]:
         """Obtenir tous les schémas JSON des outils"""

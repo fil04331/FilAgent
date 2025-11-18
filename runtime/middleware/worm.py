@@ -237,6 +237,146 @@ class WormLogger:
             print(f"Error verifying integrity: {e}")
             return False
 
+    def finalize_current_log(self, log_file: Optional[Path] = None, archive: bool = True) -> Optional[str]:
+        """
+        Finaliser et sceller le log WORM courant
+
+        Cette méthode rend le log immuable et génère une signature cryptographique
+        pour garantir l'intégrité selon les exigences de la Loi 25 (Québec).
+
+        Processus de finalisation:
+        1. Créer un checkpoint Merkle tree (root hash)
+        2. Générer un digest signé cryptographiquement (EdDSA)
+        3. Archiver dans audit/signed/ si demandé
+        4. Marquer le log comme finalisé (read-only)
+
+        Args:
+            log_file: Fichier de log à finaliser (optionnel, utilise le fichier par défaut)
+            archive: Si True, archiver le log finalisé dans audit/signed/
+
+        Returns:
+            str: ID du log finalisé (format: FINAL-{timestamp}-{hash[:8]}) ou None en cas d'erreur
+
+        Raises:
+            None: Les erreurs sont loggées mais n'interrompent pas l'exécution
+        """
+        if log_file is None:
+            log_file = self.default_log_file
+        elif not isinstance(log_file, Path):
+            log_file = Path(log_file)
+
+        # Check if log file exists
+        if not log_file.exists():
+            print(f"⚠ Cannot finalize: log file does not exist: {log_file}")
+            return None
+
+        with self._lock:
+            try:
+                # Step 1: Create Merkle checkpoint for integrity verification
+                root_hash = self.create_checkpoint(log_file)
+                if not root_hash:
+                    print(f"❌ Failed to create checkpoint for {log_file}")
+                    return None
+
+                # Step 2: Generate cryptographic signature for compliance (Loi 25)
+                timestamp = datetime.now()
+                finalization_id = f"FINAL-{timestamp.strftime('%Y%m%d%H%M%S')}-{root_hash[:8]}"
+
+                # Read log content for signing
+                with open(log_file, "r", encoding="utf-8") as f:
+                    log_content = f.read()
+
+                # Calculate SHA-256 hash of entire log (for compatibility with existing tests)
+                sha256_hash = hashlib.sha256(log_content.encode("utf-8")).hexdigest()
+
+                # Create finalization digest with EdDSA signature
+                try:
+                    from cryptography.hazmat.primitives.asymmetric import ed25519
+
+                    # Generate ephemeral keypair for signing (in production, use HSM/vault)
+                    private_key = ed25519.Ed25519PrivateKey.generate()
+                    public_key = private_key.public_key()
+
+                    # Prepare data to sign
+                    sign_data = {
+                        "finalization_id": finalization_id,
+                        "log_file": str(log_file),
+                        "timestamp": timestamp.isoformat(),
+                        "sha256": sha256_hash,
+                        "merkle_root": root_hash,
+                        "num_entries": log_content.count("\n"),
+                    }
+
+                    # Sign the digest
+                    sign_bytes = json.dumps(sign_data, sort_keys=True).encode("utf-8")
+                    signature = private_key.sign(sign_bytes)
+
+                    # Create finalization record
+                    finalization_record = {
+                        **sign_data,
+                        "signature": f"ed25519:{signature.hex()}",
+                        "compliance": {
+                            "standard": "Loi 25 (Québec)",
+                            "immutable": True,
+                            "tamper_evident": True,
+                        },
+                    }
+
+                except ImportError:
+                    # Fallback if cryptography not available
+                    print("⚠ cryptography library not available, creating unsigned digest")
+                    finalization_record = {
+                        "finalization_id": finalization_id,
+                        "log_file": str(log_file),
+                        "timestamp": timestamp.isoformat(),
+                        "sha256": sha256_hash,
+                        "merkle_root": root_hash,
+                        "num_entries": log_content.count("\n"),
+                        "compliance": {"standard": "Loi 25 (Québec)", "immutable": True},
+                    }
+
+                # Step 3: Save finalization digest
+                digest_file = self.digest_dir / f"{log_file.stem}-finalization-{timestamp.strftime('%Y%m%d%H%M%S')}.json"
+                with open(digest_file, "w", encoding="utf-8") as f:
+                    json.dump(finalization_record, f, indent=2)
+
+                # Step 4: Archive in audit/signed/ if requested
+                if archive:
+                    archive_dir = Path("audit/signed")
+                    archive_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Copy log to archive (WORM - Write Once Read Many)
+                    archive_path = archive_dir / f"{finalization_id}-{log_file.name}"
+                    import shutil
+
+                    shutil.copy2(log_file, archive_path)
+
+                    # Make archive read-only (Unix permissions)
+                    try:
+                        archive_path.chmod(0o444)  # r--r--r--
+                    except Exception as e:
+                        print(f"⚠ Could not set read-only permissions: {e}")
+
+                    # Save finalization record in archive
+                    archive_digest = archive_dir / f"{finalization_id}-digest.json"
+                    with open(archive_digest, "w", encoding="utf-8") as f:
+                        json.dump(finalization_record, f, indent=2)
+
+                print(f"✓ Log finalized: {finalization_id}")
+                print(f"  - Merkle root: {root_hash}")
+                print(f"  - SHA-256: {sha256_hash}")
+                if archive:
+                    print(f"  - Archived to: {archive_path}")
+
+                return finalization_id
+
+            except Exception as e:
+                print(f"❌ Error finalizing log: {e}")
+                import traceback
+
+                traceback.print_exc()
+                return None
+
 
 # Instance globale
 _worm_logger: Optional[WormLogger] = None

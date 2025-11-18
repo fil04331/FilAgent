@@ -1,0 +1,114 @@
+# FilAgent Configuration - Perplexity API Backend
+#
+# This configuration uses Perplexity's API for LLM inference
+# Requires: pdm install --with ml
+# Requires: PERPLEXITY_API_KEY environment variable
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # Backend: perplexity (cloud API)
+  backend: "perplexity"
+
+  # Model name - choose based on your needs:
+  # - llama-3.1-sonar-small-128k-online  (Fast, cost-effective, with search)
+  # - llama-3.1-sonar-large-128k-online  (Balanced performance, with search)
+  # - llama-3.1-sonar-huge-128k-online   (Best quality, with search)
+  # - llama-3.1-8b-instruct              (Fast, no search)
+  # - llama-3.1-70b-instruct             (High quality, no search)
+  model_path: "llama-3.1-sonar-large-128k-online"
+
+  # API configuration (optional, uses PERPLEXITY_API_KEY env var by default)
+  # api_key: "pplx-your-api-key-here"
+
+# =============================================================================
+# Generation Configuration
+# =============================================================================
+generation:
+  temperature: 0.2        # Lower = more deterministic (0.0-1.0)
+  top_p: 0.95             # Nucleus sampling (0.0-1.0)
+  max_tokens: 1024        # Maximum tokens to generate
+  seed: 42                # For reproducibility
+
+# =============================================================================
+# Feature Flags
+# =============================================================================
+features:
+  htn_enabled: true       # Enable Hierarchical Task Network planning
+  debug_mode: false       # Debug logging
+  parallel_execution: true
+  strict_validation: true
+  decision_records: true  # Compliance: Decision Record generation
+
+# =============================================================================
+# HTN Planning System
+# =============================================================================
+planner:
+  default_strategy: "hybrid"      # llm_based, rule_based, hybrid
+  max_decomposition_depth: 3      # Max depth for task decomposition
+  max_retry_attempts: 2
+  planning_timeout_sec: 30
+  enable_tracing: true            # Provenance tracking
+  enable_caching: true            # Cache plans for similar queries
+
+# Executor configuration
+executor:
+  default_strategy: "adaptive"    # sequential, parallel, adaptive
+  max_parallel_workers: 4
+  task_timeout_sec: 60
+  enable_work_stealing: true      # Load balancing
+
+# Verifier configuration
+verifier:
+  default_level: "strict"         # basic, strict, paranoid
+  enable_self_checks: true
+
+# =============================================================================
+# Compliance & Governance
+# =============================================================================
+compliance:
+  enable_audit_trail: true        # WORM logging
+  enable_decision_records: true   # Decision Records (DR)
+  enable_provenance: true         # W3C PROV-JSON tracking
+  enable_pii_redaction: true      # PII masking
+
+# Policy engine
+policies:
+  rbac_enabled: true
+  guardrails_enabled: true
+  output_validation_enabled: true
+
+# =============================================================================
+# Memory Configuration
+# =============================================================================
+memory:
+  episodic:
+    enabled: true
+    database_path: "data/filagent.db"
+    max_history: 1000
+
+  semantic:
+    enabled: false        # Requires faiss-cpu (pdm install --with ml)
+    index_path: "data/semantic_index"
+    embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+monitoring:
+  prometheus_enabled: true
+  prometheus_port: 9090
+  metrics_interval_sec: 60
+
+# =============================================================================
+# Logging
+# =============================================================================
+logging:
+  level: "INFO"           # DEBUG, INFO, WARNING, ERROR
+  format: "json"          # json, text
+  output_dir: "logs/events"
+
+  # OpenTelemetry
+  otel_enabled: false
+  otel_endpoint: "http://localhost:4318"

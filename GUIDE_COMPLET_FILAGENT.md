@@ -170,19 +170,22 @@ Exemple: "Calcule les taxes sur 1000$ avec TPS et TVQ"
 ### 1. Diagnostic Complet
 
 ```bash
-python diagnostic_filagent.py
+# Vérifier l'environnement et les dépendances
+pdm --version
+python --version
+
+# Vérifier les dépendances installées
+pdm list
+
+# Lancer les tests de santé
+pdm run pytest tests/ -v --tb=short -k "test_config or test_agent_init"
 ```
 
 Vérifie:
 - ✅ Environnement Python
-- ✅ Dépendances
-- ✅ Configuration
-- ✅ Structure répertoires
-- ✅ Base de données
-- ✅ Modèle LLM
-- ✅ Serveur API
-- ✅ Conformité
-- ✅ Intégration MCP
+- ✅ Dépendances installées via PDM
+- ✅ Configuration de l'agent
+- ✅ Initialisation des composants core
 
 ### 2. Test des Capacités
 
@@ -420,8 +423,8 @@ grafana/dashboard_htn.json
 # Interface seulement
 ./start_ui.sh
 
-# Diagnostic
-python diagnostic_filagent.py
+# Diagnostic système
+pdm run pytest tests/ -v -k "test_config or test_agent_init"
 
 # Tests capacités
 python test_capabilities.py
@@ -437,7 +440,7 @@ python test_capabilities.py
 ## 📞 Support
 
 - **Documentation complète**: DOCUMENTATION_FILAGENT.md
-- **Diagnostic**: `python diagnostic_filagent.py`
+- **Diagnostic**: `pdm run pytest tests/ -v -k "test_config"`
 - **Tests**: `python test_capabilities.py`
 - **GitHub**: https://github.com/fil/FilAgent
 

@@ -7,12 +7,23 @@ agent:
   mode: "production"
   
 model:
-  path: "models/weights/base.gguf"
-  type: "llama-cpp"
+  path: "sonar"
+  backend: "perplexity"
+
+generation:
   temperature: 0.7
   max_tokens: 2048
+  top_p: 0.95
   seed: 42  # Reproductibilité
-  
+  top_k: 40
+  repetition_penalty: 1.1
+
+# HTN Planning - ACTIVÉ POUR DEBUG
+# Investigating bug: HTN truncates Perplexity responses to exactly 283 chars
+# Adding debug logs to identify truncation point
+htn_planning:
+  enabled: true  # TEMPORAIREMENT ACTIVÉ POUR DEBUGGING
+
 memory:
   episodic:
     type: "sqlite"

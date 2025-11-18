@@ -442,6 +442,8 @@ class TestWorkStealingExecutor:
         lock = threading.Lock()
 
         def counting_action():
+            # Add small delay to create window for work stealing
+            time.sleep(0.05)
             with lock:
                 execution_count["count"] += 1
             return "done"

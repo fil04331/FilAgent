@@ -1128,16 +1128,27 @@ def performance_tracker():
 # FIXTURES: Markers & Configuration
 # ============================================================================
 
+# Check if llama_cpp is available for conditional test skipping
+import importlib.util
+_LLAMA_CPP_AVAILABLE = importlib.util.find_spec("llama_cpp") is not None
+
+# Reusable skip marker for tests requiring llama-cpp-python
+skip_if_no_llama_cpp = pytest.mark.skipif(
+    not _LLAMA_CPP_AVAILABLE,
+    reason="llama-cpp-python not installed (optional ml dependency). Install with: pdm install --with ml"
+)
+
 def pytest_configure(config):
     """
     Configuration pytest personnalisée
-    
+
     Registers custom markers for test categorization:
     - e2e: End-to-end tests
     - compliance: Compliance and validation tests
     - resilience: Resilience and fallback tests
     - slow: Slow tests (> 1 second)
     - fixtures: Tests for fixture functionality
+    - requires_llama_cpp: Tests requiring llama-cpp-python package
     """
     config.addinivalue_line(
         "markers", "e2e: Tests end-to-end complets"
@@ -1153,6 +1164,9 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "fixtures: Tests validating fixture functionality"
+    )
+    config.addinivalue_line(
+        "markers", "requires_llama_cpp: Tests requiring llama-cpp-python package (optional ml dependency)"
     )
 
 
