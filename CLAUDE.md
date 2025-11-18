@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Version**: 2.2.0
-**Last Updated**: 2025-11-17
+**Version**: 2.3.0
+**Last Updated**: 2025-11-18
 **Project**: FilAgent - LLM Agent with Governance & Traceability
 
 ---
@@ -291,7 +291,21 @@ class MyTool(BaseTool):
 - `calculator`: Mathematical expressions
 - `file_reader`: Read files with encoding support
 - `python_sandbox`: Execute Python code in isolated environment
-- `document_analyzer_pme`: Analyze PDF, DOCX, XLSX documents (Quebec SME focus)
+- `document_analyzer_pme`: **Comprehensive document analysis for Quebec SMEs**
+  - **Supported formats**: PDF, DOCX, XLSX (50 MB max)
+  - **Analysis types**: Invoice, extract, financial, contract, report
+  - **Features**:
+    - Real-time document preview (PDF, Excel, Word)
+    - Multi-format export (JSON with EdDSA signature, CSV UTF-8, Excel)
+    - "Download All" ZIP package generator
+    - Comprehensive error handling (10+ validation checks)
+    - PII redaction in all outputs (Loi 25/PIPEDA compliant)
+    - Decision Records for all analyses
+    - Quebec tax calculations (TPS 5%, TVQ 9.975%)
+  - **Validation**: Extension, size, corruption, permissions, disk space
+  - **Security**: Timeout protection (30s), cleanup guarantees, no info leaks
+  - **Testing**: 21 unit tests + 18 compliance tests (100% regulatory compliance)
+  - **Interface**: Available in Gradio app (port 7860) and Agent tool registry
 
 ### Memory System
 
@@ -894,7 +908,78 @@ The project includes Quebec SME-specific benchmarks:
 
 **Remember**: This is a compliance-first, governance-focused project. Always prioritize traceability, security, and reproducibility.
 
-**Version**: 2.2.0
-**Last Updated**: 2025-11-17
+---
+
+## Gradio Interfaces
+
+FilAgent provides three web-based interfaces for different use cases:
+
+### 1. Production Interface (Port 7860)
+
+**File**: `gradio_app_production.py`
+
+**Launch**: `pdm run python gradio_app_production.py`
+
+**Features**:
+- Multi-turn conversations with context retention
+- Document Analyzer tool with real-time preview
+- Model configuration (dynamic switching between Perplexity models)
+- Export results in multiple formats (JSON, CSV, Excel)
+- Download All as ZIP package
+
+**Document Analyzer Tab**:
+- Upload files (PDF, DOCX, XLSX - max 50 MB)
+- Select analysis type (invoice, extract, financial, contract, report)
+- Real-time preview rendering
+- Export analysis results (JSON with EdDSA signature, CSV UTF-8, Excel)
+- Download entire analysis package as ZIP
+- Comprehensive validation (extension, size, corruption, permissions, disk space)
+- Error messages with clear solutions (10+ standardized messages)
+- PII redaction in all outputs (Loi 25/PIPEDA compliant)
+- Decision Records for audit trail
+- Timeout protection (30s max processing time)
+- Automatic cleanup of temporary files
+
+### 2. Model Selector Interface (Port 7861)
+
+**File**: `gradio_app_model_selector.py`
+
+**Launch**: `pdm run python gradio_app_model_selector.py`
+
+**Features**:
+- Interactive model comparison (5 Perplexity models)
+- Difficulty-based recommendations (Low, Medium, High)
+- Cost and latency estimation
+- Example queries with results
+- Model selection guide
+
+See `docs/GUIDE_SELECTION_MODELES_PERPLEXITY.md` for detailed documentation.
+
+### 3. FastAPI Server (Port 8000)
+
+**File**: `runtime/server.py`
+
+**Launch**: `pdm run server` or `python runtime/server.py`
+
+**Features**:
+- OpenAI-compatible API endpoints
+- RESTful architecture
+- API documentation at `/docs`
+- WebSocket support for streaming
+- Health checks and monitoring
+
+**API Endpoints**:
+- `POST /chat` - Send chat messages
+- `GET /health` - Server health status
+- `GET /docs` - Interactive API documentation (Swagger UI)
+
+---
+
+**Version**: 2.3.0
+**Last Updated**: 2025-11-18
 **Maintainer**: FilAgent Team
-- update this file everytime a major change is made. otherwise it will always be outdated
+
+**Notes**:
+- Update this file every time a major change is made to avoid outdated information
+- Development platform: macOS
+- All Document Analyzer features implemented as of v2.3.0 (Phases 1-6 complete)

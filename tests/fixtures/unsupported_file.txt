@@ -1,0 +1,1 @@
+Ceci est un fichier texte, format non supporté par l'analyseur
