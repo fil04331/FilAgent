@@ -1,7 +1,7 @@
 # Core
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-gradio==4.7.1
+gradio==5.31.0
 pydantic==2.4.2
 python-dotenv==1.0.0
 
