@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Security
+- **Removed unused python-jose dependency** (CVE-2024-23342 mitigation)
+  - Resolves Dependabot Alert #85: Minerva timing attack on python-ecdsa
+  - Impact: MINIMAL - FilAgent uses Ed25519, not affected P-256 curve
+  - Removed packages: python-jose, python-ecdsa, rsa, pyasn1
+  - All EdDSA signatures remain functional (39 tests passed)
+  - All WORM integrity checks operational (9 tests passed)
+  - pip-audit: 0 vulnerabilities found
+
 ## [2.3.0] - 2025-11-18
 
 ### Added - Document Analyzer Implementation
