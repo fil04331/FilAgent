@@ -72,7 +72,9 @@ dependencies = [
     "python-docx>=1.1.0,<2",  # Word document analysis (imports as 'docx')
     "openpyxl>=3.0.0,<4",  # Excel document analysis for DocumentAnalyzerPME tool
     "openai>=2.8.0",
-    "gradio>=5.49.1",
+    "gradio>=5.11.0",
+    "llama-cpp-python<0.3,>=0.2.0",
+    "python-jose>=3.4.0",
 ]
 
 [project.optional-dependencies]
@@ -81,7 +83,7 @@ ml = [
     "llama-cpp-python>=0.2.0,<0.3",
     "faiss-cpu>=1.8.0,<1.9",
     "sentence-transformers>=2.2.2,<3",
-    "openai>=1.0.0,<2",  # For Perplexity API (OpenAI-compatible)
+    "openai>=2.8.0",  # For Perplexity API (OpenAI-compatible) - aligned with main deps
 ]
 
 # GPU support
@@ -91,36 +93,30 @@ gpu = [
 
 # Advanced LLM features
 advanced = [
-    "transformers>=4.35.0,<5",
+    "transformers>=4.53.0,<5",  # Security fix: CVE-2023-6730, multiple ReDoS vulnerabilities
     "vllm>=0.2.0,<0.3",
 ]
 
 # Development dependencies
 dev = [
-    # Testing
     "pytest>=7.4.0,<9",
     "pytest-asyncio>=0.21.0,<0.25",
-    "pytest-cov>=4.1.0,<6",
+    "pytest-cov>=7.0.0",
     "pytest-mock>=3.12.0,<4",
     "pytest-timeout>=2.2.0,<3",
     "pytest-subtests>=0.12.0,<0.15",
-    "psutil>=5.9.0,<7",  # For performance/load testing
-
-    # Development tooling
-    "black>=23.11.0,<25",
-    "flake8>=6.1.0,<8",
-    "mypy>=1.7.0,<1.12",
+    "psutil>=5.9.0,<7",
+    "black>=25.11.0",
+    "flake8>=7.3.0",
+    "mypy>=1.18.2",
     "isort>=5.12.0,<6",
     "pre-commit>=3.5.0,<4",
-
-    # Documentation
     "mkdocs>=1.5.0,<2",
     "mkdocs-material>=9.4.0,<10",
-
-    # Security scanning
-    "pip-audit>=2.6.0,<3",
-    "bandit>=1.7.5,<2",
+    "pip-audit>=2.9.0",
+    "bandit>=1.9.1",
     "safety>=3.0.0,<4",
+    "pylint>=4.0.3",
 ]
 
 # Benchmarking dependencies
