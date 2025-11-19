@@ -256,6 +256,7 @@ asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = ["runtime", "planner", "tools", "memory", "policy"]
+branch = true
 omit = [
     "*/tests/*",
     "*/test_*.py",
