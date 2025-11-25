@@ -148,7 +148,7 @@ distribution = false  # Don't build distributions by default
 [tool.pdm.scripts]
 # Development scripts
 test = "pytest"
-test-cov = "pytest --cov=. --cov-branch --cov-report=html --cov-report=term"
+test-cov = "pytest --cov=runtime --cov=planner --cov=tools --cov=memory --cov=policy --cov-branch --cov-report=html --cov-report=term --cov-report=term-missing"
 test-unit = "pytest -m unit"
 test-integration = "pytest -m integration"
 test-compliance = "pytest -m compliance"
@@ -256,6 +256,8 @@ asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = ["runtime", "planner", "tools", "memory", "policy"]
+branch = true
+parallel = true
 omit = [
     "*/tests/*",
     "*/test_*.py",
@@ -263,12 +265,17 @@ omit = [
     "*/venv/*",
     "*/.venv/*",
     "*/__pypackages__/*",
+    "*/gradio_app*.py",
+    "*/mcp_server.py",
+    "*/examples/*",
+    "*/scripts/*",
 ]
 
 [tool.coverage.report]
 precision = 2
 show_missing = true
 skip_covered = false
+fail_under = 80.0
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -279,6 +286,8 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+    "pass",
+    "\\.\\.\\.",
 ]
 
 [tool.coverage.html]
