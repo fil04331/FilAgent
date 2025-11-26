@@ -31,8 +31,17 @@ from typing import Dict, Any, Optional, List, Generator
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
+import warnings
 
 import pytest
+
+# Silence noisy third-party deprecation warnings to keep unit output readable
+warnings.filterwarnings("ignore", "PyPDF2 is deprecated.*", DeprecationWarning)
+warnings.filterwarnings(
+    "ignore",
+    "jsonschema\\.exceptions\\.RefResolutionError is deprecated.*",
+    DeprecationWarning,
+)
 
 # Optional imports for API testing
 try:

@@ -16,7 +16,7 @@ Complexité:
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -79,9 +79,9 @@ class Task:
     def __post_init__(self):
         """Initialise les métadonnées avec timestamps"""
         if "created_at" not in self.metadata:
-            self.metadata["created_at"] = datetime.utcnow().isoformat()
+            self.metadata["created_at"] = datetime.now(timezone.utc).isoformat()
         if "updated_at" not in self.metadata:
-            self.metadata["updated_at"] = datetime.utcnow().isoformat()
+            self.metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     def update_status(self, new_status: TaskStatus, error: Optional[str] = None):
         """
@@ -92,16 +92,16 @@ class Task:
             error: Message d'erreur optionnel
         """
         self.status = new_status
-        self.metadata["updated_at"] = datetime.utcnow().isoformat()
+        self.metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
 
         if error:
             self.error = error
-            self.metadata["error_timestamp"] = datetime.utcnow().isoformat()
+            self.metadata["error_timestamp"] = datetime.now(timezone.utc).isoformat()
 
     def set_result(self, result: Any):
         """Enregistre le résultat avec timestamp"""
         self.result = result
-        self.metadata["completed_at"] = datetime.utcnow().isoformat()
+        self.metadata["completed_at"] = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> Dict[str, Any]:
         """Sérialise en dict pour logging/traçabilité"""
@@ -320,7 +320,7 @@ class TaskGraph:
             "adjacency_list": self.adjacency_list,
             "metadata": {
                 "total_tasks": len(self.tasks),
-                "serialized_at": datetime.utcnow().isoformat(),
+                "serialized_at": datetime.now(timezone.utc).isoformat(),
             },
         }
 

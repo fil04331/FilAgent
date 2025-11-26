@@ -33,7 +33,7 @@ import json
 import uuid
 import hashlib
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 
@@ -119,7 +119,7 @@ def generate_message(
 
     # Generate timestamp if not provided
     if timestamp is None:
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
 
     message = {
         'role': role,
@@ -209,7 +209,7 @@ def generate_conversation(
         task_id = generate_task_id()
 
     messages = []
-    base_time = datetime.utcnow() - timedelta(hours=1)
+    base_time = datetime.now(timezone.utc) - timedelta(hours=1)
 
     # Add system message if requested
     if include_system:
@@ -289,7 +289,7 @@ def generate_multi_user_conversation(
     task_id = generate_task_id()
 
     messages = []
-    base_time = datetime.utcnow() - timedelta(hours=1)
+    base_time = datetime.now(timezone.utc) - timedelta(hours=1)
 
     user_names = [f"user{i+1}" for i in range(num_participants)]
 
@@ -768,12 +768,12 @@ def generate_decision_record(
         task_id = generate_task_id()
 
     # Generate unique DR ID
-    timestamp = datetime.utcnow().strftime("%Y%m%d")
-    random_suffix = hashlib.md5(datetime.utcnow().isoformat().encode()).hexdigest()[:6]
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    random_suffix = hashlib.md5(datetime.now(timezone.utc).isoformat().encode()).hexdigest()[:6]
     dr_id = f"DR-{timestamp}-{random_suffix}"
 
     # Generate prompt hash
-    prompt_text = f"Sample prompt for {decision_type} at {datetime.utcnow().isoformat()}"
+    prompt_text = f"Sample prompt for {decision_type} at {datetime.now(timezone.utc).isoformat()}"
     prompt_hash = hashlib.sha256(prompt_text.encode()).hexdigest()
 
     # Decision content based on type
@@ -781,7 +781,7 @@ def generate_decision_record(
 
     dr = {
         "dr_id": dr_id,
-        "ts": datetime.utcnow().isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "actor": actor,
         "task_id": task_id,
         "policy_version": "policies@0.1.0",
@@ -880,8 +880,8 @@ def generate_prov_graph(
     output_hash = hashlib.sha256(b"sample output message").hexdigest()[:16]
 
     # Timestamps
-    start_time = datetime.utcnow().isoformat()
-    end_time = (datetime.utcnow() + timedelta(seconds=5)).isoformat()
+    start_time = datetime.now(timezone.utc).isoformat()
+    end_time = (datetime.now(timezone.utc) + timedelta(seconds=5)).isoformat()
 
     # Build PROV graph
     prov_graph = {
@@ -958,7 +958,7 @@ def generate_prov_graph(
         prov_graph["activity"][f"tool_exec:{tool_id}"] = {
             "prov:type": "ToolExecution",
             "prov:startTime": start_time,
-            "prov:endTime": (datetime.utcnow() + timedelta(seconds=2)).isoformat(),
+            "prov:endTime": (datetime.now(timezone.utc) + timedelta(seconds=2)).isoformat(),
             "tool_name": "python_sandbox"
         }
 
@@ -1018,7 +1018,7 @@ def generate_compliance_event(
     span_id = uuid.uuid4().hex[:8]
 
     event = {
-        "ts": datetime.utcnow().isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "trace_id": trace_id,
         "span_id": span_id,
         "level": level,
@@ -1343,7 +1343,7 @@ def generate_complete_test_scenario() -> Dict[str, Any]:
         "provenance": provenance,
         "compliance_events": compliance_events,
         "metadata": {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "scenario_type": "complete_integration",
             "version": "1.0.0"
         }
