@@ -319,7 +319,7 @@ class DocumentAnalyzerPME(BaseTool):
         except Exception as e:
             raise ValueError(f"Error reading PDF: {str(e)}")
 
-    def _extract_excel(self, file_path: str) -> Dict:
+    def _extract_excel(self, file_path: str) -> Dict:  # noqa: C901
         """Extract data from Excel file"""
         try:
             df = pd.read_excel(file_path)

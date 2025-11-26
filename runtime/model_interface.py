@@ -8,6 +8,13 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 from pathlib import Path
 
+# Charger les variables d'environnement (.env) pour les API keys
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv optional, env vars may be set by system
+
 __all__ = [
     "ModelInterface",
     "LlamaCppInterface",
@@ -42,6 +49,7 @@ class GenerationResult:
     prompt_tokens: int
     total_tokens: int
     tool_calls: Optional[List[Dict]] = None  # Pour les appels d'outils
+    citations: Optional[List[str]] = None  # URLs des sources (Perplexity)
 
 
 class ModelInterface(ABC):
@@ -154,8 +162,9 @@ class LlamaCppInterface(ModelInterface):
             raise RuntimeError("Model not loaded. Call load() first.")
 
         # Construire le prompt complet si system_prompt est fourni
+        # Format simple sans labels explicites pour éviter que le modèle les répète
         if system_prompt:
-            full_prompt = f"System: {system_prompt}\n\nUser: {prompt}\n\nAssistant:"
+            full_prompt = f"{system_prompt}\n\n{prompt}"
         else:
             full_prompt = prompt
 
@@ -163,7 +172,7 @@ class LlamaCppInterface(ModelInterface):
             # Estimer les tokens du prompt (approximation)
             prompt_tokens = len(full_prompt.split())
 
-            # Générer avec llama.cpp
+            # Générer avec llama.cpp (SANS streaming)
             response = self.model(
                 full_prompt,
                 temperature=config.temperature,
@@ -172,8 +181,9 @@ class LlamaCppInterface(ModelInterface):
                 repeat_penalty=config.repetition_penalty,
                 max_tokens=config.max_tokens,
                 seed=config.seed,
-                stop=["User:", "\n\nUser:", "System:", "</s>"],
+                stop=["</s>", "\n\n\n"],  # Stop tokens simplifiés
                 echo=False,  # Ne pas inclure le prompt dans la réponse
+                stream=False,  # ✨ IMPORTANT: Générer toute la réponse d'un coup
             )
 
             # Extraire le texte généré
@@ -341,12 +351,18 @@ class PerplexityInterface(ModelInterface):
             completion_tokens = response.usage.completion_tokens
             total_tokens = response.usage.total_tokens
 
+            # Extract citations if available (Perplexity returns source URLs)
+            citations = None
+            if hasattr(response, 'citations') and response.citations:
+                citations = response.citations
+
             return GenerationResult(
                 text=generated_text.strip(),
                 finish_reason=finish_reason,
                 tokens_generated=completion_tokens,
                 prompt_tokens=prompt_tokens,
                 total_tokens=total_tokens,
+                citations=citations,
             )
 
         except Exception as e:
@@ -392,6 +408,156 @@ class PerplexityInterface(ModelInterface):
         return self._loaded
 
 
+class OpenAIInterface(ModelInterface):
+    """
+    Interface pour OpenAI API
+
+    Modèles supportés:
+    - gpt-4o (flagship multimodal)
+    - gpt-4o-mini (affordable, intelligent small model)
+    - gpt-4-turbo (previous generation)
+    - gpt-3.5-turbo (fast and economical)
+
+    Nécessite:
+    - Variable d'environnement OPENAI_API_KEY
+    - Package openai installé
+    """
+
+    def __init__(self):
+        self.client = None
+        self.model_name = None
+        self._loaded: bool = False
+        self._rate_limiter = None
+
+    def load(self, model_path: str, config: Dict) -> bool:
+        """
+        Charger le client OpenAI
+
+        Args:
+            model_path: Nom du modèle OpenAI (ex: "gpt-4o-mini")
+            config: Configuration contenant api_key ou utilise OPENAI_API_KEY env var
+
+        Returns:
+            True si succès, False sinon
+        """
+        try:
+            from openai import OpenAI
+            import os
+
+            # Récupérer la clé API
+            api_key = config.get("api_key") or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                print("✗ OPENAI_API_KEY not found in environment or config")
+                return False
+
+            # Initialiser le client OpenAI
+            self.client = OpenAI(api_key=api_key)
+
+            # Initialize rate limiter for API protection
+            from runtime.utils.rate_limiter import get_rate_limiter
+            self._rate_limiter = get_rate_limiter(
+                requests_per_minute=60,  # OpenAI has higher limits
+                requests_per_hour=3000
+            )
+
+            # Sauvegarder le nom du modèle
+            self.model_name = model_path
+
+            self._loaded = True
+            print(f"✓ OpenAI client initialized with model: {self.model_name}")
+            print("✓ Rate limiting enabled (60 req/min, 3000 req/hour)")
+            return True
+
+        except ImportError:
+            print("✗ openai package not installed")
+            print("Install with: pdm install")
+            return False
+        except Exception as e:
+            # Sanitize error message to avoid leaking sensitive information
+            error_str = str(e).lower()
+            if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret']):
+                print("✗ Failed to initialize OpenAI client: Authentication error")
+            else:
+                print("✗ Failed to initialize OpenAI client: Configuration error")
+            return False
+
+    def generate(
+        self,
+        prompt: str,
+        config: GenerationConfig,
+        system_prompt: Optional[str] = None
+    ) -> GenerationResult:
+        """Générer du texte avec OpenAI"""
+        if not self.is_loaded():
+            raise RuntimeError("Model not loaded. Call load() first.")
+
+        try:
+            # Construire les messages
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            # Appel API OpenAI with rate limiting
+            def api_call():
+                return self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=config.temperature,
+                    max_tokens=config.max_tokens,
+                    top_p=config.top_p,
+                    frequency_penalty=config.repetition_penalty,
+                    seed=config.seed if config.seed else None,
+                )
+
+            # Use rate limiter if available, otherwise direct call
+            if self._rate_limiter:
+                response = self._rate_limiter.execute_with_backoff(api_call)
+            else:
+                response = api_call()
+
+            # Extraire le texte généré
+            generated_text = response.choices[0].message.content
+
+            # Déterminer la raison de fin
+            finish_reason = response.choices[0].finish_reason
+
+            # Tokens
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            total_tokens = response.usage.total_tokens
+
+            return GenerationResult(
+                text=generated_text.strip(),
+                finish_reason=finish_reason,
+                tokens_generated=completion_tokens,
+                prompt_tokens=prompt_tokens,
+                total_tokens=total_tokens,
+                citations=None,  # OpenAI doesn't provide citations by default
+            )
+
+        except Exception as e:
+            print(f"⚠ OpenAI generation failed: {e}")
+            return GenerationResult(
+                text=f"[Error] Generation failed. Please check your configuration.",
+                finish_reason="error",
+                tokens_generated=0,
+                prompt_tokens=0,
+                total_tokens=0,
+            )
+
+    def unload(self):
+        """Décharger le client"""
+        self.client = None
+        self.model_name = None
+        self._loaded = False
+        print("OpenAI client unloaded")
+
+    def is_loaded(self) -> bool:
+        """Vérifier si le client est initialisé"""
+        return self._loaded
+
+
 class ModelFactory:
     """Factory pour créer des instances de modèles"""
 
@@ -401,7 +567,7 @@ class ModelFactory:
         Créer une instance de modèle selon le backend
 
         Args:
-            backend: "llama.cpp", "perplexity", ou "vllm"
+            backend: "llama.cpp", "perplexity", "openai", ou "vllm"
 
         Returns:
             Instance de ModelInterface
@@ -410,11 +576,13 @@ class ModelFactory:
             return LlamaCppInterface()
         elif backend == "perplexity":
             return PerplexityInterface()
+        elif backend == "openai":
+            return OpenAIInterface()
         elif backend == "vllm":
             # TODO: Implémenter VLLMInterface quand nécessaire
             raise NotImplementedError("vLLM backend not yet implemented")
         else:
-            raise ValueError(f"Unknown backend: {backend}. Supported: llama.cpp, perplexity, vllm")
+            raise ValueError(f"Unknown backend: {backend}. Supported: llama.cpp, perplexity, openai, vllm")
 
 
 # Instance globale pour le modèle

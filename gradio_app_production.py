@@ -10,35 +10,33 @@ respect des bonnes pratiques et évolutivité garantie.
 Conforme aux standards: Loi 25, RGPD, AI Act, ISO 27001
 """
 
-import gradio as gr
 import asyncio
-import json
-import sqlite3
 import hashlib
-import uuid
+import json
 import logging
+import sqlite3
 import traceback
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass, asdict
-from enum import Enum
-import pandas as pd
-import numpy as np
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dotenv import load_dotenv
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-# Charger les variables d'environnement (.env) - IMPORTANT pour les API keys
-load_dotenv()
-
-# Importations cryptographiques pour signatures
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import ed25519
+import gradio as gr
+import pandas as pd
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from dotenv import load_dotenv
 
 # Importation du vrai outil d'analyse de documents
 from tools.document_analyzer_pme import DocumentAnalyzerPME
 from tools.base import ToolStatus
+
+# Charger les variables d'environnement (.env) - IMPORTANT pour les API keys
+load_dotenv()
 
 # Configuration logging structuré
 logging.basicConfig(
@@ -67,16 +65,73 @@ ALL_SUPPORTED_EXTENSIONS = [ext for exts in SUPPORTED_EXTENSIONS.values() for ex
 
 # Messages d'erreur standardisés
 ERROR_MESSAGES = {
-    "file_not_found": "❌ **Fichier introuvable**\n\nLe fichier n'existe pas ou a été supprimé.\n\n💡 **Solutions**:\n1. Vérifiez que le fichier existe toujours à cet emplacement\n2. Essayez de téléverser le fichier à nouveau\n3. Vérifiez les permissions d'accès au fichier",
-    "file_too_large": f"❌ **Fichier trop volumineux**\n\nTaille maximale autorisée: {MAX_FILE_SIZE_MB} MB\n\n💡 **Solution**: Essayez avec un fichier plus petit ou divisez-le en plusieurs parties.",
-    "unsupported_format": "❌ **Format non supporté**\n\n**Formats acceptés**:\n• PDF (`.pdf`)\n• Excel (`.xlsx`, `.xls`, `.xlsm`)\n• Word (`.docx`, `.doc`)\n\n💡 **Solution**: Convertissez votre fichier dans un format supporté.",
-    "permission_denied": "❌ **Accès refusé**\n\nImpossible de lire le fichier (permissions insuffisantes).\n\n💡 **Solution**: Vérifiez les permissions du fichier.",
-    "corrupted_file": "❌ **Fichier corrompu**\n\nLe fichier ne peut pas être lu correctement.\n\n💡 **Solutions**:\n1. Ouvrez le fichier avec son application native pour vérifier\n2. Essayez de réenregistrer le fichier\n3. Utilisez un autre fichier",
-    "password_protected": "❌ **Fichier protégé**\n\nLe fichier est protégé par mot de passe.\n\n💡 **Solution**: Supprimez la protection par mot de passe avant l'analyse.",
-    "memory_error": "❌ **Mémoire insuffisante**\n\nLe fichier est trop complexe pour être traité.\n\n💡 **Solutions**:\n1. Essayez avec un fichier plus petit\n2. Simplifiez le contenu du fichier\n3. Fermez d'autres applications",
-    "timeout": f"⏱️ **Traitement trop long**\n\nLe traitement a dépassé {PROCESSING_TIMEOUT_SECONDS} secondes.\n\n💡 **Solutions**:\n1. Essayez avec un fichier plus simple\n2. Réduisez la taille du fichier",
-    "disk_space": "❌ **Espace disque insuffisant**\n\nImpossible de créer les fichiers d'export.\n\n💡 **Solution**: Libérez de l'espace disque.",
-    "export_failed": "❌ **Erreur d'export**\n\nImpossible de créer le fichier d'export.\n\n💡 **Solutions**:\n1. Vérifiez l'espace disque disponible\n2. Réessayez l'opération\n3. Contactez le support si le problème persiste",
+    "file_not_found": (
+        "❌ **Fichier introuvable**\n\n"
+        "Le fichier n'existe pas ou a été supprimé.\n\n"
+        "💡 **Solutions**:\n"
+        "1. Vérifiez que le fichier existe toujours à cet emplacement\n"
+        "2. Essayez de téléverser le fichier à nouveau\n"
+        "3. Vérifiez les permissions d'accès au fichier"
+    ),
+    "file_too_large": (
+        f"❌ **Fichier trop volumineux**\n\n"
+        f"Taille maximale autorisée: {MAX_FILE_SIZE_MB} MB\n\n"
+        "💡 **Solution**: Essayez avec un fichier plus petit ou divisez-le en plusieurs parties."
+    ),
+    "unsupported_format": (
+        "❌ **Format non supporté**\n\n"
+        "**Formats acceptés**:\n"
+        "• PDF (`.pdf`)\n"
+        "• Excel (`.xlsx`, `.xls`, `.xlsm`)\n"
+        "• Word (`.docx`, `.doc`)\n\n"
+        "💡 **Solution**: Convertissez votre fichier dans un format supporté."
+    ),
+    "permission_denied": (
+        "❌ **Accès refusé**\n\n"
+        "Impossible de lire le fichier (permissions insuffisantes).\n\n"
+        "💡 **Solution**: Vérifiez les permissions du fichier."
+    ),
+    "corrupted_file": (
+        "❌ **Fichier corrompu**\n\n"
+        "Le fichier ne peut pas être lu correctement.\n\n"
+        "💡 **Solutions**:\n"
+        "1. Ouvrez le fichier avec son application native pour vérifier\n"
+        "2. Essayez de réenregistrer le fichier\n"
+        "3. Utilisez un autre fichier"
+    ),
+    "password_protected": (
+        "❌ **Fichier protégé**\n\n"
+        "Le fichier est protégé par mot de passe.\n\n"
+        "💡 **Solution**: Supprimez la protection par mot de passe avant l'analyse."
+    ),
+    "memory_error": (
+        "❌ **Mémoire insuffisante**\n\n"
+        "Le fichier est trop complexe pour être traité.\n\n"
+        "💡 **Solutions**:\n"
+        "1. Essayez avec un fichier plus petit\n"
+        "2. Simplifiez le contenu du fichier\n"
+        "3. Fermez d'autres applications"
+    ),
+    "timeout": (
+        f"⏱️ **Traitement trop long**\n\n"
+        f"Le traitement a dépassé {PROCESSING_TIMEOUT_SECONDS} secondes.\n\n"
+        "💡 **Solutions**:\n"
+        "1. Essayez avec un fichier plus simple\n"
+        "2. Réduisez la taille du fichier"
+    ),
+    "disk_space": (
+        "❌ **Espace disque insuffisant**\n\n"
+        "Impossible de créer les fichiers d'export.\n\n"
+        "💡 **Solution**: Libérez de l'espace disque."
+    ),
+    "export_failed": (
+        "❌ **Erreur d'export**\n\n"
+        "Impossible de créer le fichier d'export.\n\n"
+        "💡 **Solutions**:\n"
+        "1. Vérifiez l'espace disque disponible\n"
+        "2. Réessayez l'opération\n"
+        "3. Contactez le support si le problème persiste"
+    ),
 }
 
 
@@ -486,14 +541,14 @@ class DatabaseManager:
             # Index pour performance
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_messages_conversation 
+                CREATE INDEX IF NOT EXISTS idx_messages_conversation
                 ON messages(conversation_id)
             """
             )
 
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_decisions_conversation 
+                CREATE INDEX IF NOT EXISTS idx_decisions_conversation
                 ON decision_records(conversation_id)
             """
             )
@@ -521,7 +576,7 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO messages (id, conversation_id, role, content, 
+                    INSERT INTO messages (id, conversation_id, role, content,
                                         pii_redacted, metadata)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """,
@@ -547,7 +602,7 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO decision_records 
+                    INSERT INTO decision_records
                     (id, conversation_id, input_hash, output_hash, model_version,
                      temperature, tools_used, compliance_checks, signature, provenance)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -579,8 +634,8 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    SELECT * FROM messages 
-                    WHERE conversation_id = ? 
+                    SELECT * FROM messages
+                    WHERE conversation_id = ?
                     ORDER BY created_at ASC
                 """,
                     (conversation_id,),
@@ -619,7 +674,7 @@ class DatabaseManager:
                 # Obtenir le dernier hash pour la chaîne
                 cursor.execute(
                     """
-                    SELECT hash_chain FROM audit_trail 
+                    SELECT hash_chain FROM audit_trail
                     ORDER BY id DESC LIMIT 1
                 """
                 )
@@ -632,7 +687,7 @@ class DatabaseManager:
 
                 cursor.execute(
                     """
-                    INSERT INTO audit_trail 
+                    INSERT INTO audit_trail
                     (event_type, actor, resource, action, outcome, metadata, hash_chain)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -667,7 +722,7 @@ class DatabaseManager:
                 # PII redactions
                 cursor.execute(
                     """
-                    SELECT COUNT(*) as count FROM messages 
+                    SELECT COUNT(*) as count FROM messages
                     WHERE pii_redacted = TRUE
                 """
                 )
@@ -765,7 +820,7 @@ class FilAgentEngine:
             if self.model:
                 try:
                     self.model.unload()
-                except:
+                except Exception:
                     pass
 
             # Charger le nouveau modèle
@@ -947,9 +1002,12 @@ class FilAgentEngine:
 
         try:
             # Construire le prompt système
-            system_prompt = """Tu es FilAgent, un assistant IA spécialisé pour les PME québécoises.
-Aide avec les calculs fiscaux (TPS 5%, TVQ 9.975%), l'analyse de documents, la conformité (Loi 25, RGPD) et la génération de rapports.
-Réponds en français québécois de manière précise et professionnelle."""
+            system_prompt = (
+                "Tu es FilAgent, un assistant IA spécialisé pour les PME québécoises.\n"
+                "Aide avec les calculs fiscaux (TPS 5%, TVQ 9.975%), l'analyse de documents, "
+                "la conformité (Loi 25, RGPD) et la génération de rapports.\n"
+                "Réponds en français québécois de manière précise et professionnelle."
+            )
 
             # Construire le prompt utilisateur avec contexte
             user_prompt = message
@@ -1142,7 +1200,7 @@ class DocumentAnalyzerTool:
         self.real_tool = DocumentAnalyzerPME()
         logger.info("✅ DocumentAnalyzerTool initialisé avec vrai backend")
 
-    async def execute(
+    async def execute(  # noqa: C901
         self,
         file_path: str = None,
         analysis_type: str = "invoice",
@@ -1332,7 +1390,7 @@ class DocumentAnalyzerTool:
 
     def _get_info_message(self) -> str:
         """Message d'information quand aucun fichier fourni"""
-        return f"""📄 **Analyseur de Documents - Prêt**
+        return """📄 **Analyseur de Documents - Prêt**
 
 **Capacités disponibles**:
 ✅ Extraction automatique de données
@@ -1409,7 +1467,7 @@ class ReportGeneratorTool:
     async def execute(self, message: str, intent: Dict) -> str:
         """Générer un rapport"""
 
-        return f"""📊 **Générateur de Rapports**
+        return """📊 **Générateur de Rapports**
 
 **Types de rapports disponibles**:
 
@@ -1607,10 +1665,14 @@ class FilAgentInterface:
             )
 
             return f"""
-            <div style="width: 100%; max-height: 600px; overflow: auto; border: 1px solid #ddd; border-radius: 8px;">
-                <div style="background: #4CAF50; color: white; padding: 10px; position: sticky; top: 0; z-index: 10;">
+            <div style="width: 100%; max-height: 600px; overflow: auto; border: 1px solid #ddd;
+                border-radius: 8px;">
+                <div style="background: #4CAF50; color: white; padding: 10px; position: sticky;
+                    top: 0; z-index: 10;">
                     <strong>📊 {filename}</strong>
-                    <span style="float: right; font-size: 0.9em;">{total_rows} lignes × {len(df.columns)} colonnes</span>
+                    <span style="float: right; font-size: 0.9em;">
+                        {total_rows} lignes × {len(df.columns)} colonnes
+                    </span>
                 </div>
                 <style>
                     .excel-preview {{
@@ -1648,15 +1710,21 @@ class FilAgentInterface:
             logger.error(f"Fichier Excel invalide: {e}")
             if "password" in str(e).lower() or "encrypted" in str(e).lower():
                 return "<p style='color: #f44336; padding: 20px;'>🔒 Fichier Excel protégé par mot de passe</p>"
-            return f"<p style='color: #f44336; padding: 20px;'>❌ Fichier Excel corrompu ou format invalide</p>"
+            return "<p style='color: #f44336; padding: 20px;'>❌ Fichier Excel corrompu ou format invalide</p>"
 
         except MemoryError:
             logger.error(f"Mémoire insuffisante pour Excel: {file_path}")
-            return "<p style='color: #f44336; padding: 20px;'>❌ Fichier Excel trop volumineux pour l'aperçu</p>"
+            return (
+                "<p style='color: #f44336; padding: 20px;'>"
+                "❌ Fichier Excel trop volumineux pour l'aperçu</p>"
+            )
 
         except ImportError:
             logger.error("Module openpyxl manquant")
-            return "<p style='color: #f44336; padding: 20px;'>❌ Module openpyxl manquant (pip install openpyxl)</p>"
+            return (
+                "<p style='color: #f44336; padding: 20px;'>"
+                "❌ Module openpyxl manquant (pip install openpyxl)</p>"
+            )
 
         except Exception as e:
             logger.error(f"Erreur lecture Excel: {e}")
@@ -1664,7 +1732,7 @@ class FilAgentInterface:
                 f"<p style='color: #f44336; padding: 20px;'>❌ Erreur lecture Excel: {str(e)}</p>"
             )
 
-    def _render_word_preview(self, file_path: str) -> str:
+    def _render_word_preview(self, file_path: str) -> str:  # noqa: C901
         """Rendu aperçu Word via HTML (Phase 6.1: Enhanced error handling)"""
         try:
             import docx
@@ -1711,7 +1779,10 @@ class FilAgentInterface:
 
         except ImportError:
             logger.error("Module python-docx manquant")
-            return "<p style='color: #f44336; padding: 20px;'>❌ Module python-docx manquant (pip install python-docx)</p>"
+            return (
+                "<p style='color: #f44336; padding: 20px;'>"
+                "❌ Module python-docx manquant (pip install python-docx)</p>"
+            )
 
         except PermissionError:
             logger.error(f"Permission refusée pour Word: {file_path}")
@@ -1737,7 +1808,7 @@ class FilAgentInterface:
                 f"<p style='color: #f44336; padding: 20px;'>❌ Erreur lecture Word: {error_str}</p>"
             )
 
-    def export_analysis_results(self, export_format: str) -> Tuple[str, Any]:
+    def export_analysis_results(self, export_format: str) -> Tuple[str, Any]:  # noqa: C901
         """
         Exporter les résultats d'analyse dans le format choisi (Phase 6.1: Enhanced)
 
@@ -1822,7 +1893,7 @@ class FilAgentInterface:
         temp_file.close()
 
         logger.info(f"✅ Export JSON créé: {temp_file.name}")
-        return temp_file.name, f"✅ Export JSON créé avec succès"
+        return temp_file.name, "✅ Export JSON créé avec succès"
 
     def _export_as_csv(self, filename_base: str) -> Tuple[str, str]:
         """Exporter en CSV"""
@@ -1853,7 +1924,7 @@ class FilAgentInterface:
         temp_file.close()
 
         logger.info(f"✅ Export CSV créé: {temp_file.name}")
-        return temp_file.name, f"✅ Export CSV créé avec succès"
+        return temp_file.name, "✅ Export CSV créé avec succès"
 
     def _export_as_excel(self, filename_base: str) -> Tuple[str, str]:
         """Exporter en Excel"""
@@ -1893,9 +1964,9 @@ class FilAgentInterface:
             metadata_df.to_excel(writer, sheet_name="Metadata", index=False)
 
         logger.info(f"✅ Export Excel créé: {temp_file.name}")
-        return temp_file.name, f"✅ Export Excel créé avec succès"
+        return temp_file.name, "✅ Export Excel créé avec succès"
 
-    def create_download_zip(self) -> Tuple[str, str]:
+    def create_download_zip(self) -> Tuple[str, str]:  # noqa: C901
         """
         Créer un ZIP contenant le fichier analysé + résultats exportés (Phase 6.1: Enhanced)
 
@@ -1917,8 +1988,6 @@ class FilAgentInterface:
         try:
             import tempfile
             import zipfile
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             # Créer un fichier ZIP temporaire
             temp_zip = tempfile.NamedTemporaryFile(suffix=".zip", prefix="filagent_", delete=False)
@@ -2063,7 +2132,7 @@ https://github.com/your-org/filagent
         return self.engine.reload_model(backend, model_name)
 
 
-def create_gradio_interface() -> gr.Blocks:
+def create_gradio_interface() -> gr.Blocks:  # noqa: C901
     """Créer l'interface Gradio complète"""
 
     interface = FilAgentInterface()
@@ -2085,7 +2154,7 @@ def create_gradio_interface() -> gr.Blocks:
     ) as app:
 
         # État de l'application
-        conversation_id = gr.State(value=str(uuid.uuid4()))
+        _conversation_id = gr.State(value=str(uuid.uuid4()))
 
         # En-tête
         gr.Markdown(
@@ -2095,7 +2164,7 @@ def create_gradio_interface() -> gr.Blocks:
         """
         )
 
-        with gr.Tabs() as tabs:
+        with gr.Tabs():
             # ========== ONGLET CHAT ==========
             with gr.Tab("💬 Assistant", id=1):
                 with gr.Row():
@@ -2205,7 +2274,8 @@ def create_gradio_interface() -> gr.Blocks:
                     gr.Markdown(
                         """
                     ### 🔍 Analyse Intelligente de Documents
-                    Téléversez vos factures, états financiers ou rapports pour une analyse automatique avec calculs TPS/TVQ.
+                    Téléversez vos factures, états financiers ou rapports
+                    pour une analyse automatique avec calculs TPS/TVQ.
 
                     **Formats supportés**: PDF, Excel (.xlsx, .xls), Word (.docx, .doc)
                     """
@@ -2256,10 +2326,13 @@ Téléversez un fichier pour commencer l'analyse.
                             )
 
                     # Zone d'aperçu (ACTIVÉE - Phase 4)
-                    with gr.Accordion("👁️ Aperçu du Document", open=False) as doc_preview_accordion:
+                    with gr.Accordion("👁️ Aperçu du Document", open=False) as _doc_preview_accordion:
                         doc_preview_html = gr.HTML(
                             label="Contenu",
-                            value="<p style='color: #999; padding: 20px; text-align: center;'>📄 Téléversez un document pour voir l'aperçu</p>",
+                            value=(
+                                "<p style='color: #999; padding: 20px; text-align: center;'>"
+                                "📄 Téléversez un document pour voir l'aperçu</p>"
+                            ),
                         )
 
                         # Bouton de téléchargement (Phase 4.3)
@@ -2278,7 +2351,7 @@ Téléversez un fichier pour commencer l'analyse.
                     gr.Markdown("---")
                     with gr.Accordion(
                         "📤 Exporter les Résultats", open=False
-                    ) as doc_export_accordion:
+                    ) as _doc_export_accordion:
                         gr.Markdown(
                             """
                         ### 💾 Formats d'Export Disponibles
@@ -2360,21 +2433,21 @@ Téléversez un fichier pour commencer l'analyse.
                 gr.Markdown(
                     """
                 ## Tableau de Bord Conformité
-                
+
                 ### ✅ Certifications Actives
                 - **Loi 25 (Québec)**: Protection renseignements personnels
                 - **RGPD**: Règlement général protection données
                 - **AI Act**: Réglementation IA européenne
                 - **ISO 27001**: Sécurité information
                 - **NIST AI RMF**: Framework gestion risques IA
-                
+
                 ### 🔐 Mesures de Sécurité
                 - Signatures EdDSA sur toutes les décisions
                 - Logs WORM immuables (Write Once Read Many)
                 - Chaîne Merkle pour intégrité
                 - Chiffrement AES-256 au repos
                 - Isolation sandbox pour exécution
-                
+
                 ### 📊 Métriques de Conformité
                 - Taux redaction PII: 100%
                 - Decision Records signés: 100%
@@ -2603,7 +2676,10 @@ Téléversez un fichier pour commencer l'analyse.
 ✅ Redaction PII (conformité Loi 25)
 
 🔒 *Traitement 100% local et sécurisé*""",
-                "<p style='color: #999; padding: 20px; text-align: center;'>📄 Téléversez un document pour voir l'aperçu</p>",  # Reset preview
+                (
+                    "<p style='color: #999; padding: 20px; text-align: center;'>"
+                    "📄 Téléversez un document pour voir l'aperçu</p>"
+                ),  # Reset preview
                 gr.update(visible=False),  # Hide download button
                 None,  # Clear download file
             )
@@ -2652,9 +2728,14 @@ Téléversez un fichier pour commencer l'analyse.
 
             if file_path:
                 # Succès - retourner le fichier et le statut
+                status_text = (
+                    f"✅ **{status_msg}**\n\n"
+                    f"Format: {export_format}\n"
+                    f"Fichier: `{Path(file_path).name}`"
+                )
                 return (
                     gr.update(value=file_path, visible=True),  # export_file_output
-                    f"✅ **{status_msg}**\n\nFormat: {export_format}\nFichier: `{Path(file_path).name}`",  # export_status
+                    status_text,  # export_status
                 )
             else:
                 # Erreur - afficher le message d'erreur
@@ -2669,9 +2750,18 @@ Téléversez un fichier pour commencer l'analyse.
 
             if zip_path:
                 # Succès
+                zip_status = (
+                    f"✅ **{status_msg}**\n\n"
+                    "**Contenu du ZIP**:\n"
+                    "- Document original\n"
+                    "- Résultats JSON (signé)\n"
+                    "- Résultats CSV\n"
+                    "- Résultats Excel\n"
+                    "- README.txt"
+                )
                 return (
                     gr.update(value=zip_path, visible=True),  # export_file_output
-                    f"✅ **{status_msg}**\n\n**Contenu du ZIP**:\n- Document original\n- Résultats JSON (signé)\n- Résultats CSV\n- Résultats Excel\n- README.txt",  # export_status
+                    zip_status,  # export_status
                 )
             else:
                 # Erreur

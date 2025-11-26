@@ -129,11 +129,37 @@ class ModelManager:
             print(f"❌ Erreur chargement modèle: {e}")
             return False
 
-    def clean_response(self, text: str) -> str:
+    def extract_sources(self, text: str) -> Tuple[str, List[str]]:
+        """
+        Extrait les sources citées dans le texte Perplexity
+
+        Returns:
+            Tuple[str, List[str]]: (texte nettoyé, liste des sources)
+        """
+        import re
+
+        sources = []
+        # Chercher les patterns de sources [1], [2], etc.
+        citation_pattern = r'\[(\d+)\]'
+        citations = re.findall(citation_pattern, text)
+
+        # Pour l'instant, on garde les citations telles quelles
+        # Les vraies URLs ne sont pas dans le texte mais dans les métadonnées de l'API
+        # On va formater pour rendre les citations cliquables visuellement
+
+        return text, citations
+
+    def clean_response(self, text: str, citation_urls: Optional[List[str]] = None) -> str:
         """
         Nettoie la réponse en formatant les balises spéciales pour Gradio
 
         Convertit les balises <think> en blocs formatés et extrait le contenu final
+        AFFICHE TOUT LE RAISONNEMENT (pas de troncature)
+        Affiche les URLs réelles des sources si disponibles
+
+        Args:
+            text: Le texte de la réponse
+            citation_urls: Liste optionnelle des URLs de sources (depuis Perplexity API)
         """
         import re
 
@@ -145,16 +171,62 @@ class ModelManager:
             think_content = match.group(1).strip()
             final_answer = match.group(2).strip()
 
-            # Formater avec le raisonnement visible
-            formatted = f"""💭 **Chaîne de pensée**:
-> {think_content[:500]}{'...' if len(think_content) > 500 else ''}
+            # Extraire les numéros de citations du texte
+            clean_answer, citation_numbers = self.extract_sources(final_answer)
 
-**Réponse finale**:
-{final_answer}"""
+            # ✅ AFFICHER TOUT LE RAISONNEMENT (enlever la limite de 500 caractères)
+            # Formater le raisonnement en bloc dépliable
+            formatted = f"""💭 **Chaîne de pensée complète**:
+
+<details>
+<summary>🧠 Cliquez pour voir le raisonnement détaillé ({len(think_content)} caractères)</summary>
+
+```
+{think_content}
+```
+</details>
+
+**📝 Réponse finale**:
+
+{clean_answer}"""
+
+            # Afficher les sources avec les URLs réelles si disponibles
+            if citation_urls and citation_numbers:
+                formatted += "\n\n📚 **Sources citées**:\n\n"
+                # Map citation numbers to URLs
+                for num_str in sorted(set(citation_numbers)):
+                    try:
+                        idx = int(num_str) - 1  # [1] -> index 0
+                        if 0 <= idx < len(citation_urls):
+                            url = citation_urls[idx]
+                            formatted += f"- [{num_str}] {url}\n"
+                    except (ValueError, IndexError):
+                        pass
+            elif citation_numbers:
+                # Fallback si pas d'URLs disponibles
+                formatted += f"\n\n📚 **Sources citées**: {', '.join([f'[{c}]' for c in sorted(set(citation_numbers))])}"
+
             return formatted
 
-        # Cas 2: Pas de balises <think>, retourner tel quel
-        return text
+        # Cas 2: Pas de balises <think>, extraire quand même les sources
+        clean_text, citation_numbers = self.extract_sources(text)
+
+        # Afficher les sources avec les URLs réelles si disponibles
+        if citation_urls and citation_numbers:
+            clean_text += "\n\n📚 **Sources citées**:\n\n"
+            for num_str in sorted(set(citation_numbers)):
+                try:
+                    idx = int(num_str) - 1  # [1] -> index 0
+                    if 0 <= idx < len(citation_urls):
+                        url = citation_urls[idx]
+                        clean_text += f"- [{num_str}] {url}\n"
+                except (ValueError, IndexError):
+                    pass
+        elif citation_numbers:
+            # Fallback si pas d'URLs disponibles
+            clean_text += f"\n\n📚 **Sources citées**: {', '.join([f'[{c}]' for c in sorted(set(citation_numbers))])}"
+
+        return clean_text
 
     def generate(self, prompt: str, system_prompt: Optional[str] = None) -> Tuple[str, Dict]:
         """
@@ -187,8 +259,8 @@ class ModelManager:
                 "response_length": len(result.text)
             }
 
-            # Nettoyer la réponse pour affichage Gradio
-            cleaned_text = self.clean_response(result.text)
+            # Nettoyer la réponse pour affichage Gradio avec citations
+            cleaned_text = self.clean_response(result.text, citation_urls=result.citations)
 
             return cleaned_text, metrics
 
