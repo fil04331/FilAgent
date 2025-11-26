@@ -95,3 +95,14 @@ memory/episodic/
 /logs/
 /secrets/
 .hypothesis/
+
+# Benchmarks (large downloaded datasets)
+eval/benchmarks/humaneval/
+eval/benchmarks/mbpp/
+eval/benchmarks/swe_bench/lite/
+
+# PDM local config
+.pdm-python
+
+# Claude Code local settings
+.claude/settings.local.json
