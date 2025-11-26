@@ -9,7 +9,7 @@ load_dotenv()  # Load .env file at startup
 
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -62,7 +62,8 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(None, ge=1, le=10000)
 
-    @validator('conversation_id')
+    @field_validator('conversation_id')
+    @classmethod
     def validate_conversation_id(cls, v):
         """Valider le format du conversation_id"""
         if v is not None:
@@ -72,7 +73,8 @@ class ChatRequest(BaseModel):
                 raise ValueError('conversation_id too long (max 128 characters)')
         return v
 
-    @validator('task_id')
+    @field_validator('task_id')
+    @classmethod
     def validate_task_id(cls, v):
         """Valider le format du task_id"""
         if v is not None:
@@ -270,7 +272,7 @@ async def get_conversation(
     conversation_id: str = FastAPIPath(
         ...,
         max_length=128,
-        regex=r'^[a-zA-Z0-9\-_]+$',
+        pattern=r'^[a-zA-Z0-9\-_]+$',
         description="Identifiant unique de la conversation"
     )
 ):

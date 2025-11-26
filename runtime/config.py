@@ -6,7 +6,7 @@ Loads and validates configuration from YAML files
 import yaml
 from pathlib import Path
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GenerationConfig(BaseModel):
@@ -47,8 +47,7 @@ class MemoryConfig(BaseModel):
     semantic_max_items: int = Field(default=10000, alias="semantic.max_items")
     semantic_similarity_threshold: float = Field(default=0.7, alias="semantic.similarity_threshold")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class LoggingConfig(BaseModel):
