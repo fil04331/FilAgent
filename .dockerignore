@@ -1,0 +1,119 @@
+# FilAgent Docker Build Ignore File
+# Excludes files that should not be included in Docker images
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+venv_new/
+__pypackages__/
+.pdm-build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Secrets and sensitive files
+.env
+.env.*
+*.key
+*.pem
+*.p12
+credentials.json
+secrets/
+
+# Large model files (should be mounted as volumes)
+models/weights/*.gguf
+models/weights/*.pt
+models/weights/*.pth
+models/hf_models/
+
+# Logs (generated at runtime)
+logs/
+*.log
+
+# Database files (generated at runtime)
+memory/episodic.sqlite
+memory/semantic/*.faiss
+memory/semantic/*.parquet
+memory/episodic/
+
+# Audit files (should be mounted as volumes)
+audit/signed/*.tar.gz
+audit/signed/*.json
+audit/signed/*.jsonl
+
+# Cache
+.cache/
+*.cache
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+
+# Test artifacts
+htmlcov/
+.coverage
+coverage.xml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in runtime)
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+conftest.py
+
+# Development files
+*.backup
+*_backup.py
+temp/
+pids/
+diagnostic_report.json
+
+# Benchmark data (large files)
+eval/benchmarks/humaneval/
+eval/benchmarks/mbpp/
+eval/benchmarks/swe_bench/lite/
+eval/benchmarks/*.lock
+# Keep pdm.lock (needed for builds)
+!pdm.lock
+
+# Scripts not needed in production
+scripts/
+examples/
+
+# Claude Code configuration
+.claude/
+
+# Docker files (prevent recursive copying)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# PDM local config
+.pdm-python
+.pdm.toml

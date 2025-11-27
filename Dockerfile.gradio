@@ -1,0 +1,104 @@
+# FilAgent Gradio Production Interface
+# Multi-stage build for optimized image size and security
+# Compliant with: Loi 25, RGPD, AI Act, ISO 27001
+
+# ============================================================================
+# STAGE 1: Builder - Install dependencies with PDM
+# ============================================================================
+FROM python:3.12-slim-bookworm AS builder
+
+# Security: Run as non-root user during build
+RUN useradd --create-home --shell /bin/bash builder
+WORKDIR /home/builder/app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PDM for dependency management
+RUN pip install --no-cache-dir pdm==2.20.1
+
+# Copy dependency files first (for better layer caching)
+COPY pyproject.toml pdm.lock ./
+
+# Configure PDM to install to a local directory (not venv)
+RUN pdm config python.use_venv false
+
+# Install production dependencies only (exclude dev, benchmark groups)
+# Using --prod flag to skip dev dependencies
+RUN pdm install --prod --no-editable --no-self
+
+# ============================================================================
+# STAGE 2: Runtime - Minimal production image
+# ============================================================================
+FROM python:3.12-slim-bookworm AS runtime
+
+# Labels for compliance and traceability
+LABEL maintainer="FilAgent Team <contact@filagent.ai>" \
+      version="2.0.0" \
+      description="FilAgent Gradio Production Interface" \
+      compliance="Loi-25, RGPD, AI-Act, ISO-27001" \
+      org.opencontainers.image.source="https://github.com/fil04331/FilAgent"
+
+# Security: Create non-root user
+RUN useradd --create-home --shell /bin/bash --uid 1000 filagent
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set working directory
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /home/builder/app/__pypackages__/3.12/lib /app/packages
+
+# Copy application code
+COPY --chown=filagent:filagent runtime/ ./runtime/
+COPY --chown=filagent:filagent tools/ ./tools/
+COPY --chown=filagent:filagent planner/ ./planner/
+COPY --chown=filagent:filagent memory/ ./memory/
+COPY --chown=filagent:filagent policy/ ./policy/
+COPY --chown=filagent:filagent config/ ./config/
+COPY --chown=filagent:filagent gradio_app_production.py ./
+
+# Create required directories with proper permissions
+RUN mkdir -p logs/events logs/decisions logs/prompts logs/traces audit/signed data \
+    provenance/keys memory/episodic memory/semantic \
+    && chown -R filagent:filagent logs audit data provenance memory
+
+# Environment configuration
+ENV PYTHONPATH=/app:/app/packages \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Gradio configuration
+    GRADIO_SERVER_NAME=0.0.0.0 \
+    GRADIO_SERVER_PORT=7860 \
+    GRADIO_ANALYTICS_ENABLED=false \
+    # Security: Disable telemetry
+    DO_NOT_TRACK=1 \
+    # FilAgent configuration
+    FILAGENT_ENV=production \
+    FILAGENT_LOG_LEVEL=INFO \
+    FILAGENT_BASE_DIR=/app
+
+# Switch to non-root user
+USER filagent
+
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl --fail http://localhost:7860/ || exit 1
+
+# Expose Gradio port
+EXPOSE 7860
+
+# Default command: Run Gradio production interface
+CMD ["python", "gradio_app_production.py"]

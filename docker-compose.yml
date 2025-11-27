@@ -1,0 +1,164 @@
+# FilAgent Docker Compose Configuration
+# Production-ready orchestration for FilAgent services
+# Compliant with: Loi 25, RGPD, AI Act, ISO 27001
+#
+# Usage:
+#   Development:  docker compose up --build
+#   Production:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Stop:         docker compose down
+#   Logs:         docker compose logs -f gradio
+
+services:
+  # ============================================================================
+  # Gradio Production Interface
+  # Main user-facing interface for FilAgent
+  # ============================================================================
+  gradio:
+    build:
+      context: .
+      dockerfile: Dockerfile.gradio
+    container_name: filagent-gradio
+    restart: unless-stopped
+
+    # Port mapping: host:container
+    ports:
+      - "7860:7860"
+
+    # Environment variables
+    environment:
+      # API Keys (from .env file or environment)
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+      # Gradio configuration
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+      - GRADIO_ANALYTICS_ENABLED=false
+
+      # FilAgent configuration
+      - FILAGENT_ENV=production
+      - FILAGENT_LOG_LEVEL=INFO
+      - MODEL_BACKEND=perplexity
+
+      # Security settings
+      - DO_NOT_TRACK=1
+      - PYTHONUNBUFFERED=1
+
+    # Persistent storage volumes
+    volumes:
+      # Logs persistence (compliance requirement: 7 years retention)
+      - filagent-logs:/app/logs
+      # Audit trail persistence (immutable records)
+      - filagent-audit:/app/audit
+      # Data persistence
+      - filagent-data:/app/data
+      # Configuration (read-only mount from host)
+      - ./config:/app/config:ro
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Read-only root filesystem for security
+    # Note: Commented out as Gradio may need to write temp files
+    # read_only: true
+
+  # ============================================================================
+  # FastAPI Server (Optional)
+  # OpenAI-compatible API endpoint
+  # ============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.gradio
+    container_name: filagent-api
+    restart: unless-stopped
+    profiles:
+      - full  # Only starts with: docker compose --profile full up
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - FILAGENT_ENV=production
+      - FILAGENT_LOG_LEVEL=INFO
+
+    volumes:
+      - filagent-logs:/app/logs
+      - filagent-audit:/app/audit
+      - ./config:/app/config:ro
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    # Override command to run FastAPI server
+    command: ["python", "-m", "uvicorn", "runtime.server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+
+# ============================================================================
+# Named Volumes for Data Persistence
+# ============================================================================
+volumes:
+  filagent-logs:
+    name: filagent-logs
+    driver: local
+
+  filagent-audit:
+    name: filagent-audit
+    driver: local
+
+  filagent-data:
+    name: filagent-data
+    driver: local
+
+# ============================================================================
+# Networks (optional, for multi-service communication)
+# ============================================================================
+networks:
+  default:
+    name: filagent-network
+    driver: bridge
