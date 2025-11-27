@@ -14,6 +14,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import sqlite3
 import traceback
 import uuid
@@ -239,8 +240,8 @@ def cleanup_temp_files(*file_paths):
 class FilAgentConfig:
     """Configuration centralisée de FilAgent"""
 
-    # Paths
-    base_dir: Path = Path("/Users/felixlefebvre/FilAgent")
+    # Paths - Use environment variable or detect from file location
+    base_dir: Path = Path(os.environ.get("FILAGENT_BASE_DIR", Path(__file__).parent.resolve()))
     db_path: Path = None
     logs_dir: Path = None
     keys_dir: Path = None
@@ -2790,11 +2791,16 @@ if __name__ == "__main__":
     import sys
 
     # Configuration logging
+    # Determine log directory from environment or relative to script
+    base_dir = Path(os.environ.get("FILAGENT_BASE_DIR", Path(__file__).parent.resolve()))
+    logs_dir = base_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.FileHandler("/Users/felixlefebvre/FilAgent/logs/gradio.log"),
+            logging.FileHandler(logs_dir / "gradio.log"),
             logging.StreamHandler(sys.stdout),
         ],
     )
