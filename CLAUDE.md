@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Version**: 2.3.0
-**Last Updated**: 2025-11-18
+**Version**: 2.4.0
+**Last Updated**: 2025-11-28
 **Project**: FilAgent - LLM Agent with Governance & Traceability
 
 ---
@@ -288,24 +288,46 @@ class MyTool(BaseTool):
 **Tool Registry**: Auto-registration via `tools/registry.py::get_registry()`
 
 **Available Tools:**
-- `calculator`: Mathematical expressions
-- `file_reader`: Read files with encoding support
-- `python_sandbox`: Execute Python code in isolated environment
-- `document_analyzer_pme`: **Comprehensive document analysis for Quebec SMEs**
-  - **Supported formats**: PDF, DOCX, XLSX (50 MB max)
-  - **Analysis types**: Invoice, extract, financial, contract, report
-  - **Features**:
-    - Real-time document preview (PDF, Excel, Word)
-    - Multi-format export (JSON with EdDSA signature, CSV UTF-8, Excel)
-    - "Download All" ZIP package generator
-    - Comprehensive error handling (10+ validation checks)
-    - PII redaction in all outputs (Loi 25/PIPEDA compliant)
-    - Decision Records for all analyses
-    - Quebec tax calculations (TPS 5%, TVQ 9.975%)
-  - **Validation**: Extension, size, corruption, permissions, disk space
-  - **Security**: Timeout protection (30s), cleanup guarantees, no info leaks
-  - **Testing**: 21 unit tests + 18 compliance tests (100% regulatory compliance)
-  - **Interface**: Available in Gradio app (port 7860) and Agent tool registry
+
+1. **`math_calculator`**: Secure mathematical expression evaluator
+   - **Supported operations**: +, -, *, /, //, %, **, comparisons
+   - **Math functions**: sqrt, sin, cos, tan, log, exp, abs, round, min, max
+   - **Constants**: pi, e
+   - **Security**: Safe eval with blocked dangerous patterns (no eval, exec, import)
+   - **UI Interface**: Gradio accordion in Tools tab (port 7860)
+
+2. **`file_read`**: Secure file reader with allowlist
+   - **Allowed paths**: `working_set/`, `temp/`, `memory/working_set/`
+   - **Max size**: 10 MB
+   - **Security**: Path traversal protection, symlink validation, null byte blocking
+   - **UI Interface**: Gradio accordion in Tools tab (port 7860)
+
+3. **`python_sandbox`**: Isolated Python code execution
+   - **Limits**: 30s CPU, 512 MB RAM, no network/file access
+   - **Security**: AST validation, dangerous imports blocked, resource limits (Unix)
+   - **Blocked**: os, sys, subprocess, socket, pickle, eval, exec, open
+   - **UI Interface**: Gradio accordion in Tools tab with syntax highlighting
+
+4. **`document_analyzer_pme`**: Comprehensive document analysis for Quebec SMEs
+   - **Supported formats**: PDF, DOCX, XLSX (50 MB max)
+   - **Analysis types** (5 types):
+     - `invoice`: TPS/TVQ calculations with tax number extraction
+     - `extract`: Raw data extraction from documents
+     - `financial`: Balance sheets, budgets analysis with financial keyword detection
+     - `contract`: Legal clause detection (confidentiality, non-compete, data protection, etc.)
+     - `report`: Document structure analysis with section detection
+   - **Features**:
+     - Real-time document preview (PDF, Excel, Word)
+     - Multi-format export (JSON with EdDSA signature, CSV UTF-8, Excel)
+     - "Download All" ZIP package generator
+     - Comprehensive error handling (10+ validation checks)
+     - PII redaction in all outputs (Loi 25/PIPEDA compliant)
+     - Decision Records for all analyses
+     - Quebec tax calculations (TPS 5%, TVQ 9.975%)
+   - **Validation**: Extension, size, corruption, permissions, disk space
+   - **Security**: Timeout protection (30s), cleanup guarantees, no info leaks
+   - **Testing**: 21 unit tests + 18 compliance tests (100% regulatory compliance)
+   - **UI Interface**: Main accordion in Tools tab with file upload and preview
 
 ### Memory System
 
@@ -922,23 +944,43 @@ FilAgent provides three web-based interfaces for different use cases:
 
 **Features**:
 - Multi-turn conversations with context retention
-- Document Analyzer tool with real-time preview
-- Model configuration (dynamic switching between Perplexity models)
+- 4 specialized tools with dedicated UI interfaces
+- Model configuration (dynamic switching between Perplexity/OpenAI models)
 - Export results in multiple formats (JSON, CSV, Excel)
 - Download All as ZIP package
 
-**Document Analyzer Tab**:
-- Upload files (PDF, DOCX, XLSX - max 50 MB)
-- Select analysis type (invoice, extract, financial, contract, report)
-- Real-time preview rendering
-- Export analysis results (JSON with EdDSA signature, CSV UTF-8, Excel)
-- Download entire analysis package as ZIP
-- Comprehensive validation (extension, size, corruption, permissions, disk space)
-- Error messages with clear solutions (10+ standardized messages)
-- PII redaction in all outputs (Loi 25/PIPEDA compliant)
-- Decision Records for audit trail
-- Timeout protection (30s max processing time)
-- Automatic cleanup of temporary files
+**Tools Tab** (4 tools with UI):
+
+1. **Document Analyzer** (main accordion):
+   - Upload files (PDF, DOCX, XLSX - max 50 MB)
+   - 5 analysis types: invoice, extract, financial, contract, report
+   - Real-time preview rendering (PDF iframe, Excel table, Word text)
+   - Export analysis results (JSON with EdDSA signature, CSV UTF-8, Excel)
+   - Download entire analysis package as ZIP
+   - Comprehensive validation (extension, size, corruption, permissions, disk space)
+   - Error messages with clear solutions (10+ standardized messages)
+   - PII redaction in all outputs (Loi 25/PIPEDA compliant)
+   - Decision Records for audit trail
+   - Timeout protection (30s max processing time)
+
+2. **Math Calculator** (accordion):
+   - Expression input with examples
+   - Supports: arithmetic, sqrt, sin, cos, tan, log, exp
+   - Secure evaluation (no arbitrary code execution)
+   - Result display with metadata
+
+3. **Python Sandbox** (accordion):
+   - Code editor with syntax highlighting
+   - Isolated execution (30s timeout, 512 MB RAM limit)
+   - AST validation for dangerous patterns
+   - Output and status display
+   - Blocked: os, sys, subprocess, open, eval, exec
+
+4. **File Reader** (accordion):
+   - Path input for allowed directories
+   - Content display with line count
+   - Allowlist: working_set/, temp/, memory/working_set/
+   - Path traversal and symlink protection
 
 ### 2. Model Selector Interface (Port 7861)
 
@@ -975,8 +1017,8 @@ See `docs/GUIDE_SELECTION_MODELES_PERPLEXITY.md` for detailed documentation.
 
 ---
 
-**Version**: 2.3.0
-**Last Updated**: 2025-11-18
+**Version**: 2.4.0
+**Last Updated**: 2025-11-28
 **Maintainer**: FilAgent Team
 
 **Notes**:
