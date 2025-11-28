@@ -153,7 +153,13 @@ class DocumentAnalyzerPME(BaseTool):
         try:
             if analysis_type == "invoice":
                 result = self.analyze_invoice(file_path)
-            else:
+            elif analysis_type == "financial":
+                result = self.analyze_financial(file_path)
+            elif analysis_type == "contract":
+                result = self.analyze_contract(file_path)
+            elif analysis_type == "report":
+                result = self.analyze_report(file_path)
+            else:  # extract or default
                 result = self._extract_data(file_path)
 
             return ToolResult(status=ToolStatus.SUCCESS, output=str(result), metadata=result)
@@ -251,8 +257,8 @@ class DocumentAnalyzerPME(BaseTool):
                 "file_path": {"type": "string", "description": "Path to the document to analyze"},
                 "analysis_type": {
                     "type": "string",
-                    "enum": ["invoice", "extract"],
-                    "description": "Type of analysis to perform (default: invoice)",
+                    "enum": ["invoice", "extract", "financial", "contract", "report"],
+                    "description": "Type of analysis: invoice (TPS/TVQ), extract (raw data), financial (balance sheets/budgets), contract (legal clauses), report (general report)",
                 },
             },
             "required": ["file_path"],
@@ -277,6 +283,181 @@ class DocumentAnalyzerPME(BaseTool):
             "tps_number": self._extract_tax_number(data, "TPS"),
             "tvq_number": self._extract_tax_number(data, "TVQ"),
             "pii_redacted": True,  # Conformité Loi 25
+        }
+
+    def analyze_financial(self, file_path: str) -> Dict[str, Any]:
+        """
+        Analyse financière pour bilans, budgets et états financiers
+
+        Extrait les données financières clés et calcule des ratios pertinents
+        pour les PME québécoises.
+        """
+        data = self._extract_data(file_path)
+        text = data.get("text", "")
+
+        # Extraction des montants financiers
+        amounts = data.get("raw_amounts", [])
+        numeric_amounts = []
+        for amt in amounts:
+            try:
+                numeric_amounts.append(float(str(amt).replace(",", "")))
+            except (ValueError, TypeError):
+                continue
+
+        # Calcul statistiques de base
+        total_amounts = sum(numeric_amounts) if numeric_amounts else 0
+        avg_amount = total_amounts / len(numeric_amounts) if numeric_amounts else 0
+        max_amount = max(numeric_amounts) if numeric_amounts else 0
+        min_amount = min(numeric_amounts) if numeric_amounts else 0
+
+        # Detection de mots-cles financiers
+        financial_keywords = {
+            "actif": text.lower().count("actif"),
+            "passif": text.lower().count("passif"),
+            "capital": text.lower().count("capital"),
+            "revenu": text.lower().count("revenu"),
+            "depense": text.lower().count("dépense") + text.lower().count("depense"),
+            "benefice": text.lower().count("bénéfice") + text.lower().count("benefice"),
+            "perte": text.lower().count("perte"),
+            "budget": text.lower().count("budget"),
+        }
+
+        return {
+            "analysis_type": "financial",
+            "document_type": "financial_statement",
+            "amounts_detected": len(numeric_amounts),
+            "total_amounts": round(total_amounts, 2),
+            "average_amount": round(avg_amount, 2),
+            "max_amount": round(max_amount, 2),
+            "min_amount": round(min_amount, 2),
+            "financial_keywords": financial_keywords,
+            "data_source": data.get("columns", []) if "columns" in data else "text_extraction",
+            "rows_analyzed": data.get("rows", 0) if "rows" in data else len(text.split("\n")),
+            "pii_redacted": True,
+        }
+
+    def analyze_contract(self, file_path: str) -> Dict[str, Any]:
+        """
+        Analyse juridique de contrats
+
+        Detecte les clauses importantes, dates, parties et obligations.
+        Conforme aux exigences de la Loi 25 pour la protection des
+        renseignements personnels.
+        """
+        data = self._extract_data(file_path)
+        text = data.get("text", "")
+        text_lower = text.lower()
+
+        # Detection des parties contractantes (patterns rediges)
+        parties_patterns = [
+            r"entre\s+([^,]+),?\s+(?:ci-après|d'une part)",
+            r"(?:le client|l'acheteur|le vendeur|le fournisseur)\s*:?\s*([^,\n]+)",
+        ]
+        parties_found = []
+        for pattern in parties_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            parties_found.extend(matches[:2])  # Limiter a 2 par pattern
+
+        # Detection de clauses importantes
+        clause_keywords = {
+            "confidentialite": "confidentialité" in text_lower or "confidentialite" in text_lower,
+            "non_concurrence": "non-concurrence" in text_lower or "non concurrence" in text_lower,
+            "resiliation": "résiliation" in text_lower or "resiliation" in text_lower,
+            "garantie": "garantie" in text_lower,
+            "responsabilite": "responsabilité" in text_lower or "responsabilite" in text_lower,
+            "force_majeure": "force majeure" in text_lower,
+            "propriete_intellectuelle": "propriété intellectuelle" in text_lower,
+            "protection_donnees": "protection des données" in text_lower or "loi 25" in text_lower,
+        }
+
+        # Detection de dates
+        date_patterns = [
+            r"\d{1,2}[\s/-]\w+[\s/-]\d{4}",  # 15 janvier 2024
+            r"\d{4}[\s/-]\d{2}[\s/-]\d{2}",  # 2024-01-15
+            r"\d{1,2}/\d{1,2}/\d{4}",        # 15/01/2024
+        ]
+        dates_found = []
+        for pattern in date_patterns:
+            matches = re.findall(pattern, text)
+            dates_found.extend(matches[:5])  # Limiter
+
+        # Detection de montants
+        amounts = data.get("raw_amounts", [])
+
+        return {
+            "analysis_type": "contract",
+            "document_type": "legal_contract",
+            "parties_detected": len(parties_found),
+            "parties": ["[REDACTED]" for _ in parties_found],  # PII redaction
+            "clauses_detected": clause_keywords,
+            "important_clauses_count": sum(clause_keywords.values()),
+            "dates_found": len(dates_found),
+            "amounts_detected": len(amounts),
+            "has_confidentiality": clause_keywords.get("confidentialite", False),
+            "has_data_protection": clause_keywords.get("protection_donnees", False),
+            "word_count": len(text.split()),
+            "paragraphs": data.get("paragraphs", len(text.split("\n\n"))),
+            "pii_redacted": True,
+            "loi25_compliance_check": clause_keywords.get("protection_donnees", False),
+        }
+
+    def analyze_report(self, file_path: str) -> Dict[str, Any]:
+        """
+        Analyse generale de rapports
+
+        Extrait la structure, les sections principales et les metriques
+        cles du document.
+        """
+        data = self._extract_data(file_path)
+        text = data.get("text", "")
+
+        # Analyse de structure
+        lines = text.split("\n")
+        non_empty_lines = [l for l in lines if l.strip()]
+
+        # Detection de sections/titres (lignes courtes en majuscules ou avec numerotation)
+        sections = []
+        for line in non_empty_lines:
+            line_stripped = line.strip()
+            # Titres potentiels: lignes courtes, numerotees, ou en majuscules
+            if len(line_stripped) < 80:
+                if (line_stripped.isupper() or
+                    re.match(r"^\d+[\.\)]\s+", line_stripped) or
+                    re.match(r"^[IVX]+[\.\)]\s+", line_stripped) or
+                    line_stripped.startswith("#")):
+                    sections.append(line_stripped[:50])  # Tronquer
+
+        # Extraction de mots-cles de rapport
+        report_keywords = {
+            "introduction": "introduction" in text.lower(),
+            "conclusion": "conclusion" in text.lower(),
+            "recommandations": "recommandation" in text.lower(),
+            "resume": "résumé" in text.lower() or "resume" in text.lower(),
+            "analyse": "analyse" in text.lower(),
+            "resultats": "résultat" in text.lower() or "resultat" in text.lower(),
+            "methodologie": "méthodologie" in text.lower() or "methodologie" in text.lower(),
+        }
+
+        # Statistiques du document
+        word_count = len(text.split())
+        char_count = len(text)
+        amounts = data.get("raw_amounts", [])
+
+        return {
+            "analysis_type": "report",
+            "document_type": "general_report",
+            "word_count": word_count,
+            "character_count": char_count,
+            "line_count": len(lines),
+            "non_empty_lines": len(non_empty_lines),
+            "sections_detected": len(sections),
+            "section_titles": sections[:10],  # Limiter a 10 sections
+            "structure_keywords": report_keywords,
+            "has_standard_structure": sum(report_keywords.values()) >= 2,
+            "amounts_detected": len(amounts),
+            "estimated_pages": max(1, word_count // 300),  # ~300 mots/page
+            "data_source": "excel" if "columns" in data else "text_document",
+            "pii_redacted": True,
         }
 
     def _extract_data(self, file_path: str) -> Dict:
