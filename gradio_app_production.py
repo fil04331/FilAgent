@@ -32,8 +32,11 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from dotenv import load_dotenv
 
-# Importation du vrai outil d'analyse de documents
+# Importation des outils
 from tools.document_analyzer_pme import DocumentAnalyzerPME
+from tools.python_sandbox import PythonSandboxTool
+from tools.file_reader import FileReaderTool
+from tools.calculator import CalculatorTool
 from tools.base import ToolStatus
 
 # Charger les variables d'environnement (.env) - IMPORTANT pour les API keys
@@ -1299,11 +1302,12 @@ class DocumentAnalyzerTool:
     def _format_success(self, data: Dict, file_path: str) -> str:
         """Formater les résultats avec succès"""
         filename = Path(file_path).name
+        analysis_type = data.get("analysis_type", "")
 
-        # Format selon le type de données
-        if "subtotal" in data:
-            # Facture avec calculs
-            return f"""📄 **Analyse de Document - Succès**
+        # Format selon le type d'analyse
+        if "subtotal" in data and analysis_type != "financial":
+            # Facture avec calculs TPS/TVQ
+            return f"""📄 **Analyse de Facture - Succès**
 
 **Fichier**: `{filename}`
 
@@ -1322,19 +1326,150 @@ class DocumentAnalyzerTool:
 
 ### 🔒 Conformité
 
-✅ **Numéro TPS**: {data.get('tps_number', 'N/A')}
-✅ **Numéro TVQ**: {data.get('tvq_number', 'N/A')}
-✅ **PII Redaction**: {'Activée' if data.get('pii_redacted') else 'Non requise'}
+- **Numéro TPS**: {data.get('tps_number', 'N/A')}
+- **Numéro TVQ**: {data.get('tvq_number', 'N/A')}
+- **PII Redaction**: {'Activée' if data.get('pii_redacted') else 'Non requise'}
 
 ---
 
-**Statut**: ✅ Analyse complète
+**Statut**: Analyse complete
 **Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🔐 *Decision Record créé automatiquement*
+*Decision Record cree automatiquement*
+"""
+        elif analysis_type == "financial":
+            # Analyse financière
+            keywords = data.get("financial_keywords", {})
+            return f"""📊 **Analyse Financière - Succès**
+
+**Fichier**: `{filename}`
+
+---
+
+### 💹 Statistiques Financières
+
+| Métrique | Valeur |
+|----------|--------|
+| **Montants détectés** | {data.get('amounts_detected', 0)} |
+| **Total des montants** | {data.get('total_amounts', 0):,.2f} $ |
+| **Moyenne** | {data.get('average_amount', 0):,.2f} $ |
+| **Maximum** | {data.get('max_amount', 0):,.2f} $ |
+| **Minimum** | {data.get('min_amount', 0):,.2f} $ |
+
+---
+
+### 📈 Mots-clés Financiers Détectés
+
+| Terme | Occurrences |
+|-------|-------------|
+| Actif | {keywords.get('actif', 0)} |
+| Passif | {keywords.get('passif', 0)} |
+| Capital | {keywords.get('capital', 0)} |
+| Revenu | {keywords.get('revenu', 0)} |
+| Dépense | {keywords.get('depense', 0)} |
+| Bénéfice | {keywords.get('benefice', 0)} |
+| Perte | {keywords.get('perte', 0)} |
+| Budget | {keywords.get('budget', 0)} |
+
+---
+
+**Lignes analysées**: {data.get('rows_analyzed', 'N/A')}
+**PII Redaction**: {'Activée' if data.get('pii_redacted') else 'Non requise'}
+
+**Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        elif analysis_type == "contract":
+            # Analyse de contrat
+            clauses = data.get("clauses_detected", {})
+            return f"""📋 **Analyse de Contrat - Succès**
+
+**Fichier**: `{filename}`
+
+---
+
+### ⚖️ Résumé du Contrat
+
+| Métrique | Valeur |
+|----------|--------|
+| **Parties détectées** | {data.get('parties_detected', 0)} |
+| **Clauses importantes** | {data.get('important_clauses_count', 0)} |
+| **Dates trouvées** | {data.get('dates_found', 0)} |
+| **Montants détectés** | {data.get('amounts_detected', 0)} |
+| **Nombre de mots** | {data.get('word_count', 0)} |
+
+---
+
+### 📝 Clauses Détectées
+
+| Clause | Présente |
+|--------|----------|
+| Confidentialité | {'Oui' if clauses.get('confidentialite') else 'Non'} |
+| Non-concurrence | {'Oui' if clauses.get('non_concurrence') else 'Non'} |
+| Résiliation | {'Oui' if clauses.get('resiliation') else 'Non'} |
+| Garantie | {'Oui' if clauses.get('garantie') else 'Non'} |
+| Responsabilité | {'Oui' if clauses.get('responsabilite') else 'Non'} |
+| Force majeure | {'Oui' if clauses.get('force_majeure') else 'Non'} |
+| Propriété intellectuelle | {'Oui' if clauses.get('propriete_intellectuelle') else 'Non'} |
+| Protection des données | {'Oui' if clauses.get('protection_donnees') else 'Non'} |
+
+---
+
+### 🔒 Conformité Loi 25
+
+**Clause de protection des données**: {'Detectee' if data.get('has_data_protection') else 'Non detectee - A VERIFIER'}
+**PII Redaction**: {'Activée' if data.get('pii_redacted') else 'Non requise'}
+
+**Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        elif analysis_type == "report":
+            # Analyse de rapport
+            keywords = data.get("structure_keywords", {})
+            sections = data.get("section_titles", [])
+            return f"""📑 **Analyse de Rapport - Succès**
+
+**Fichier**: `{filename}`
+
+---
+
+### 📊 Statistiques du Document
+
+| Métrique | Valeur |
+|----------|--------|
+| **Nombre de mots** | {data.get('word_count', 0):,} |
+| **Nombre de caractères** | {data.get('character_count', 0):,} |
+| **Lignes non vides** | {data.get('non_empty_lines', 0)} |
+| **Sections détectées** | {data.get('sections_detected', 0)} |
+| **Pages estimées** | {data.get('estimated_pages', 1)} |
+
+---
+
+### 📝 Structure du Document
+
+| Section | Présente |
+|---------|----------|
+| Introduction | {'Oui' if keywords.get('introduction') else 'Non'} |
+| Résumé | {'Oui' if keywords.get('resume') else 'Non'} |
+| Méthodologie | {'Oui' if keywords.get('methodologie') else 'Non'} |
+| Analyse | {'Oui' if keywords.get('analyse') else 'Non'} |
+| Résultats | {'Oui' if keywords.get('resultats') else 'Non'} |
+| Recommandations | {'Oui' if keywords.get('recommandations') else 'Non'} |
+| Conclusion | {'Oui' if keywords.get('conclusion') else 'Non'} |
+
+**Structure standard**: {'Oui' if data.get('has_standard_structure') else 'Non'}
+
+---
+
+### 📋 Sections Détectées
+
+{chr(10).join(['- ' + s for s in sections[:5]]) if sections else '*(Aucune section detectee)*'}
+
+---
+
+**PII Redaction**: {'Activée' if data.get('pii_redacted') else 'Non requise'}
+**Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
         else:
-            # Extraction générique
-            return f"""📄 **Analyse de Document - Succès**
+            # Extraction générique (extract ou autre)
+            return f"""📄 **Extraction de Données - Succès**
 
 **Fichier**: `{filename}`
 
@@ -1346,7 +1481,7 @@ class DocumentAnalyzerTool:
 
 ---
 
-**Statut**: ✅ Extraction complète
+**Statut**: Extraction complete
 **Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
 
@@ -2294,10 +2429,10 @@ def create_gradio_interface() -> gr.Blocks:  # noqa: C901
 
                             # Type d'analyse
                             doc_analysis_type = gr.Radio(
-                                choices=["invoice", "extract"],
+                                choices=["invoice", "extract", "financial", "contract", "report"],
                                 value="invoice",
                                 label="Type d'analyse",
-                                info="'invoice' = Calculs TPS/TVQ | 'extract' = Extraction données brutes",
+                                info="invoice=TPS/TVQ | extract=Donnees brutes | financial=Bilans/Budgets | contract=Clauses juridiques | report=Rapport general",
                             )
 
                             # Bouton d'analyse
@@ -2391,43 +2526,134 @@ Téléversez un fichier pour commencer l'analyse.
                             label="Fichier exporté", visible=False, interactive=False
                         )
 
-                # ========== AUTRES OUTILS (Existants) ==========
+                # ========== CALCULATEUR MATHEMATIQUE ==========
                 gr.Markdown("---")
-                gr.Markdown("### 🛠️ Autres Outils Disponibles")
-
-                with gr.Row():
-                    with gr.Column():
-                        gr.Markdown(
-                            """
-                        ### 💰 Calculateur Fiscal
-                        - TPS/TVQ automatique
-                        - Calculs inverses
-                        - Multi-devises
-                        - Historique
+                with gr.Accordion("🔢 Calculateur Mathématique", open=False):
+                    gr.Markdown(
                         """
-                        )
+                    ### 🧮 Évaluation d'Expressions Mathématiques
 
-                    with gr.Column():
-                        gr.Markdown(
-                            """
-                        ### 🔒 Audit Conformité
-                        - Loi 25 Québec
-                        - RGPD Europe
-                        - Rapports signés
-                        - Recommandations
-                        """
-                        )
+                    Évaluez des expressions mathématiques de manière sécurisée.
+                    Supporte: opérations de base, fonctions trigonométriques, logarithmes, etc.
 
-                    with gr.Column():
-                        gr.Markdown(
-                            """
-                        ### 📊 Rapports Automatisés
-                        - Génération PDF/Excel
-                        - Templates corporatifs
-                        - Signatures numériques
-                        - Export multi-formats
+                    **Exemples**: `2 + 3 * 4`, `sqrt(16)`, `sin(3.14159/2)`, `log(100)`
+                    """
+                    )
+
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            calc_expression_input = gr.Textbox(
+                                label="Expression mathématique",
+                                placeholder="Ex: 2 + 3 * 4, sqrt(16), sin(3.14159)",
+                                lines=2,
+                            )
+                            with gr.Row():
+                                calc_execute_btn = gr.Button(
+                                    "🧮 Calculer", variant="primary", size="lg"
+                                )
+                                calc_clear_btn = gr.Button(
+                                    "🗑️ Effacer", variant="secondary", size="lg"
+                                )
+
+                            # Exemples
+                            gr.Examples(
+                                examples=[
+                                    "2 + 3 * 4",
+                                    "sqrt(16) + 2",
+                                    "sin(3.14159 / 2)",
+                                    "log(100)",
+                                    "(10 + 5) * 3 / 2",
+                                    "2 ** 10",
+                                ],
+                                inputs=calc_expression_input,
+                                label="Exemples d'expressions",
+                            )
+
+                        with gr.Column(scale=1):
+                            calc_result_output = gr.Markdown(
+                                value="**Résultat**: En attente d'une expression...",
+                                label="Résultat",
+                            )
+
+                # ========== SANDBOX PYTHON ==========
+                with gr.Accordion("🐍 Sandbox Python", open=False):
+                    gr.Markdown(
                         """
-                        )
+                    ### 🔒 Exécution Python Sécurisée
+
+                    Exécutez du code Python dans un environnement sandbox isolé.
+                    Limites: CPU 30s, Mémoire 512 MB, pas d'accès réseau/fichiers.
+
+                    **Sécurité**: Validation AST, blocage imports dangereux, isolation processus.
+                    """
+                    )
+
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            sandbox_code_input = gr.Code(
+                                label="Code Python",
+                                language="python",
+                                value="# Exemple: calcul simple\nresult = sum(range(1, 11))\nprint(f'Somme de 1 à 10 = {result}')",
+                                lines=10,
+                            )
+                            with gr.Row():
+                                sandbox_execute_btn = gr.Button(
+                                    "▶️ Exécuter", variant="primary", size="lg"
+                                )
+                                sandbox_clear_btn = gr.Button(
+                                    "🗑️ Effacer", variant="secondary", size="lg"
+                                )
+
+                        with gr.Column(scale=1):
+                            sandbox_output = gr.Markdown(
+                                value="**Sortie**: En attente d'exécution...",
+                                label="Sortie",
+                            )
+                            sandbox_status = gr.Markdown(
+                                value="**Statut**: Prêt",
+                                label="Statut",
+                            )
+
+                # ========== LECTEUR DE FICHIERS ==========
+                with gr.Accordion("📂 Lecteur de Fichiers", open=False):
+                    gr.Markdown(
+                        """
+                    ### 📖 Lecture Sécurisée de Fichiers
+
+                    Lisez le contenu de fichiers texte dans les répertoires autorisés.
+                    Taille max: 10 MB. Protection contre path traversal et symlinks.
+
+                    **Répertoires autorisés**: `working_set/`, `temp/`, `memory/working_set/`
+                    """
+                    )
+
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            file_path_input = gr.Textbox(
+                                label="Chemin du fichier",
+                                placeholder="Ex: working_set/data.txt",
+                                lines=1,
+                            )
+                            with gr.Row():
+                                file_read_btn = gr.Button(
+                                    "📖 Lire", variant="primary", size="lg"
+                                )
+                                file_clear_btn = gr.Button(
+                                    "🗑️ Effacer", variant="secondary", size="lg"
+                                )
+
+                        with gr.Column(scale=2):
+                            file_content_output = gr.Textbox(
+                                label="Contenu du fichier",
+                                value="",
+                                lines=15,
+                                interactive=False,
+                                show_copy_button=True,
+                            )
+                            file_status_output = gr.Markdown(
+                                value="**Statut**: En attente d'un chemin...",
+                                label="Statut",
+                            )
 
             # ========== ONGLET CONFORMITÉ ==========
             with gr.Tab("🔒 Conformité", id=3):
@@ -2779,6 +3005,216 @@ Téléversez un fichier pour commencer l'analyse.
         )
 
         export_all_btn.click(handle_export_zip, outputs=[export_file_output, export_status])
+
+        # ========== CALCULATEUR MATHEMATIQUE EVENT HANDLERS ==========
+
+        # Initialiser l'outil calculateur
+        calculator_tool = CalculatorTool()
+
+        def handle_calculator(expression: str) -> str:
+            """Handler pour le calculateur mathématique"""
+            if not expression or not expression.strip():
+                return "**Résultat**: Veuillez entrer une expression mathématique"
+
+            try:
+                result = calculator_tool.execute({"expression": expression.strip()})
+
+                if result.status == ToolStatus.SUCCESS:
+                    metadata = result.metadata or {}
+                    return f"""**Résultat**: `{result.output}`
+
+---
+
+| Détail | Valeur |
+|--------|--------|
+| Expression | `{metadata.get('expression', expression)}` |
+| Type | {metadata.get('result_type', 'number')} |
+
+*Calculé de manière sécurisée*
+"""
+                else:
+                    return f"""**Erreur**: {result.error}
+
+*Vérifiez la syntaxe de l'expression*
+"""
+            except Exception as e:
+                logger.error(f"Erreur calculateur: {e}")
+                return f"**Erreur**: {str(e)}"
+
+        def clear_calculator() -> Tuple[str, str]:
+            """Effacer le calculateur"""
+            return "", "**Résultat**: En attente d'une expression..."
+
+        calc_execute_btn.click(
+            handle_calculator,
+            inputs=[calc_expression_input],
+            outputs=[calc_result_output],
+        )
+
+        calc_clear_btn.click(
+            clear_calculator,
+            outputs=[calc_expression_input, calc_result_output],
+        )
+
+        # Exécuter aussi sur Enter
+        calc_expression_input.submit(
+            handle_calculator,
+            inputs=[calc_expression_input],
+            outputs=[calc_result_output],
+        )
+
+        # ========== SANDBOX PYTHON EVENT HANDLERS ==========
+
+        # Initialiser l'outil sandbox
+        sandbox_tool = PythonSandboxTool()
+
+        def handle_sandbox(code: str) -> Tuple[str, str]:
+            """Handler pour le sandbox Python"""
+            if not code or not code.strip():
+                return (
+                    "**Sortie**: Veuillez entrer du code Python",
+                    "**Statut**: En attente de code",
+                )
+
+            try:
+                logger.info(f"Exécution sandbox: {len(code)} caractères")
+                result = sandbox_tool.execute({"code": code})
+
+                if result.status == ToolStatus.SUCCESS:
+                    metadata = result.metadata or {}
+                    elapsed = metadata.get("elapsed_time", 0)
+                    output_text = result.output or "[Aucune sortie]"
+
+                    return (
+                        f"""**Sortie**:
+```
+{output_text}
+```
+""",
+                        f"""**Statut**: Execution reussie
+
+| Métrique | Valeur |
+|----------|--------|
+| Temps | {elapsed:.3f}s |
+| Code retour | {metadata.get('returncode', 0)} |
+""",
+                    )
+                elif result.status == ToolStatus.TIMEOUT:
+                    return (
+                        "**Sortie**: *Timeout - exécution trop longue*",
+                        "**Statut**: Timeout (>30s)",
+                    )
+                elif result.status == ToolStatus.BLOCKED:
+                    return (
+                        f"**Sortie**: *Code bloqué*\n\n{result.error}",
+                        "**Statut**: Bloqué (code dangereux détecté)",
+                    )
+                else:
+                    return (
+                        f"**Sortie**: *Erreur*\n\n{result.error}",
+                        "**Statut**: Erreur d'exécution",
+                    )
+            except Exception as e:
+                logger.error(f"Erreur sandbox: {e}")
+                return (
+                    f"**Sortie**: *Exception*\n\n{str(e)}",
+                    "**Statut**: Erreur système",
+                )
+
+        def clear_sandbox() -> Tuple[str, str, str]:
+            """Effacer le sandbox"""
+            return (
+                "# Exemple: calcul simple\nresult = sum(range(1, 11))\nprint(f'Somme de 1 à 10 = {result}')",
+                "**Sortie**: En attente d'exécution...",
+                "**Statut**: Prêt",
+            )
+
+        sandbox_execute_btn.click(
+            handle_sandbox,
+            inputs=[sandbox_code_input],
+            outputs=[sandbox_output, sandbox_status],
+        )
+
+        sandbox_clear_btn.click(
+            clear_sandbox,
+            outputs=[sandbox_code_input, sandbox_output, sandbox_status],
+        )
+
+        # ========== LECTEUR DE FICHIERS EVENT HANDLERS ==========
+
+        # Initialiser l'outil lecteur
+        file_reader_tool = FileReaderTool()
+
+        def handle_file_read(file_path: str) -> Tuple[str, str]:
+            """Handler pour le lecteur de fichiers"""
+            if not file_path or not file_path.strip():
+                return (
+                    "",
+                    "**Statut**: Veuillez entrer un chemin de fichier",
+                )
+
+            try:
+                logger.info(f"Lecture fichier: {file_path}")
+                result = file_reader_tool.execute({"file_path": file_path.strip()})
+
+                if result.status == ToolStatus.SUCCESS:
+                    metadata = result.metadata or {}
+                    file_size = metadata.get("file_size", 0)
+                    content = result.output or ""
+
+                    # Tronquer si trop long pour l'affichage
+                    if len(content) > 50000:
+                        content = content[:50000] + "\n\n... [Tronqué - fichier trop long]"
+
+                    return (
+                        content,
+                        f"""**Statut**: Lecture reussie
+
+| Info | Valeur |
+|------|--------|
+| Taille | {file_size:,} bytes |
+| Lignes | {len(content.splitlines())} |
+""",
+                    )
+                elif result.status == ToolStatus.BLOCKED:
+                    return (
+                        "",
+                        f"**Statut**: Bloqué\n\n{result.error}\n\n*Seuls les répertoires autorisés sont accessibles*",
+                    )
+                else:
+                    return (
+                        "",
+                        f"**Statut**: Erreur\n\n{result.error}",
+                    )
+            except Exception as e:
+                logger.error(f"Erreur lecture fichier: {e}")
+                return ("", f"**Statut**: Exception\n\n{str(e)}")
+
+        def clear_file_reader() -> Tuple[str, str, str]:
+            """Effacer le lecteur"""
+            return (
+                "",
+                "",
+                "**Statut**: En attente d'un chemin...",
+            )
+
+        file_read_btn.click(
+            handle_file_read,
+            inputs=[file_path_input],
+            outputs=[file_content_output, file_status_output],
+        )
+
+        file_clear_btn.click(
+            clear_file_reader,
+            outputs=[file_path_input, file_content_output, file_status_output],
+        )
+
+        # Exécuter aussi sur Enter
+        file_path_input.submit(
+            handle_file_read,
+            inputs=[file_path_input],
+            outputs=[file_content_output, file_status_output],
+        )
 
     return app
 
