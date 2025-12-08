@@ -247,6 +247,22 @@ class TestAgentFallbacks:
             assert agent.dr_manager is not None or agent.dr_manager is None
             assert agent.tracker is not None or agent.tracker is None
     
+    def test_compliance_guardian_initialization_success(self, mock_config):
+        """Test successful ComplianceGuardian initialization"""
+        from planner.compliance_guardian import ComplianceGuardian
+        mock_config.compliance_guardian.enabled = True
+        
+        with patch('runtime.agent.get_config', return_value=mock_config), \
+             patch('runtime.agent.get_logger'), \
+             patch('runtime.agent.get_dr_manager'), \
+             patch('runtime.agent.get_tracker'), \
+             patch('runtime.agent._init_model'):
+            agent = Agent(config=mock_config)
+            
+            # Should be properly initialized with stricter validation
+            assert hasattr(agent, 'compliance_guardian')
+            assert isinstance(agent.compliance_guardian, ComplianceGuardian)
+    
     def test_compliance_guardian_initialization_fallback(self, mock_config):
         """Test fallback when ComplianceGuardian fails"""
         mock_config.compliance_guardian.enabled = True
