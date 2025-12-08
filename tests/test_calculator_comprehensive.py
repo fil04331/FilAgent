@@ -8,6 +8,7 @@ Tests cover:
 - Error handling
 - Unsafe expression detection
 """
+import math
 import pytest
 from tools.calculator import CalculatorTool
 from tools.base import ToolStatus
@@ -239,8 +240,10 @@ class TestAstNameRestrictions:
         result = calculator.execute({"expression": "e ** 2"})
 
         assert result.status == ToolStatus.SUCCESS
-        # e^2 ≈ 7.389
-        assert "7.38" in result.output or "7.39" in result.output
+        # e^2 ≈ 7.389, use tolerance-based comparison
+        result_value = float(result.output)
+        expected_value = math.e ** 2
+        assert abs(result_value - expected_value) < 0.01
 
     def test_function_calls_still_work(self, calculator):
         """Test that function calls (not bare names) still work"""
