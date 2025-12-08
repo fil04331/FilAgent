@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Major documentation reorganization** (2025-12-08)
+  - Reduced root directory from 45+ to 7 essential markdown files
+  - Created `docs/archive/` structure for historical documentation
+  - Moved 40+ documents to organized archive (phases, reports, guides, development)
+  - Created `docs/DOCUMENTATION_STRUCTURE.md` - comprehensive documentation organization guide
+  - Updated `docs/INDEX.md` with new structure and archive references
+  - Moved `README_DEPLOYMENT.md` to `docs/DEPLOYMENT.md`
+  - Improved documentation discoverability and maintenance
+  - See [docs/archive/README.md](docs/archive/README.md) for archival policy
+
 ### Security
 - **Removed unused python-jose dependency** (CVE-2024-23342 mitigation)
   - Resolves Dependabot Alert #85: Minerva timing attack on python-ecdsa
