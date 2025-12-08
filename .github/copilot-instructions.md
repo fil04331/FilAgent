@@ -1,3 +1,12 @@
+---
+title: "GitHub Copilot Instructions for FilAgent"
+description: "Expert en développement backend haute performance (MCP), systèmes massivement concurrents à faible latence"
+version: "1.0.0"
+role: "Ingénieur Backend MCP & Agent System Developer"
+format: "system-prompt"
+language: "en/fr"
+---
+
 # GitHub Copilot Instructions for FilAgent
 
 ## Project Overview
@@ -225,6 +234,191 @@ Based on `config/eval_targets.yaml`:
 - Agent documentation: `AGENT.md`
 - Project phases: `STATUS_PHASE*.md` files
 
+## Backend MCP Development (High-Performance Concurrent Systems)
+
+### When to Apply MCP Backend Expertise
+
+Apply high-performance backend patterns when:
+- **Throughput**: > 500 requests/second required
+- **Latency**: < 10ms P95 response time required (sub-10ms for most requests)
+- **Concurrency**: > 1000 simultaneous connections
+- **Use Cases**: WebSockets, gRPC, real-time systems, MCP servers
+
+### MCP (Model Context Protocol) Server Development
+
+**Core Principles:**
+1. **Protocol Compliance**: Follow MCP specification for tool registration, request/response format
+2. **Async by Default**: All I/O operations must be non-blocking (async/await)
+3. **Connection Pooling**: Reuse connections, implement proper lifecycle management
+4. **Backpressure Handling**: Implement flow control to prevent memory overflow
+5. **Graceful Degradation**: System must remain operational under high load
+
+**MCP Server Architecture:**
+```python
+# Conceptual architecture pattern based on mcp_server.py
+# This is a design template - see mcp_server.py for full working implementation
+# Method bodies use 'pass' as this shows structure, not complete code
+class FilAgentMCPServer:
+    async def initialize(self) -> Dict[str, Any]:
+        """Initialize server components with dependency injection"""
+        self.agent = get_agent()
+        self.config = get_config()
+        self.tool_registry = get_tool_registry()
+        self._register_base_tools()
+        return {
+            "name": "filagent",
+            "version": "1.0.0",
+            "protocolVersion": "1.0.0",
+            "capabilities": {"tools": {}, "prompts": {}}
+        }
+    
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle incoming MCP request with validation and timeout
+        
+        Args:
+            request: MCP request dictionary with method, params, and id
+            
+        Returns:
+            MCP response dictionary with result or error
+        """
+        # 1. Validate request schema with Pydantic
+        # 2. Apply policy engine checks (RBAC, PII masking)
+        # 3. Execute tool with asyncio.wait_for(timeout=30s)
+        # 4. Log to provenance tracker with decision record
+        # 5. Return structured response with usage metrics
+        pass
+    
+    async def shutdown(self):
+        """Graceful shutdown with connection draining"""
+        # 1. Stop accepting new requests (set shutdown flag)
+        # 2. Wait for pending requests with timeout
+        # 3. Close database connection pools
+        # 4. Flush logs and metrics to disk
+        pass
+```
+
+### Performance Optimization Techniques
+
+**1. Concurrency Patterns:**
+- Use `asyncio.gather()` for parallel operations
+- Implement semaphores for resource limiting: `asyncio.Semaphore(max_concurrent)`
+- Use connection pools (asyncpg, aioredis) instead of per-request connections
+- Prefer `asyncio.create_task()` over `await` for fire-and-forget operations
+
+**2. Memory Management:**
+- Stream large responses instead of buffering: `async for chunk in stream`
+- Implement object pooling for frequently created objects
+- Use `__slots__` in Python classes to reduce memory overhead
+- Monitor memory with prometheus metrics
+
+**3. Database Optimization:**
+- Use prepared statements and query caching
+- Implement read replicas for read-heavy workloads
+- Use database connection pooling (asyncpg pool size: 10-50)
+- Add appropriate indexes before deploying
+
+**4. Caching Strategy:**
+- L1: In-memory LRU cache (functools.lru_cache, cachetools)
+- L2: Redis with TTL for distributed cache
+- Cache invalidation: Time-based or event-driven
+- Cache warming for predictable patterns
+
+### Language-Specific Guidance
+
+**Python (Current Backend):**
+- FastAPI for HTTP APIs with async support
+- asyncio for concurrency, avoid threading unless CPU-bound
+- uvloop for 2-4x performance boost: `uvloop.install()`
+- Pydantic V2 for validation (10x faster than V1)
+- Use `asyncpg` over `psycopg2` for PostgreSQL
+
+**Go (Future Performance-Critical Paths):**
+- Goroutines for concurrency with channel-based communication
+- Context for cancellation and timeout propagation
+- Sync.Pool for object reuse
+- pprof for profiling CPU and memory
+
+**Rust (Future Ultra-Low-Latency):**
+- Tokio for async runtime
+- Zero-copy serialization with serde
+- Arc<Mutex<T>> for shared state
+- Avoid allocations in hot paths
+
+### Monitoring & Observability
+
+**Required Metrics:**
+```python
+# Prometheus metrics for MCP server
+# Install: pip install prometheus-client
+# Note: In production, wrap metric usage in conditionals or use a metrics facade
+import logging
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+    
+    mcp_requests_total = Counter('mcp_requests_total', 'Total MCP requests', ['method', 'status'])
+    mcp_request_duration = Histogram('mcp_request_duration_seconds', 'MCP request duration', ['method'])
+    mcp_active_connections = Gauge('mcp_active_connections', 'Active MCP connections')
+    mcp_errors_total = Counter('mcp_errors_total', 'Total MCP errors', ['type'])
+    METRICS_ENABLED = True
+except ImportError:
+    # Metrics disabled if prometheus-client not installed
+    logging.warning("prometheus-client not available, metrics disabled")
+    METRICS_ENABLED = False
+```
+
+**Performance Targets:**
+- P50 latency: < 5ms
+- P95 latency: < 10ms
+- P99 latency: < 50ms
+- Error rate: < 0.1%
+- Throughput: > 500 req/s per instance
+
+### Load Testing & Benchmarking
+
+**Before deploying performance-critical changes:**
+```bash
+# Load test with wrk
+wrk -t12 -c400 -d30s http://localhost:8000/endpoint
+
+# Profile with py-spy
+py-spy record -o profile.svg -- python runtime/server.py
+
+# Memory profiling
+python -m memory_profiler runtime/server.py
+```
+
+### Common Anti-Patterns to Avoid
+
+❌ **DON'T:**
+- Synchronous I/O in async functions (blocking operations)
+- Creating new connections per request
+- Unbounded queues or buffers
+- Missing timeouts on external calls
+- Ignoring backpressure signals
+- Using global locks for frequently accessed data
+
+✅ **DO:**
+- Use connection pooling and keep-alive
+- Implement circuit breakers for external services
+- Set timeouts on all I/O operations (default: 30s)
+- Use semaphores to limit concurrency
+- Profile before optimizing (measure, don't guess)
+- Load test before production deployment
+
+### MCP Server Checklist
+
+Before merging MCP server changes:
+- [ ] All handlers are async with proper error handling
+- [ ] Timeouts configured on all external calls
+- [ ] Connection pooling implemented and tested
+- [ ] Prometheus metrics exported
+- [ ] Load tested at 2x expected traffic
+- [ ] Memory profiling shows no leaks
+- [ ] Graceful shutdown drains connections
+- [ ] Health check endpoint responds < 5ms
+- [ ] Documentation updated with performance characteristics
+
 ## Notes for Copilot
 
 - **Language**: Code, inline comments, and docstrings in English; high-level documentation files in French
@@ -233,3 +427,4 @@ Based on `config/eval_targets.yaml`:
 - **Governance first**: Security and compliance are top priorities
 - **Local-first**: This system is designed to run entirely locally
 - **Regulatory compliance**: Respect Québec Law 25 and EU AI Act requirements
+- **Performance**: For high-throughput/low-latency requirements (>500 req/s, <10ms), apply MCP Backend guidance above
