@@ -235,15 +235,20 @@ jobs:
           echo "📝 Exporting requirements files from PDM..."
 
           # Export production requirements only
-          pdm export -f requirements --without-hashes --prod -o requirements.txt
+          pdm export --prod -o requirements.txt --without-hashes
           echo "✅ Created requirements.txt (production only)"
 
           # Export production + dev requirements
-          pdm export -f requirements --without-hashes --dev -o requirements-dev.txt
+          pdm export --prod -G dev -o requirements-dev.txt --without-hashes
           echo "✅ Created requirements-dev.txt (production + dev)"
 
           # Export production + ML requirements
-          pdm export -f requirements --without-hashes --with ml -o requirements-ml.txt 2>/dev/null || echo "⚠️ No ML dependencies to export"
+          pdm export --prod -G ml -o requirements-ml.txt --without-hashes
+          echo "✅ Created requirements-ml.txt (production + ML)"
+
+          # Export complete requirements
+          pdm export --prod -G dev -G ml -G ui -G benchmark -o requirements_complete.txt --without-hashes
+          echo "✅ Created requirements_complete.txt (all dependencies)"
 
       - name: Check for changes
         id: check_changes
