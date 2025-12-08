@@ -14,6 +14,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime
 from eval.base import BenchmarkHarness, BenchmarkTask, BenchmarkResult
+from eval.planning_validator import evaluate_planning_capability
 
 
 class ComplianceHarness(BenchmarkHarness):
@@ -896,4 +897,63 @@ class ComplianceHarness(BenchmarkHarness):
                 response=response,
                 ground_truth=task.ground_truth,
                 error=f"Audit trail evaluation failed: {str(e)}"
+            )
+    
+    def _evaluate_planning(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
+        """
+        Évaluer la qualité du planning avec validation structurelle
+        
+        Au lieu de chercher des keywords, on valide la structure réelle du plan:
+        - Décomposition en tâches
+        - Validation des dépendances (DAG)
+        - Ordre topologique
+        - Simulabilité d'exécution
+        """
+        try:
+            # Utiliser le planning_validator pour une évaluation robuste
+            evaluation = evaluate_planning_capability(response)
+            
+            if not evaluation['passed']:
+                return BenchmarkResult(
+                    task_id=task.id,
+                    passed=False,
+                    response=response,
+                    ground_truth=task.ground_truth,
+                    error=evaluation.get('error', 'Planning validation failed'),
+                    metadata={'evaluation': evaluation}
+                )
+            
+            # Vérifier les critères minimaux
+            quality = evaluation.get('quality', {})
+            task_count = quality.get('task_count', 0)
+            
+            if task_count < 2:
+                return BenchmarkResult(
+                    task_id=task.id,
+                    passed=False,
+                    response=response,
+                    ground_truth=task.ground_truth,
+                    error="Plan must contain at least 2 tasks",
+                    metadata={'evaluation': evaluation}
+                )
+            
+            return BenchmarkResult(
+                task_id=task.id,
+                passed=True,
+                response=response,
+                ground_truth=task.ground_truth,
+                metadata={
+                    'evaluation': evaluation,
+                    'task_count': task_count,
+                    'quality_score': quality.get('valid', False)
+                }
+            )
+            
+        except Exception as e:
+            return BenchmarkResult(
+                task_id=task.id,
+                passed=False,
+                response=response,
+                ground_truth=task.ground_truth,
+                error=f"Planning evaluation failed: {str(e)}"
             )
