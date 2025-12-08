@@ -180,3 +180,78 @@ class TestMetadata:
 
         assert result.status == ToolStatus.SUCCESS
         assert "result_type" in result.metadata
+
+
+class TestAstNameRestrictions:
+    """Test that ast.Name is restricted to constants only (Issue #178)"""
+
+    def test_bare_sqrt_rejected(self, calculator):
+        """Test that bare function name 'sqrt' is rejected"""
+        result = calculator.execute({"expression": "sqrt"})
+
+        assert result.status == ToolStatus.ERROR
+        assert "Nom non autorisé: sqrt" in result.error
+
+    def test_bare_sin_rejected(self, calculator):
+        """Test that bare function name 'sin' is rejected"""
+        result = calculator.execute({"expression": "sin"})
+
+        assert result.status == ToolStatus.ERROR
+        assert "Nom non autorisé: sin" in result.error
+
+    def test_bare_cos_rejected(self, calculator):
+        """Test that bare function name 'cos' is rejected"""
+        result = calculator.execute({"expression": "cos"})
+
+        assert result.status == ToolStatus.ERROR
+        assert "Nom non autorisé: cos" in result.error
+
+    def test_bare_abs_rejected(self, calculator):
+        """Test that bare function name 'abs' is rejected"""
+        result = calculator.execute({"expression": "abs"})
+
+        assert result.status == ToolStatus.ERROR
+        assert "Nom non autorisé: abs" in result.error
+
+    def test_constant_pi_allowed(self, calculator):
+        """Test that constant 'pi' is still allowed"""
+        result = calculator.execute({"expression": "pi"})
+
+        assert result.status == ToolStatus.SUCCESS
+        assert "3.14" in result.output
+
+    def test_constant_e_allowed(self, calculator):
+        """Test that constant 'e' is still allowed"""
+        result = calculator.execute({"expression": "e"})
+
+        assert result.status == ToolStatus.SUCCESS
+        assert "2.71" in result.output
+
+    def test_pi_in_expression(self, calculator):
+        """Test that pi works in mathematical expressions"""
+        result = calculator.execute({"expression": "2 * pi"})
+
+        assert result.status == ToolStatus.SUCCESS
+        assert "6.28" in result.output
+
+    def test_e_in_expression(self, calculator):
+        """Test that e works in mathematical expressions"""
+        result = calculator.execute({"expression": "e ** 2"})
+
+        assert result.status == ToolStatus.SUCCESS
+        # e^2 ≈ 7.389
+        assert "7.38" in result.output or "7.39" in result.output
+
+    def test_function_calls_still_work(self, calculator):
+        """Test that function calls (not bare names) still work"""
+        result = calculator.execute({"expression": "sqrt(16)"})
+
+        assert result.status == ToolStatus.SUCCESS
+        assert "4" in result.output
+
+    def test_nested_function_calls_work(self, calculator):
+        """Test that nested function calls still work"""
+        result = calculator.execute({"expression": "sqrt(abs(-16))"})
+
+        assert result.status == ToolStatus.SUCCESS
+        assert "4" in result.output

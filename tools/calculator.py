@@ -154,7 +154,7 @@ class CalculatorTool(BaseTool):
                 return func(*args)
             elif isinstance(node, ast.Name):
                 name = node.id
-                if name not in allowed_names:
+                if name not in {'pi', 'e'}:
                     raise ValueError(f"Nom non autorisé: {name}")
                 return allowed_names[name]
             elif isinstance(node, ast.Compare):
