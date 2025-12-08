@@ -256,9 +256,10 @@ Apply high-performance backend patterns when:
 **MCP Server Architecture:**
 ```python
 # Conceptual architecture pattern based on mcp_server.py
-# See mcp_server.py for full implementation details
+# This is a design template - see mcp_server.py for full working implementation
+# Method bodies use 'pass' as this shows structure, not complete code
 class FilAgentMCPServer:
-    async def initialize(self):
+    async def initialize(self) -> Dict[str, Any]:
         """Initialize server components with dependency injection"""
         self.agent = get_agent()
         self.config = get_config()
@@ -349,6 +350,7 @@ class FilAgentMCPServer:
 ```python
 # Prometheus metrics for MCP server
 # Install: pip install prometheus-client
+# Note: In production, wrap metric usage in conditionals or use a metrics facade
 import logging
 
 try:
@@ -358,9 +360,11 @@ try:
     mcp_request_duration = Histogram('mcp_request_duration_seconds', 'MCP request duration', ['method'])
     mcp_active_connections = Gauge('mcp_active_connections', 'Active MCP connections')
     mcp_errors_total = Counter('mcp_errors_total', 'Total MCP errors', ['type'])
+    METRICS_ENABLED = True
 except ImportError:
     # Metrics disabled if prometheus-client not installed
     logging.warning("prometheus-client not available, metrics disabled")
+    METRICS_ENABLED = False
 ```
 
 **Performance Targets:**
