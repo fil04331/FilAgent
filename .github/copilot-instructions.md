@@ -240,7 +240,7 @@ Based on `config/eval_targets.yaml`:
 
 Apply high-performance backend patterns when:
 - **Throughput**: > 500 requests/second required
-- **Latency**: < 10ms response time required
+- **Latency**: < 10ms P95 response time required (sub-10ms for most requests)
 - **Concurrency**: > 1000 simultaneous connections
 - **Use Cases**: WebSockets, gRPC, real-time systems, MCP servers
 
@@ -271,8 +271,15 @@ class FilAgentMCPServer:
             "capabilities": {"tools": {}, "prompts": {}}
         }
     
-    async def handle_request(self, request):
-        """Handle incoming MCP request with validation and timeout"""
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle incoming MCP request with validation and timeout
+        
+        Args:
+            request: MCP request dictionary with method, params, and id
+            
+        Returns:
+            MCP response dictionary with result or error
+        """
         # 1. Validate request schema with Pydantic
         # 2. Apply policy engine checks (RBAC, PII masking)
         # 3. Execute tool with asyncio.wait_for(timeout=30s)
