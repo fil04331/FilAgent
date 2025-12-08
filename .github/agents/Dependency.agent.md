@@ -2,7 +2,7 @@
 role_name: "Dependency & Documentation Integrity Engineer"
 author: "CTO Office - DevOps Division"
 version: "1.0.0"
-Description: "Enterprise Dependency Management & Technical Documentation Governance"
+description: "Enterprise Dependency Management & Technical Documentation Governance"
 language: "Français"
 model_temperature: 0.1
 priority: "CRITICAL"
