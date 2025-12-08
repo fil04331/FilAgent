@@ -21,7 +21,7 @@ Niveaux de validation:
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Optional, Any, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from .metrics import get_metrics
 
 
@@ -59,7 +59,7 @@ class VerificationResult:
     def __post_init__(self):
         """Initialise métadonnées de traçabilité"""
         if "verified_at" not in self.metadata:
-            self.metadata["verified_at"] = datetime.utcnow().isoformat()
+            self.metadata["verified_at"] = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> Dict[str, Any]:
         """Sérialise pour logging"""
@@ -149,7 +149,7 @@ class TaskVerifier:
             "task_name": task.name,
             "task_action": task.action,
             "level": level.value,
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
         }
 
         checks = {}
@@ -233,7 +233,7 @@ class TaskVerifier:
                 pass
             
             # Construire résultat
-            metadata["completed_at"] = datetime.utcnow().isoformat()
+            metadata["completed_at"] = datetime.now(timezone.utc).isoformat()
 
             return VerificationResult(
                 passed=passed,
@@ -248,7 +248,7 @@ class TaskVerifier:
         except Exception as e:
             # Traçabilité: échec de vérification
             metadata["verification_error"] = str(e)
-            metadata["completed_at"] = datetime.utcnow().isoformat()
+            metadata["completed_at"] = datetime.now(timezone.utc).isoformat()
 
             return VerificationResult(
                 passed=False,
@@ -351,7 +351,7 @@ class TaskVerifier:
         try:
             created = datetime.fromisoformat(task.metadata.get("created_at", ""))
             updated = datetime.fromisoformat(task.metadata.get("updated_at", ""))
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Vérifier ordre chronologique
             if created > updated:
@@ -403,7 +403,7 @@ class TaskVerifier:
             "passed": all(checks.values()),
             "checks": checks,
             "stats": self._stats.copy(),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     def get_stats(self) -> Dict[str, Any]:
