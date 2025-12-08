@@ -157,6 +157,30 @@ class CalculatorTool(BaseTool):
                 if name not in allowed_names:
                     raise ValueError(f"Nom non autorisé: {name}")
                 return allowed_names[name]
+            elif isinstance(node, ast.Compare):
+                # Only allow single comparisons (no chaining)
+                if len(node.ops) != 1 or len(node.comparators) != 1:
+                    raise ValueError("Comparaisons multiples non autorisées")
+                allowed_cmp_ops = (ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE)
+                op = node.ops[0]
+                if not isinstance(op, allowed_cmp_ops):
+                    raise ValueError("Opérateur de comparaison non autorisé")
+                left = _eval(node.left)
+                right = _eval(node.comparators[0])
+                if isinstance(op, ast.Eq):
+                    return left == right
+                elif isinstance(op, ast.NotEq):
+                    return left != right
+                elif isinstance(op, ast.Lt):
+                    return left < right
+                elif isinstance(op, ast.LtE):
+                    return left <= right
+                elif isinstance(op, ast.Gt):
+                    return left > right
+                elif isinstance(op, ast.GtE):
+                    return left >= right
+                else:
+                    raise ValueError("Opérateur de comparaison non autorisé")
             else:
                 raise ValueError("Expression non autorisée")
 
