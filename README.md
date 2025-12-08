@@ -145,9 +145,26 @@ curl -X POST http://localhost:8000/chat \
 ```
 
 **Guides additionnels :**
-- [QUICK_TEST.md](QUICK_TEST.md) - Guide complet de tests post-installation
-- [README_DEPLOYMENT.md](README_DEPLOYMENT.md) - Guide de déploiement en production
+- [README_SETUP.md](README_SETUP.md) - Guide complet d'installation
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - Guide de déploiement en production
 - [docs/PERPLEXITY_INTEGRATION.md](docs/PERPLEXITY_INTEGRATION.md) - Configuration détaillée Perplexity
+- [docs/INDEX.md](docs/INDEX.md) - Index complet de la documentation
+
+## **📚 Documentation**
+
+La documentation complète du projet est organisée pour faciliter la découverte et la maintenance :
+
+- **Racine du dépôt** : Documents essentiels (README, CHANGELOG, LICENSE, SECURITY)
+- **`docs/`** : Documentation technique active et maintenue
+- **`docs/archive/`** : Documentation historique et rapports de phases
+- **`docs/ADRs/`** : Architecture Decision Records
+- **`docs/SOPs/`** : Standard Operating Procedures
+
+📖 **Navigation rapide** :
+- [Index complet de la documentation](docs/INDEX.md)
+- [Structure de la documentation](docs/DOCUMENTATION_STRUCTURE.md)
+- [Guide pour Claude Code](CLAUDE.md)
+- [Guidelines pour AI agents](AGENTS.md)
 
 ## **⚖️ Conformité et Gouvernance**
 

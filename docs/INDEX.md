@@ -1,26 +1,34 @@
 # FilAgent Documentation Index
 
-**Version**: 1.0.0
-**Last Updated**: 2025-11-16
+**Version**: 2.0.0
+**Last Updated**: 2025-12-08
 
 This index provides a comprehensive overview of all documentation available for FilAgent.
 
 ---
 
-## Core Documentation
+## Core Documentation (Root Directory)
 
-### Getting Started
+### Essential Documents
 
 - [README.md](/README.md) - Project overview, quick start, and installation
-- [QUICK_TEST.md](/QUICK_TEST.md) - **NEW** Quick testing guide post-installation (2025-11-16)
-- [README_DEPLOYMENT.md](/README_DEPLOYMENT.md) - **NEW** Production deployment guide (2025-11-16)
-- [CLAUDE.md](/CLAUDE.md) - Comprehensive guide for AI assistants
-- [GUIDE_COMPLET_FILAGENT.md](/GUIDE_COMPLET_FILAGENT.md) - Complete user guide (French)
+- [CHANGELOG.md](/CHANGELOG.md) - Version history and notable changes
+- [LICENSE](/LICENSE) - Dual proprietary license (personal/commercial)
+- [SECURITY.md](/SECURITY.md) - Security policies and vulnerability reporting
+- [README_SETUP.md](/README_SETUP.md) - Quick installation guide
 
-### Configuration & Setup
+### AI Assistant Guidelines
 
-- [.env.example](/.env.example) - Environment variables template (Updated 2025-11-16)
-- [models/weights/README.md](/models/weights/README.md) - Model download guide (Updated 2025-11-16)
+- [CLAUDE.md](/CLAUDE.md) - Comprehensive guide for Claude Code
+- [AGENTS.md](/AGENTS.md) - Repository guidelines for AI agents (GitHub Copilot)
+
+---
+
+## Documentation Directory (`docs/`)
+
+### Deployment & Operations
+
+- [DEPLOYMENT.md](/docs/DEPLOYMENT.md) - Production deployment guide
 - [CONFIGURATION_CAPACITES.md](/docs/CONFIGURATION_CAPACITES.md) - Detailed configuration options
 - [DEPENDENCY_MANAGEMENT.md](/docs/DEPENDENCY_MANAGEMENT.md) - PDM and dependency setup
 - [PDM_QUICK_REFERENCE.md](/docs/PDM_QUICK_REFERENCE.md) - Quick reference for PDM commands
@@ -161,11 +169,10 @@ Located in [docs/SOPs/](/docs/SOPs/):
 ### For End Users
 
 1. [README.md](/README.md) - Getting started
-2. [QUICK_TEST.md](/QUICK_TEST.md) - **NEW** Quick testing guide
-3. [README_DEPLOYMENT.md](/README_DEPLOYMENT.md) - **NEW** Deployment guide
-4. [GUIDE_COMPLET_FILAGENT.md](/GUIDE_COMPLET_FILAGENT.md) - Complete guide
-5. [PERPLEXITY_INTEGRATION.md](/docs/PERPLEXITY_INTEGRATION.md) - Perplexity setup
-6. [.env.example](/.env.example) - Configuration template
+2. [README_SETUP.md](/README_SETUP.md) - Quick installation guide
+3. [DEPLOYMENT.md](/docs/DEPLOYMENT.md) - Deployment guide
+4. [PERPLEXITY_INTEGRATION.md](/docs/PERPLEXITY_INTEGRATION.md) - Perplexity setup
+5. [.env.example](/.env.example) - Configuration template
 
 ---
 
@@ -190,14 +197,28 @@ When adding new documentation:
 
 ---
 
+## Archived Documentation
+
+Historical documentation has been moved to [docs/archive/](/docs/archive/) to keep the repository organized. See [docs/archive/README.md](/docs/archive/README.md) for details.
+
+### Archive Categories
+
+- **Phase Reports** ([docs/archive/phases/](/docs/archive/phases/)) - Development phase status reports (Phase 0-5)
+- **Technical Reports** ([docs/archive/reports/](/docs/archive/reports/)) - Historical audit and analysis reports
+- **Guides** ([docs/archive/guides/](/docs/archive/guides/)) - Consolidated or replaced user guides
+- **Development** ([docs/archive/development/](/docs/archive/development/)) - Development artifacts and task cards
+
+**Why Archive?** Archived documents preserve project history and context while keeping the main documentation current and focused. See the [Archive README](/docs/archive/README.md) for the full archival policy.
+
+---
+
 ## Support
 
 **Questions or Issues?**
 - GitHub Issues: https://github.com/fil04331/FilAgent/issues
-- Security: security@filagent.ai
-- Governance: governance@filagent.ai
+- Security: See [SECURITY.md](/SECURITY.md)
 
 ---
 
-**Last Updated**: 2025-11-16
+**Last Updated**: 2025-12-08
 **Maintainer**: FilAgent Technical Writing Team
