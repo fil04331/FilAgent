@@ -95,8 +95,8 @@ class CalculatorTool(BaseTool):
         Utilise ast pour parser et évaluer des expressions mathématiques simples.
         Possibilités : nombres, opérations arithmétiques, appels de fonctions sûres.
         """
-        # Autoriser uniquement les noms et opérations sûres
-        allowed_names = {**self.safe_functions, **self.safe_operations}
+        # Autoriser uniquement les noms sûrs (fonctions et constantes)
+        allowed_names = {**self.safe_functions}
         allowed_func_names = set(self.safe_functions.keys())
         allowed_ops = (
             ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd
