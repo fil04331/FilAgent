@@ -17,7 +17,7 @@ jobs:
 
     steps:
       # Étape 1: Récupère le code de votre dépôt
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Étape 2: Configure l'environnement Python
       - name: Set up Python

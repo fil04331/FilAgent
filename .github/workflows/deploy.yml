@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Validate configuration
         run: |
@@ -56,7 +56,7 @@ jobs:
     needs: validate
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Create deployment package
         run: |
@@ -91,7 +91,7 @@ jobs:
           tar -czf filagent-deployment.tar.gz -C dist filagent
 
       - name: Upload package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: deployment-package
           path: filagent-deployment.tar.gz
@@ -106,7 +106,7 @@ jobs:
 
     steps:
       - name: Download package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v6
         with:
           name: deployment-package
 
