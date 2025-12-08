@@ -255,11 +255,11 @@ Apply high-performance backend patterns when:
 
 **MCP Server Architecture:**
 ```python
-# Example: Async MCP server with proper resource management
-# Based on mcp_server.py implementation
+# Conceptual architecture pattern based on mcp_server.py
+# See mcp_server.py for full implementation details
 class FilAgentMCPServer:
     async def initialize(self):
-        """Initialize server components"""
+        """Initialize server components with dependency injection"""
         self.agent = get_agent()
         self.config = get_config()
         self.tool_registry = get_tool_registry()
@@ -273,19 +273,19 @@ class FilAgentMCPServer:
     
     async def handle_request(self, request):
         """Handle incoming MCP request with validation and timeout"""
-        # Validate request schema
-        # Apply policy engine checks
-        # Execute tool with timeout
-        # Log to provenance tracker
-        # Return structured response
+        # 1. Validate request schema with Pydantic
+        # 2. Apply policy engine checks (RBAC, PII masking)
+        # 3. Execute tool with asyncio.wait_for(timeout=30s)
+        # 4. Log to provenance tracker with decision record
+        # 5. Return structured response with usage metrics
         pass
     
     async def shutdown(self):
         """Graceful shutdown with connection draining"""
-        # Stop accepting new requests
-        # Wait for pending requests (with timeout)
-        # Close database connections
-        # Flush logs and metrics
+        # 1. Stop accepting new requests (set shutdown flag)
+        # 2. Wait for pending requests with timeout
+        # 3. Close database connection pools
+        # 4. Flush logs and metrics to disk
         pass
 ```
 
@@ -342,6 +342,8 @@ class FilAgentMCPServer:
 ```python
 # Prometheus metrics for MCP server
 # Install: pip install prometheus-client
+import logging
+
 try:
     from prometheus_client import Counter, Histogram, Gauge
     
@@ -351,7 +353,7 @@ try:
     mcp_errors_total = Counter('mcp_errors_total', 'Total MCP errors', ['type'])
 except ImportError:
     # Metrics disabled if prometheus-client not installed
-    logger.warning("prometheus-client not available, metrics disabled")
+    logging.warning("prometheus-client not available, metrics disabled")
 ```
 
 **Performance Targets:**
