@@ -7,6 +7,7 @@ import math
 import operator
 from typing import Dict, Any, Optional
 import re
+import ast  # For safe expression evaluation
 
 from .base import BaseTool, ToolResult, ToolStatus
 
@@ -90,40 +91,76 @@ class CalculatorTool(BaseTool):
 
     def _safe_eval(self, expression: str):
         """
-        Évaluer de manière sûre en utilisant seulement les opérations autorisées
-        Note: Cette approche est basique. Une vraie implémentation nécessiterait
-        un parser AST plus sophistiqué.
+        Évaluer de manière SÉCURISÉE sans utiliser eval()
+        Utilise ast pour parser et évaluer des expressions mathématiques simples.
+        Possibilités : nombres, opérations arithmétiques, appels de fonctions sûres.
         """
-        # Nettoyer l'expression
-        expression = expression.strip()
+        # Autoriser uniquement les noms et opérations sûres
+        allowed_names = {**self.safe_functions, **self.safe_operations}
+        allowed_func_names = set(self.safe_functions.keys())
+        allowed_ops = (
+            ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd
+        )
 
-        # Bloquer les appels de fonctions dangereux
-        if any(func in expression for func in ["eval", "exec", "__", "import"]):
-            raise ValueError("Unsafe expression detected")
+        # Parse l'expression en AST
+        try:
+            node = ast.parse(expression.strip(), mode='eval')
+        except Exception:
+            raise ValueError("Expression non valide")
 
-        # Remplacer les fonctions mathématiques par des appels Python
-        for func_name, func in self.safe_functions.items():
-            if func_name in expression:
-                # Remplacer les appels de fonction
-                pattern = rf"\b{func_name}\s*\("
-                if re.search(pattern, expression):
-                    # Créer un contexte d'exécution
-                    context = self.safe_functions.copy()
+        def _eval(node):
+            if isinstance(node, ast.Expression):
+                return _eval(node.body)
+            elif isinstance(node, ast.Num):  # Python <=3.7
+                return node.n
+            elif isinstance(node, ast.Constant):  # Python >=3.8
+                if isinstance(node.value, (int, float)):
+                    return node.value
+                else:
+                    raise ValueError("Constante non autorisée")
+            elif isinstance(node, ast.BinOp):
+                if not isinstance(node.op, allowed_ops):
+                    raise ValueError("Opérateur non autorisé")
+                left = _eval(node.left)
+                right = _eval(node.right)
+                if isinstance(node.op, ast.Add):
+                    return left + right
+                elif isinstance(node.op, ast.Sub):
+                    return left - right
+                elif isinstance(node.op, ast.Mult):
+                    return left * right
+                elif isinstance(node.op, ast.Div):
+                    return left / right
+                elif isinstance(node.op, ast.Pow):
+                    return left ** right
+                elif isinstance(node.op, ast.Mod):
+                    return left % right
+            elif isinstance(node, ast.UnaryOp):
+                if not isinstance(node.op, allowed_ops):
+                    raise ValueError("Opérateur unaire non autorisé")
+                operand = _eval(node.operand)
+                if isinstance(node.op, ast.USub):
+                    return -operand
+                elif isinstance(node.op, ast.UAdd):
+                    return +operand
+            elif isinstance(node, ast.Call):
+                if not isinstance(node.func, ast.Name):
+                    raise ValueError("Appel de fonction non autorisé")
+                func_name = node.func.id
+                if func_name not in allowed_func_names:
+                    raise ValueError(f"Fonction non autorisée: {func_name}")
+                func = allowed_names[func_name]
+                args = [_eval(arg) for arg in node.args]
+                return func(*args)
+            elif isinstance(node, ast.Name):
+                name = node.id
+                if name not in allowed_names:
+                    raise ValueError(f"Nom non autorisé: {name}")
+                return allowed_names[name]
+            else:
+                raise ValueError("Expression non autorisée")
 
-                    # Évaluer dans un contexte limité
-                    result = eval(expression, {"__builtins__": {}}, context)
-                    return result
-
-        # Pour les expressions simples (arithmétique basique)
-        # Créer un contexte vide (pas de builtins)
-        context = {"__builtins__": {}}
-        context.update(self.safe_operations)
-        context.update(self.safe_functions)
-
-        # Évaluer
-        result = eval(expression, context, {})
-        return result
-
+        return _eval(node)
     def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""
         if not isinstance(arguments, dict):
