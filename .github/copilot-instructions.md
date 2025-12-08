@@ -1,6 +1,6 @@
 ---
 title: "GitHub Copilot Instructions for FilAgent"
-description: "Expert en développement backend haute performance (MCP), systèmes massivement concurrents et faible latence"
+description: "Expert en développement backend haute performance (MCP), systèmes massivement concurrents à faible latence"
 version: "1.0.0"
 role: "Ingénieur Backend MCP & Agent System Developer"
 format: "system-prompt"
@@ -256,22 +256,36 @@ Apply high-performance backend patterns when:
 **MCP Server Architecture:**
 ```python
 # Example: Async MCP server with proper resource management
+# Based on mcp_server.py implementation
 class FilAgentMCPServer:
     async def initialize(self):
-        # Initialize connection pools
-        # Register tools with async handlers
-        # Set up health checks
-        pass
+        """Initialize server components"""
+        self.agent = get_agent()
+        self.config = get_config()
+        self.tool_registry = get_tool_registry()
+        self._register_base_tools()
+        return {
+            "name": "filagent",
+            "version": "1.0.0",
+            "protocolVersion": "1.0.0",
+            "capabilities": {"tools": {}, "prompts": {}}
+        }
     
     async def handle_request(self, request):
-        # Validate request
-        # Execute with timeout
+        """Handle incoming MCP request with validation and timeout"""
+        # Validate request schema
+        # Apply policy engine checks
+        # Execute tool with timeout
+        # Log to provenance tracker
         # Return structured response
         pass
     
     async def shutdown(self):
-        # Drain pending requests
-        # Close connections gracefully
+        """Graceful shutdown with connection draining"""
+        # Stop accepting new requests
+        # Wait for pending requests (with timeout)
+        # Close database connections
+        # Flush logs and metrics
         pass
 ```
 
@@ -327,12 +341,17 @@ class FilAgentMCPServer:
 **Required Metrics:**
 ```python
 # Prometheus metrics for MCP server
-from prometheus_client import Counter, Histogram, Gauge
-
-mcp_requests_total = Counter('mcp_requests_total', 'Total MCP requests', ['method', 'status'])
-mcp_request_duration = Histogram('mcp_request_duration_seconds', 'MCP request duration', ['method'])
-mcp_active_connections = Gauge('mcp_active_connections', 'Active MCP connections')
-mcp_errors_total = Counter('mcp_errors_total', 'Total MCP errors', ['type'])
+# Install: pip install prometheus-client
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+    
+    mcp_requests_total = Counter('mcp_requests_total', 'Total MCP requests', ['method', 'status'])
+    mcp_request_duration = Histogram('mcp_request_duration_seconds', 'MCP request duration', ['method'])
+    mcp_active_connections = Gauge('mcp_active_connections', 'Active MCP connections')
+    mcp_errors_total = Counter('mcp_errors_total', 'Total MCP errors', ['type'])
+except ImportError:
+    # Metrics disabled if prometheus-client not installed
+    logger.warning("prometheus-client not available, metrics disabled")
 ```
 
 **Performance Targets:**
