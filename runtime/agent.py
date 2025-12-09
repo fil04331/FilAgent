@@ -10,6 +10,14 @@ import textwrap
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
+# Structured logging avec fallback robuste
+import structlog
+try:
+    _module_logger = structlog.get_logger("agent")
+except Exception:
+    import logging
+    _module_logger = logging.getLogger("agent")  # Fallback stdlib
+
 from .config import get_config
 from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
@@ -49,19 +57,19 @@ class Agent:
         try:
             self.logger = get_logger()
         except Exception as e:
-            print(f"⚠ Failed to initialize logger: {e}")
+            _module_logger.warning("logger_init_failed", error=str(e))
             self.logger = None
 
         try:
             self.dr_manager = get_dr_manager()
         except Exception as e:
-            print(f"⚠ Failed to initialize DR manager: {e}")
+            _module_logger.warning("dr_manager_init_failed", error=str(e))
             self.dr_manager = None
 
         try:
             self.tracker = get_tracker()
         except Exception as e:
-            print(f"⚠ Failed to initialize tracker: {e}")
+            _module_logger.warning("tracker_init_failed", error=str(e))
             self.tracker = None
 
         # Initialiser le ComplianceGuardian si activé
@@ -72,7 +80,7 @@ class Agent:
                 rules_path = getattr(cg_config, "rules_path", "config/compliance_rules.yaml")
                 self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
         except Exception as e:
-            print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+            _module_logger.warning("compliance_guardian_init_failed", error=str(e))
             self.compliance_guardian = None
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
@@ -99,21 +107,21 @@ class Agent:
             if not self._is_mock(self.logger) and self.logger is not current_logger:
                 self.logger = current_logger
         except Exception as e:
-            print(f"⚠ Failed to refresh logger: {e}")
+            _module_logger.warning("logger_refresh_failed", error=str(e))
 
         try:
             current_dr_manager = audittrail_mw.get_dr_manager()
             if not self._is_mock(self.dr_manager) and self.dr_manager is not current_dr_manager:
                 self.dr_manager = current_dr_manager
         except Exception as e:
-            print(f"⚠ Failed to refresh DR manager: {e}")
+            _module_logger.warning("dr_manager_refresh_failed", error=str(e))
 
         try:
             current_tracker = provenance_mw.get_tracker()
             if not self._is_mock(self.tracker) and self.tracker is not current_tracker:
                 self.tracker = current_tracker
         except Exception as e:
-            print(f"⚠ Failed to refresh tracker: {e}")
+            _module_logger.warning("tracker_refresh_failed", error=str(e))
 
         # Rafraîchir le ComplianceGuardian si la configuration change
         try:
@@ -125,7 +133,7 @@ class Agent:
             else:
                 self.compliance_guardian = None
         except Exception as e:
-            print(f"⚠ Failed to refresh ComplianceGuardian: {e}")
+            _module_logger.warning("compliance_guardian_refresh_failed", error=str(e))
 
     def initialize_model(self):
         """Initialiser le modèle"""
@@ -294,7 +302,7 @@ class Agent:
                     task_id=task_id,
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.start.htn event: {e}")
+                _module_logger.warning("log_event_failed", event="conversation.start.htn", error=str(e))
 
         # 1. Planifier
         htn_config = getattr(self.config, "htn_planning", None)
@@ -330,7 +338,7 @@ class Agent:
                     reasoning_markers=[f"plan_confidence:{plan_result.confidence}"],
                 )
             except Exception as e:
-                print(f"⚠ Failed to create decision record for planning: {e}")
+                _module_logger.warning("dr_creation_failed", decision="planning", error=str(e))
 
         # 2. Exécuter
         exec_result = self.executor.execute(
@@ -352,7 +360,7 @@ class Agent:
             response = self._format_htn_response(plan_result, exec_result, verifications, conversation_id, task_id)
         else:
             # Échec critique: fallback sur mode simple
-            print("⚠ HTN execution failed, falling back to simple mode")
+            _module_logger.warning("htn_execution_failed", action="fallback_to_simple")
             response = self._run_simple(user_query, conversation_id, task_id)
 
         # Métriques: calculer et mettre à jour métriques agrégées
@@ -384,7 +392,7 @@ class Agent:
                 if cg_config and cg_config.strict_mode:
                     raise
                 else:
-                    print(f"⚠ Compliance validation warning: {e}")
+                    _module_logger.warning("compliance_validation_warning", error=str(e))
 
         # Logger le début de la conversation (avec fallback)
         if self.logger:
@@ -397,7 +405,7 @@ class Agent:
                     task_id=task_id,
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.start event: {e}")
+                _module_logger.warning("log_event_failed", event="conversation.start", error=str(e))
 
         # Enregistrer le message utilisateur en mémoire persistante
         try:
@@ -408,12 +416,12 @@ class Agent:
                 task_id=task_id,
             )
         except Exception as e:
-            print(f"⚠ Failed to persist user message: {e}")
+            _module_logger.warning("persist_message_failed", role="user", error=str(e))
 
         try:
             history = get_messages(conversation_id)
         except Exception as e:
-            print(f"⚠ Failed to load conversation history: {e}")
+            _module_logger.warning("load_history_failed", conversation_id=conversation_id, error=str(e))
             history = []
         trimmed_history = history[:-1] if history else history
         context = self._build_context(trimmed_history, conversation_id, task_id)
@@ -496,7 +504,7 @@ class Agent:
                                 output=execution_result.output if execution_result.output else execution_result.error,
                             )
                         except Exception as e:
-                            print(f"⚠ Failed to log tool call for '{tool_name}': {e}")
+                            _module_logger.warning("log_tool_call_failed", tool=tool_name, error=str(e))
 
                     if self.tracker:
                         try:
@@ -516,7 +524,7 @@ class Agent:
                                 end_time=tool_end_time,
                             )
                         except Exception as e:
-                            print(f"⚠ Failed to track tool execution for '{tool_name}': {e}")
+                            _module_logger.warning("track_tool_execution_failed", tool=tool_name, error=str(e))
 
                 # Injecter les résultats des outils dans le contexte et relancer le modèle
                 formatted_results = self._format_tool_results(tool_results)
@@ -548,7 +556,7 @@ class Agent:
                 task_id=task_id,
             )
         except Exception as e:
-            print(f"⚠ Failed to persist assistant message: {e}")
+            _module_logger.warning("persist_message_failed", role="assistant", error=str(e))
 
         response_hash = hashlib.sha256(final_response.encode("utf-8")).hexdigest()
         unique_tools = list(dict.fromkeys(tools_used))
@@ -563,7 +571,7 @@ class Agent:
                     tokens_used=usage["total_tokens"],
                 )
             except Exception as e:
-                print(f"⚠ Failed to log generation: {e}")
+                _module_logger.warning("log_generation_failed", error=str(e))
 
         if self.tracker:
             try:
@@ -582,7 +590,7 @@ class Agent:
                     },
                 )
             except Exception as e:
-                print(f"⚠ Failed to track generation: {e}")
+                _module_logger.warning("track_generation_failed", error=str(e))
 
         if self.dr_manager and (
             unique_tools
@@ -615,9 +623,9 @@ class Agent:
                             metadata={"dr_id": dr.dr_id},
                         )
                     except Exception as e:
-                        print(f"⚠ Failed to log dr.created event: {e}")
+                        _module_logger.warning("log_event_failed", event="dr.created", error=str(e))
             except Exception as e:
-                print(f"⚠ Failed to create decision record: {e}")
+                _module_logger.warning("dr_creation_failed", decision="generate_response", error=str(e))
 
         # COMPLIANCE: Auditer l'exécution et générer Decision Record
         if self.compliance_guardian:
@@ -659,7 +667,7 @@ class Agent:
                         context=dr_context
                     )
             except Exception as e:
-                print(f"⚠ Compliance audit/DR generation warning: {e}")
+                _module_logger.warning("compliance_audit_failed", error=str(e))
 
         if self.logger:
             try:
@@ -672,7 +680,7 @@ class Agent:
                     metadata={"iterations": iterations},
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.end event: {e}")
+                _module_logger.warning("log_event_failed", event="conversation.end", error=str(e))
 
         return {
             "response": final_response,
@@ -905,7 +913,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
                 task_id=task_id,
             )
         except Exception as e:
-            print(f"⚠ Failed to persist assistant message: {e}")
+            _module_logger.warning("persist_message_failed", role="assistant", context="htn", error=str(e))
 
         # Logger la fin de la conversation HTN
         if self.logger:
@@ -923,7 +931,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
                     },
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.end.htn event: {e}")
+                _module_logger.warning("log_event_failed", event="conversation.end.htn", error=str(e))
 
         return {
             "response": response_text,
