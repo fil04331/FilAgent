@@ -244,18 +244,13 @@ class Agent:
         - Requêtes complexes: "analyse... génère... crée..."
         - Nombre de verbes d'action > 2
         """
-        # DEBUG: ACTIVÉ TEMPORAIREMENT pour investiguer bug troncature 283 chars
-        print(f"\n[HTN-DEBUG] _requires_planning called for query: {query[:100]}...")
-
         # Vérifier si HTN est activé dans la configuration
         htn_config = getattr(self.config, "htn_planning", None)
         if htn_config and not getattr(htn_config, "enabled", True):
-            print(f"[HTN-DEBUG] HTN disabled in config, returning False")
             return False
 
         # Si le planificateur n'est pas initialisé, ne pas utiliser HTN
         if self.planner is None:
-            print(f"[HTN-DEBUG] Planner not initialized, returning False")
             return False
 
         keywords = ["puis", "ensuite", "après", "finalement", "et"]
@@ -275,12 +270,7 @@ class Agent:
         has_multi_step = any(kw in query.lower() for kw in keywords)
         num_actions = sum(1 for verb in action_verbs if verb in query.lower())
 
-        result = has_multi_step or num_actions >= 2
-        print(f"[HTN-DEBUG] Planning decision: {result}")
-        print(f"  - has_multi_step: {has_multi_step}")
-        print(f"  - num_actions: {num_actions}")
-
-        return result
+        return has_multi_step or num_actions >= 2
 
     def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécution avec planification HTN"""
@@ -870,25 +860,11 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
     def _generic_execute(self, params: Dict) -> Any:
         """Action générique pour tâches non-mappées"""
         query = params.get("query", "")
-        # Utiliser le mode simple pour exécuter la requête
         conversation_id = params.get("conversation_id", "default")
         task_id = params.get("task_id")
 
-        # DEBUG: Log avant exécution
-        print(f"\n[HTN-DEBUG] _generic_execute INPUT:")
-        print(f"  - Query length: {len(query)} chars")
-        print(f"  - Query preview: {query[:100] if len(query) > 100 else query}...")
-
         result = self._run_simple(query, conversation_id, task_id)
-        response = result.get("response", "")
-
-        # DEBUG: Log après exécution
-        print(f"\n[HTN-DEBUG] _generic_execute OUTPUT:")
-        print(f"  - Response type: {type(response)}")
-        print(f"  - Response length: {len(str(response))} chars")
-        print(f"  - Response preview: {str(response)[:300] if len(str(response)) > 300 else str(response)}...")
-
-        return response
+        return result.get("response", "")
 
     def _format_htn_response(
         self,
@@ -904,19 +880,8 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
         results = []
         sorted_tasks = plan_result.graph.topological_sort()
 
-        # DEBUG: Log avant agrégation
-        print(f"\n[HTN-DEBUG] _format_htn_response - Aggregating results:")
-        print(f"  - Number of sorted tasks: {len(sorted_tasks)}")
-
         for task in sorted_tasks:
             if task.status == TaskStatus.COMPLETED:
-                # DEBUG: Log de chaque résultat de tâche
-                print(f"\n[HTN-DEBUG] Processing task: {task.task_id}")
-                print(f"  - Task name: {task.name}")
-                print(f"  - Task result type: {type(task.result)}")
-                print(f"  - Task result length: {len(str(task.result))} chars")
-                print(f"  - Task result preview: {str(task.result)[:300] if len(str(task.result)) > 300 else str(task.result)}...")
-
                 verification = verifications.get(task.task_id, None) if isinstance(verifications, dict) else None
                 results.append(
                     {
@@ -986,15 +951,6 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
         if not results:
             return "Aucun résultat disponible."
 
-        # DEBUG: Log des résultats reçus
-        print(f"\n[HTN-DEBUG] _generate_response_from_results INPUT:")
-        print(f"  - Number of results: {len(results)}")
-        for i, result in enumerate(results):
-            task_result = result.get("result", "")
-            print(f"  - Result {i+1} type: {type(task_result)}")
-            print(f"  - Result {i+1} length: {len(str(task_result))} chars")
-            print(f"  - Result {i+1} preview: {str(task_result)[:200] if len(str(task_result)) > 200 else str(task_result)}...")
-
         response_parts = []
         response_parts.append("J'ai complété les tâches suivantes:\n")
 
@@ -1016,12 +972,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
                     result_str = result_str[:4000] + "...\n(résultat tronqué - trop long)"
                 response_parts.append(f"   Résultat: {result_str}")
 
-        final_response = "\n".join(response_parts)
-        print(f"\n[HTN-DEBUG] _generate_response_from_results OUTPUT:")
-        print(f"  - Final response length: {len(final_response)} chars")
-        print(f"  - Final response preview: {final_response[:300]}...")
-
-        return final_response
+        return "\n".join(response_parts)
 
 
 # Classe helper pour l'intégration avec le serveur
