@@ -90,7 +90,7 @@ Return JSON with structure:
         }
     ],
     "aggregation": {
-        "strategy": "merge_dict|deep_merge|concat_list|null",
+        "strategy": "merge_dict",
         "config": {}
     },
     "transforms": [
