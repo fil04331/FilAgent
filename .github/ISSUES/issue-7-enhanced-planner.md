@@ -85,7 +85,7 @@ Return JSON with structure:
     "sources": [
         {
             "name": "descriptive_name",
-            "action": "tool_name",  // file_read, web_fetch, document_analyzer_pme, etc.
+            "action": "tool_name",  # file_read, web_fetch, document_analyzer_pme, etc.
             "params": {}
         }
     ],
