@@ -39,7 +39,7 @@ class TaskExecutor:
     def _execute_task(self, task: Task) -> TypedResult:
         """Execute task with param resolution and result wrapping."""
         resolved_params = self._resolve_params(task)
-        raw_result = self.actions[task.action](resolved_params)
+        raw_result = self.actions[task.action](**resolved_params)
         return self._wrap_result(raw_result, task)
 
     def _wrap_result(self, raw_result: Any, task: Task) -> TypedResult:
