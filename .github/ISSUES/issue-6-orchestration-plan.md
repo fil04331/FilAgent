@@ -27,7 +27,7 @@ class SourceSpec:
     name: str
     action: str
     params: Dict[str, Any]
-    output_schema: Optional[Dict] = None
+    output_schema: Optional[Dict[str, Any]] = None
     timeout_seconds: int = 60
 
 @dataclass
