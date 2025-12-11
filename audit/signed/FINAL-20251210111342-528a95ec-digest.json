@@ -1,0 +1,14 @@
+{
+  "finalization_id": "FINAL-20251210111342-528a95ec",
+  "log_file": "/tmp/pytest-of-runner/pytest-2/test_finalize_archives_to_audi0/logs/events.jsonl",
+  "timestamp": "2025-12-10T11:13:42.022946",
+  "sha256": "2d8c42f5aa74f1feae07e121aaee30a7368730c2af04830f85116ce219357d6c",
+  "merkle_root": "528a95ec1b354a19c0cf66c4e45c2abfcd5d4b5209cedac8e9a8d112562134bb",
+  "num_entries": 2,
+  "signature": "ed25519:eb7d009a56497026926c67b5473d2fe28369af15ddf59b13d22ee97d13a4054d5497e1b169eae4d833acb23dcfc2d68703c8efa68db8df28eedc9b700a6d0209",
+  "compliance": {
+    "standard": "Loi 25 (Qu\u00e9bec)",
+    "immutable": true,
+    "tamper_evident": true
+  }
+}

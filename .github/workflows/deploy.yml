@@ -70,11 +70,19 @@ jobs:
           # Créer script de démarrage
           cat > dist/filagent/start.sh << 'EOF'
           #!/bin/bash
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
-          python -c "from memory.episodic import create_tables; create_tables()"
-          python runtime/server.py
+          # Install PDM if not available
+          if ! command -v pdm &> /dev/null; then
+            python -m pip install pdm
+          fi
+          
+          # Install dependencies using PDM
+          pdm install --prod
+          
+          # Initialize database
+          pdm run python -c "from memory.episodic import create_tables; create_tables()"
+          
+          # Start server
+          pdm run python runtime/server.py
           EOF
 
           chmod +x dist/filagent/start.sh

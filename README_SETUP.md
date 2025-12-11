@@ -4,7 +4,7 @@
 
 - Python 3.10+
 - Git
-- `pip` ou `uv` (gestionnaire de paquets)
+- **PDM** (gestionnaire de dépendances recommandé) ou `pip` (alternative)
 
 ## Installation
 
@@ -24,15 +24,31 @@ source venv/bin/activate  # Sur Windows: venv\Scripts\activate
 
 ### 3. Installer les dépendances
 
+**Méthode recommandée : PDM**
+
+```bash
+# Installer PDM
+pip install pdm
+
+# Installer toutes les dépendances
+pdm install
+
+# Ou uniquement les dépendances de production
+pdm install --prod
+```
+
+**Méthode alternative : pip**
+
 ```bash
 pip install -r requirements.txt
 ```
 
+> ℹ️ **Note importante** : Les fichiers `requirements*.txt` sont générés automatiquement par PDM à partir de `pyproject.toml`. Pour ajouter, mettre à jour ou supprimer des dépendances, utilisez les commandes PDM et régénérez les fichiers requirements. Voir `docs/DEPENDENCY_MANAGEMENT.md` pour plus de détails.
+
 > ℹ️ **Dépendances optionnelles** : les modules lourds comme `llama-cpp-python`,
 > `faiss-cpu` ou `sentence-transformers` disposent d'un mode dégradé dans le
 > code. Ils ne sont nécessaires que si vous activez la mémoire sémantique ou un
-> backend LLM local. Installez-les uniquement si votre environnement le permet
-> via `pip install -r requirements-optional.txt`.
+> backend LLM local. Installez-les avec `pdm install -G ml` ou `pip install -r requirements-ml.txt`.
 
 ### 4. Télécharger un modèle
 
@@ -101,6 +117,20 @@ curl -X POST http://localhost:8000/chat \
 - Lire `docs/SOPs/` pour les procédures opérationnelles
 
 ## Troubleshooting
+
+### Erreur "Cannot install... conflicting dependencies"
+
+Cela signifie que les fichiers `requirements*.txt` ne sont pas synchronisés avec `pdm.lock`. Correction :
+
+```bash
+# Méthode 1: Utiliser PDM directement (recommandé)
+pip install pdm
+pdm install --prod
+
+# Méthode 2: Régénérer les fichiers requirements
+pdm export --prod -o requirements.txt --without-hashes
+pip install -r requirements.txt
+```
 
 ### Erreur "Model not found"
 

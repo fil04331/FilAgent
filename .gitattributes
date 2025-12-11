@@ -1,0 +1,8 @@
+# Mark PDM-generated files as linguist-generated to hide from diffs by default
+requirements.txt linguist-generated=true
+requirements-dev.txt linguist-generated=true
+requirements-ml.txt linguist-generated=true
+requirements_complete.txt linguist-generated=true
+
+# PDM lock file is binary-treated for merge conflicts
+pdm.lock merge=union
