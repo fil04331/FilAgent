@@ -96,7 +96,7 @@ Return JSON with structure:
     "transforms": [
         {
             "name": "step_name",
-            "type": "to_excel|to_csv|to_pdf|extract_fields|filter_rows|...",
+            "type": "to_excel",
             "input": "source_name or previous_transform_name",
             "config": {}
         }
