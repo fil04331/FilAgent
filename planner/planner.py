@@ -18,7 +18,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, List, Dict, Optional, Union, Protocol
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    TypedDict,
+    Union,
+    cast,
+)
 from datetime import datetime
 import json
 import re
@@ -41,15 +53,48 @@ class ModelInterface(Protocol):
     ) -> Union[str, Dict[str, str]]: ...
 
 
+# Protocol pour un outil avec attribut name
+class ToolProtocol(Protocol):
+    """Protocol pour les outils du registre"""
+    name: str
+
+
 # Protocol pour le registre d'outils
 class ToolsRegistry(Protocol):
     """Protocol pour le registre d'outils"""
-    def get_all(self) -> List[object]: ...
+    def get_all(self) -> Sequence[ToolProtocol]: ...
 
 
 # Types stricts pour le planificateur
 PlanningMetadataValue = Union[str, int, float, bool, List[str], Dict[str, str]]
-DecompositionTask = Dict[str, Union[str, int, List[int], Dict[str, str]]]
+NestedPlanningMetadataValue = Union[
+    str, int, float, bool, List[str], Dict[str, str],
+    Dict[str, PlanningMetadataValue]  # Pour supporter context imbriqué
+]
+
+# TypedDict pour les templates de règles
+class TaskTemplateDict(TypedDict, total=False):
+    """Template de tâche pour les règles prédéfinies"""
+    action: str
+    extract: int
+    depends_on: List[int]
+
+
+# TypedDict pour les tâches décomposées par le LLM
+class LLMDecomposedTask(TypedDict, total=False):
+    """Tâche décomposée par le LLM"""
+    name: str
+    action: str
+    params: Dict[str, str]
+    depends_on: List[int]
+    priority: int
+
+
+# TypedDict pour le résultat de décomposition LLM
+class LLMDecompositionResult(TypedDict, total=False):
+    """Résultat de décomposition par le LLM"""
+    tasks: List[LLMDecomposedTask]
+    reasoning: str
 
 
 class PlanningStrategy(str, Enum):
@@ -136,7 +181,7 @@ class HierarchicalPlanner:
             template_version: Template version to use (default: 'v1')
         """
         self.model = model_interface
-        self.tools = tools_registry
+        self.tools_registry = tools_registry
         self.max_depth = max_decomposition_depth
         self.enable_tracing = enable_tracing
 
@@ -151,7 +196,7 @@ class HierarchicalPlanner:
 
     def _init_rule_patterns(self) -> None:
         """Initialise les patterns de règles courantes"""
-        self.patterns: Dict[str, List[Dict[str, Union[str, int, List[int]]]]] = {
+        self.patterns: Dict[str, List[TaskTemplateDict]] = {
             # Pattern: "analyse X, génère Y, crée Z"
             r"analys[er]?\s+(.+?),\s+g[ée]n[ée]r[er]?\s+(.+?),\s+cr[ée][er]?\s+(.+)": [
                 {"action": "read_file", "extract": 1},
@@ -196,12 +241,18 @@ class HierarchicalPlanner:
         start_time = time.time()
 
         # Traçabilité: enregistrer le début de planification
-        planning_metadata = {
+        # Note: On convertit context en Dict[str, str] pour compatibilité avec PlanningMetadataValue
+        context_str: Dict[str, str] = {}
+        if context:
+            context_str = {k: str(v) for k, v in context.items()}
+
+        planning_metadata: Dict[str, PlanningMetadataValue] = {
             "query": query,
             "strategy": strategy.value,
             "started_at": datetime.utcnow().isoformat(),
-            "context": context or {},
         }
+        if context_str:
+            planning_metadata["context"] = context_str
 
         try:
             if strategy == PlanningStrategy.RULE_BASED:
@@ -267,20 +318,29 @@ class HierarchicalPlanner:
                 reasoning += f"Matched pattern '{pattern}'. "
 
                 # Créer les tâches selon le template
-                created_tasks = []
+                created_tasks: List[Task] = []
                 for i, template in enumerate(task_templates):
                     # Extraire les paramètres du match
-                    if "extract" in template:
-                        param_value = match.group(template["extract"])
-                    else:
-                        param_value = query
+                    param_value: str = query
+                    extract_group = template.get("extract")
+                    if extract_group is not None:
+                        extracted = match.group(extract_group)
+                        if extracted is not None:
+                            param_value = extracted
+
+                    # Récupérer l'action (requis par TaskTemplateDict)
+                    action = template.get("action", "generic_execute")
+
+                    # Récupérer les dépendances
+                    depends_on_indices = template.get("depends_on", [])
+                    depends_on_ids = [created_tasks[dep_idx].task_id for dep_idx in depends_on_indices]
 
                     # Créer la tâche
                     task = Task(
-                        name=f"{template['action']}_{i}",
-                        action=template["action"],
+                        name=f"{action}_{i}",
+                        action=action,
                         params={"input": param_value.strip()},
-                        depends_on=[created_tasks[dep_idx].task_id for dep_idx in template.get("depends_on", [])],
+                        depends_on=depends_on_ids,
                         priority=TaskPriority.NORMAL,
                     )
 
@@ -334,21 +394,33 @@ class HierarchicalPlanner:
             )
 
             # Extraire le texte de la réponse si c'est un dict
+            response_text: str
             if isinstance(response, dict):
-                response = response.get("text", response)
+                text_val = response.get("text", "")
+                response_text = str(text_val) if text_val else str(response)
+            else:
+                response_text = str(response)
 
             # Parser la réponse JSON
-            decomposition = self._parse_llm_response(response)
+            decomposition = self._parse_llm_response(response_text)
 
             # Construire le graphe
             graph = self._build_graph_from_decomposition(decomposition)
+
+            # Extraire le reasoning
+            reasoning_val = decomposition.get("reasoning")
+            reasoning_str = str(reasoning_val) if reasoning_val else "LLM decomposition"
+
+            # Construire les métadonnées avec la réponse LLM
+            result_metadata: Dict[str, PlanningMetadataValue] = dict(metadata)
+            result_metadata["llm_response"] = response_text
 
             return PlanningResult(
                 graph=graph,
                 strategy_used=PlanningStrategy.LLM_BASED,
                 confidence=0.9,
-                reasoning=decomposition.get("reasoning", "LLM decomposition"),
-                metadata={**metadata, "llm_response": response},
+                reasoning=reasoning_str,
+                metadata=result_metadata,
             )
 
         except Exception as e:
@@ -457,43 +529,25 @@ Actions disponibles: {available_actions}
 
     def _get_available_actions(self) -> List[str]:
         """Retourne la liste des actions disponibles"""
-        if self.tools:
-            return [tool.name for tool in self.tools.get_all()]
+        if self.tools_registry:
+            return [tool.name for tool in self.tools_registry.get_all()]
         return [
             "read_file", "write_file", "search", "calculate",
             "analyze_data", "generate_report", "execute_code"
         ]
     
-    def _parse_llm_response(self, response: Union[str, Dict[str, str], object]) -> Dict[str, Union[str, List[DecompositionTask]]]:
-        """Parse la réponse JSON du LLM ou retourne directement un dictionnaire."""
-        response_text: str = ""
+    def _parse_llm_response(self, response_text: str) -> LLMDecompositionResult:
+        """Parse la réponse JSON du LLM en LLMDecompositionResult.
 
-        if isinstance(response, dict):
-            if "tasks" in response:
-                return response  # type: ignore[return-value]
-            if "text" in response and isinstance(response["text"], str):
-                response_text = response["text"]
-            elif "content" in response and isinstance(response["content"], str):
-                response_text = response["content"]
-            else:
-                raise TaskDecompositionError(
-                    "Failed to parse LLM response: missing JSON payload"
-                )
-        elif hasattr(response, "text"):
-            text_attr = getattr(response, "text", None)
-            if isinstance(text_attr, str):
-                response_text = text_attr
-            else:
-                raise TaskDecompositionError(
-                    f"Failed to parse LLM response: unsupported type {type(response).__name__}"
-                )
-        elif isinstance(response, str):
-            response_text = response
-        else:
-            raise TaskDecompositionError(
-                f"Failed to parse LLM response: unsupported type {type(response).__name__}"
-            )
+        Args:
+            response_text: Le texte de réponse du LLM (déjà extrait du dict si nécessaire)
 
+        Returns:
+            LLMDecompositionResult avec tasks et reasoning
+
+        Raises:
+            TaskDecompositionError: Si le parsing échoue
+        """
         # Nettoyer la réponse (enlever markdown, etc.)
         cleaned = response_text.strip()
         if cleaned.startswith("```"):
@@ -502,30 +556,59 @@ Actions disponibles: {available_actions}
             cleaned = "\n".join(lines[1:-1])
 
         try:
-            return json.loads(cleaned)
+            parsed: Dict[str, Any] = json.loads(cleaned)
+
+            # Valider et convertir en LLMDecompositionResult
+            result: LLMDecompositionResult = {}
+
+            if "tasks" in parsed and isinstance(parsed["tasks"], list):
+                result["tasks"] = parsed["tasks"]
+            else:
+                result["tasks"] = []
+
+            if "reasoning" in parsed and isinstance(parsed["reasoning"], str):
+                result["reasoning"] = parsed["reasoning"]
+            else:
+                result["reasoning"] = "LLM decomposition"
+
+            return result
+
         except json.JSONDecodeError as e:
             raise TaskDecompositionError(
                 f"Failed to parse LLM response: {str(e)}\nResponse: {response_text[:200]}"
             ) from e
 
-    def _build_graph_from_decomposition(self, decomposition: Dict[str, Union[str, List[DecompositionTask]]]) -> TaskGraph:
-        """Construit un TaskGraph depuis la décomposition LLM"""
+    def _build_graph_from_decomposition(self, decomposition: LLMDecompositionResult) -> TaskGraph:
+        """Construit un TaskGraph depuis la décomposition LLM."""
         graph = TaskGraph()
-        task_list = decomposition.get("tasks", [])
-        created_tasks = []
+        task_list: List[LLMDecomposedTask] = decomposition.get("tasks", [])
+        created_tasks: List[Task] = []
 
         for task_spec in task_list:
             # Résoudre les dépendances (indices -> task_ids)
-            depends_on_indices = task_spec.get("depends_on", [])
-            depends_on_ids = [created_tasks[idx].task_id for idx in depends_on_indices if idx < len(created_tasks)]
+            depends_on_indices: List[int] = task_spec.get("depends_on", [])
+            depends_on_ids: List[str] = [
+                created_tasks[idx].task_id
+                for idx in depends_on_indices
+                if isinstance(idx, int) and idx < len(created_tasks)
+            ]
+
+            # Extraire les valeurs avec types stricts
+            name: str = task_spec.get("name", "unnamed_task")
+            action: str = task_spec.get("action", "generic_execute")
+            params_raw: Dict[str, str] = task_spec.get("params", {})
+            priority_val: int = task_spec.get("priority", 3)
+
+            # Convertir params au type attendu par Task
+            params: Dict[str, TaskParamValue] = {k: v for k, v in params_raw.items()}
 
             # Créer la tâche
             task = Task(
-                name=task_spec.get("name", "unnamed_task"),
-                action=task_spec.get("action", "generic_execute"),
-                params=task_spec.get("params", {}),
+                name=name,
+                action=action,
+                params=params,
                 depends_on=depends_on_ids,
-                priority=TaskPriority(task_spec.get("priority", 3)),
+                priority=TaskPriority(priority_val),
             )
 
             graph.add_task(task)
@@ -533,7 +616,7 @@ Actions disponibles: {available_actions}
 
         return graph
 
-    def _validate_plan(self, graph: TaskGraph):
+    def _validate_plan(self, graph: TaskGraph) -> None:
         """
         Valide la cohérence du plan
 
@@ -550,7 +633,7 @@ Actions disponibles: {available_actions}
             raise TaskDecompositionError("Plan must contain at least one task")
 
         # Vérifier que toutes les actions sont valides
-        if self.tools:
+        if self.tools_registry:
             available_actions = set(self._get_available_actions())
             for task in graph.tasks.values():
                 if task.action not in available_actions and task.action != "generic_execute":

@@ -133,6 +133,7 @@ dev = [
     "safety>=3.0.0,<4",
     "pylint>=4.0.3",
     "mutmut>=3.0.0,<4",  # Mutation testing pour valider la robustesse des tests
+    "types-PyYAML>=6.0.12.20250915",
 ]
 
 # Benchmarking dependencies
