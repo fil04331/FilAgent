@@ -1,7 +1,7 @@
 """
 Centralized Benchmark Runner for FilAgent
 
-Orchestre l'exécution de tous les benchmarks:
+Orchestre l'execution de tous les benchmarks:
 - HumanEval
 - MBPP
 - SWE-bench
@@ -13,12 +13,14 @@ Usage:
     python eval/runner.py --benchmark humaneval,mbpp
     python eval/runner.py --custom-only
 """
+from __future__ import annotations
+
 import argparse
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Callable, Dict, List, Optional, Type, Union
 
 # Import benchmarks
 from eval.humaneval import HumanEvalHarness
@@ -27,9 +29,21 @@ from eval.benchmarks.swe_bench.harness import SWEBenchHarness
 from eval.benchmarks.custom.compliance.harness import ComplianceHarness
 from eval.benchmarks.custom.htn_planning.harness import HTNPlanningHarness
 from eval.benchmarks.custom.tool_orchestration.harness import ToolOrchestrationHarness
+from eval.base import BenchmarkHarness, BenchmarkReport
 
 # Import config
 from runtime.config import get_config
+
+
+# Type aliases for strict typing
+MetricValue = Union[str, int, float, bool]
+BenchmarkResults = Dict[str, Union[str, int, float, bool, Dict[str, MetricValue], List[str]]]
+AggregateReport = Dict[str, Union[str, int, float, bool, Dict[str, BenchmarkResults]]]
+TargetResults = Dict[str, bool]
+SummaryStats = Dict[str, Union[int, float]]
+EvalConfig = Dict[str, Union[str, int, float, bool, Dict[str, MetricValue]]]
+AgentCallback = Callable[[str], str]
+HarnessType = Type[BenchmarkHarness]
 
 
 class BenchmarkRunner:
@@ -37,7 +51,7 @@ class BenchmarkRunner:
     Centralized runner pour tous les benchmarks FilAgent
     """
 
-    def __init__(self, output_dir: str = "eval/runs", reports_dir: str = "eval/reports"):
+    def __init__(self, output_dir: str = "eval/runs", reports_dir: str = "eval/reports") -> None:
         self.output_dir = Path(output_dir)
         self.reports_dir = Path(reports_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -45,14 +59,17 @@ class BenchmarkRunner:
 
         # Load config
         try:
-            self.config = get_config()
-            self.eval_config = self.config.get('eval', {}) if hasattr(self.config, 'get') else {}
-        except Exception as e:
-            print(f"⚠ Warning: Failed to load config: {e}")
+            config = get_config()
+            if hasattr(config, 'get') and callable(config.get):
+                self.eval_config: EvalConfig = config.get('eval', {})
+            else:
+                self.eval_config = {}
+        except (ImportError, AttributeError, RuntimeError) as e:
+            print(f"Warning: Failed to load config: {e}")
             self.eval_config = {}
 
         # Available benchmarks
-        self.benchmarks = {
+        self.benchmarks: Dict[str, HarnessType] = {
             'humaneval': HumanEvalHarness,
             'mbpp': MBPPHarness,
             'swe_bench': SWEBenchHarness,
@@ -64,23 +81,23 @@ class BenchmarkRunner:
     def run_benchmark(
         self,
         benchmark_name: str,
-        agent_callback,
+        agent_callback: AgentCallback,
         num_tasks: Optional[int] = None,
         k: int = 1,
         verbose: bool = False
-    ) -> Dict[str, Any]:
+    ) -> BenchmarkResults:
         """
-        Exécuter un benchmark spécifique
+        Executer un benchmark specifique
 
         Args:
             benchmark_name: Nom du benchmark
             agent_callback: Fonction callback agent
-            num_tasks: Nombre de tâches (None = toutes)
-            k: pass@k paramètre
+            num_tasks: Nombre de taches (None = toutes)
+            k: pass@k parametre
             verbose: Mode verbose
 
         Returns:
-            Résultats du benchmark
+            Resultats du benchmark
         """
         if benchmark_name not in self.benchmarks:
             raise ValueError(f"Unknown benchmark: {benchmark_name}")
@@ -95,7 +112,7 @@ class BenchmarkRunner:
 
         # Run benchmark
         try:
-            results = harness.run_benchmark(
+            results: BenchmarkReport = harness.run_benchmark(
                 agent_callback=agent_callback,
                 num_tasks=num_tasks,
                 k=k,
@@ -105,10 +122,11 @@ class BenchmarkRunner:
             # Save report
             harness.save_report(results, str(self.reports_dir))
 
-            return results
+            # Convert to BenchmarkResults
+            return dict(results)
 
-        except Exception as e:
-            print(f"❌ Error running {benchmark_name}: {e}")
+        except (RuntimeError, ValueError, OSError) as e:
+            print(f"Error running {benchmark_name}: {e}")
             import traceback
             traceback.print_exc()
             return {
@@ -119,33 +137,33 @@ class BenchmarkRunner:
 
     def run_all_benchmarks(
         self,
-        agent_callback,
+        agent_callback: AgentCallback,
         num_tasks_per_benchmark: Optional[int] = None,
         skip_benchmarks: Optional[List[str]] = None,
         verbose: bool = False
-    ) -> Dict[str, Any]:
+    ) -> AggregateReport:
         """
-        Exécuter tous les benchmarks
+        Executer tous les benchmarks
 
         Args:
             agent_callback: Fonction callback agent
-            num_tasks_per_benchmark: Limiter le nombre de tâches
-            skip_benchmarks: Benchmarks à ignorer
+            num_tasks_per_benchmark: Limiter le nombre de taches
+            skip_benchmarks: Benchmarks a ignorer
             verbose: Mode verbose
 
         Returns:
-            Résultats agrégés de tous les benchmarks
+            Resultats agreges de tous les benchmarks
         """
         skip_benchmarks = skip_benchmarks or []
-        all_results = {}
+        all_results: Dict[str, BenchmarkResults] = {}
 
         print(f"\n{'='*60}")
-        print(f"Running ALL FilAgent Benchmarks")
+        print("Running ALL FilAgent Benchmarks")
         print(f"{'='*60}\n")
 
         for benchmark_name in self.benchmarks.keys():
             if benchmark_name in skip_benchmarks:
-                print(f"⏭  Skipping {benchmark_name}")
+                print(f"Skipping {benchmark_name}")
                 continue
 
             results = self.run_benchmark(
@@ -167,24 +185,24 @@ class BenchmarkRunner:
 
     def run_custom_benchmarks(
         self,
-        agent_callback,
+        agent_callback: AgentCallback,
         verbose: bool = False
-    ) -> Dict[str, Any]:
+    ) -> AggregateReport:
         """
-        Exécuter uniquement les benchmarks custom FilAgent
+        Executer uniquement les benchmarks custom FilAgent
 
         Args:
             agent_callback: Fonction callback agent
             verbose: Mode verbose
 
         Returns:
-            Résultats des benchmarks custom
+            Resultats des benchmarks custom
         """
         custom_benchmarks = ['compliance', 'htn_planning', 'tool_orchestration']
-        all_results = {}
+        all_results: Dict[str, BenchmarkResults] = {}
 
         print(f"\n{'='*60}")
-        print(f"Running Custom FilAgent Benchmarks")
+        print("Running Custom FilAgent Benchmarks")
         print(f"{'='*60}\n")
 
         for benchmark_name in custom_benchmarks:
@@ -201,17 +219,17 @@ class BenchmarkRunner:
 
         return report
 
-    def _generate_aggregate_report(self, results: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_aggregate_report(self, results: Dict[str, BenchmarkResults]) -> AggregateReport:
         """
-        Générer un rapport agrégé de tous les benchmarks
+        Generer un rapport agrege de tous les benchmarks
 
         Args:
-            results: Résultats de tous les benchmarks
+            results: Resultats de tous les benchmarks
 
         Returns:
-            Rapport agrégé
+            Rapport agrege
         """
-        aggregate = {
+        aggregate: AggregateReport = {
             'timestamp': datetime.now().isoformat(),
             'total_benchmarks': len(results),
             'benchmarks': results,
@@ -224,38 +242,50 @@ class BenchmarkRunner:
         total_failed = 0
 
         for benchmark_name, result in results.items():
-            if result.get('success', True):  # If no error
-                total_tasks += result.get('total_tasks', 0)
-                total_passed += result.get('passed_at_k', result.get('passed_at_1', 0))
-                total_failed += result.get('failed', 0)
+            success = result.get('success', True)
+            if success:
+                tasks = result.get('total_tasks')
+                if tasks is not None and isinstance(tasks, (int, float)):
+                    total_tasks += int(tasks)
 
-        aggregate['summary'] = {
+                passed_k = result.get('passed_at_k')
+                passed_1 = result.get('passed_at_1')
+                passed_val = passed_k if passed_k is not None else passed_1
+                if passed_val is not None and isinstance(passed_val, (int, float)):
+                    total_passed += int(passed_val)
+
+                failed = result.get('failed')
+                if failed is not None and isinstance(failed, (int, float)):
+                    total_failed += int(failed)
+
+        summary: SummaryStats = {
             'total_tasks': total_tasks,
             'total_passed': total_passed,
             'total_failed': total_failed,
-            'overall_pass_rate': total_passed / total_tasks if total_tasks > 0 else 0,
+            'overall_pass_rate': total_passed / total_tasks if total_tasks > 0 else 0.0,
         }
+        aggregate['summary'] = summary
 
         # Check against targets
         aggregate['targets_met'] = self._check_targets(results)
 
         return aggregate
 
-    def _check_targets(self, results: Dict[str, Any]) -> Dict[str, bool]:
+    def _check_targets(self, results: Dict[str, BenchmarkResults]) -> TargetResults:
         """
-        Vérifier si les seuils cibles sont atteints
+        Verifier si les seuils cibles sont atteints
 
         Uses config/eval_targets.yaml for thresholds
         """
-        targets_met = {}
+        targets_met: TargetResults = {}
 
         # Load targets from config
         try:
             with open('config/eval_targets.yaml') as f:
                 import yaml
                 targets_config = yaml.safe_load(f)
-                benchmarks_config = targets_config.get('benchmarks', {})
-        except Exception:
+                benchmarks_config: Dict[str, Dict[str, float]] = targets_config.get('benchmarks', {})
+        except (OSError, yaml.YAMLError):
             benchmarks_config = {}
 
         # Check HumanEval
@@ -263,30 +293,33 @@ class BenchmarkRunner:
             he_result = results['humaneval']
             target = benchmarks_config.get('humaneval', {}).get('pass_at_1', 0.65)
             actual = he_result.get('pass_at_1', 0)
-            targets_met['humaneval_pass@1'] = actual >= target
+            actual_val = float(actual) if isinstance(actual, (int, float)) else 0.0
+            targets_met['humaneval_pass@1'] = actual_val >= target
 
         # Check MBPP
         if 'mbpp' in results:
             mbpp_result = results['mbpp']
             target = benchmarks_config.get('mbpp', {}).get('pass_at_1', 0.60)
             actual = mbpp_result.get('pass_at_1', 0)
-            targets_met['mbpp_pass@1'] = actual >= target
+            actual_val = float(actual) if isinstance(actual, (int, float)) else 0.0
+            targets_met['mbpp_pass@1'] = actual_val >= target
 
         # Check compliance (should be 100%)
         if 'compliance' in results:
             comp_result = results['compliance']
             actual = comp_result.get('pass_at_1', 0)
-            targets_met['compliance_100%'] = actual >= 1.0
+            actual_val = float(actual) if isinstance(actual, (int, float)) else 0.0
+            targets_met['compliance_100%'] = actual_val >= 1.0
 
         return targets_met
 
-    def _save_aggregate_report(self, report: Dict[str, Any], prefix: str = "all"):
+    def _save_aggregate_report(self, report: AggregateReport, prefix: str = "all") -> None:
         """
-        Sauvegarder le rapport agrégé
+        Sauvegarder le rapport agrege
 
         Args:
-            report: Rapport agrégé
-            prefix: Préfixe du nom de fichier
+            report: Rapport agrege
+            prefix: Prefixe du nom de fichier
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{prefix}_benchmarks_{timestamp}.json"
@@ -296,7 +329,7 @@ class BenchmarkRunner:
             json.dump(report, f, indent=2)
 
         print(f"\n{'='*60}")
-        print(f"✓ Aggregate report saved: {filepath}")
+        print(f"Aggregate report saved: {filepath}")
         print(f"{'='*60}\n")
 
         # Print summary
@@ -307,44 +340,63 @@ class BenchmarkRunner:
         with open(latest_path, 'w') as f:
             json.dump(report, f, indent=2)
 
-    def _print_summary(self, report: Dict[str, Any]):
-        """Afficher un résumé du rapport"""
-        print("\n📊 Benchmark Summary")
-        print(f"{'─'*60}")
+    def _print_summary(self, report: AggregateReport) -> None:
+        """Afficher un resume du rapport"""
+        print("\nBenchmark Summary")
+        print(f"{'='*60}")
 
-        summary = report.get('summary', {})
-        print(f"Total Tasks: {summary.get('total_tasks', 0)}")
-        print(f"Passed: {summary.get('total_passed', 0)}")
-        print(f"Failed: {summary.get('total_failed', 0)}")
-        print(f"Overall Pass Rate: {summary.get('overall_pass_rate', 0)*100:.1f}%")
+        summary = report.get('summary')
+        if summary is not None and isinstance(summary, dict):
+            print(f"Total Tasks: {summary.get('total_tasks', 0)}")
+            print(f"Passed: {summary.get('total_passed', 0)}")
+            print(f"Failed: {summary.get('total_failed', 0)}")
+            pass_rate = summary.get('overall_pass_rate', 0)
+            pass_rate_val = float(pass_rate) if isinstance(pass_rate, (int, float)) else 0.0
+            print(f"Overall Pass Rate: {pass_rate_val*100:.1f}%")
 
         # Per-benchmark results
-        print(f"\n📈 Per-Benchmark Results")
-        print(f"{'─'*60}")
+        print(f"\nPer-Benchmark Results")
+        print(f"{'='*60}")
 
-        for name, result in report.get('benchmarks', {}).items():
-            if result.get('success', True):
-                pass_rate = result.get('pass_at_1', result.get('pass_at_k', 0))
-                print(f"{name:20s}: {pass_rate*100:5.1f}% ({result.get('passed_at_k', 0)}/{result.get('total_tasks', 0)})")
-            else:
-                print(f"{name:20s}: ERROR - {result.get('error', 'Unknown')}")
+        benchmarks = report.get('benchmarks')
+        if benchmarks is not None and isinstance(benchmarks, dict):
+            for name, result in benchmarks.items():
+                if not isinstance(result, dict):
+                    continue
+                success = result.get('success', True)
+                if success:
+                    pass_at_1 = result.get('pass_at_1')
+                    pass_at_k = result.get('pass_at_k')
+                    pass_rate = pass_at_1 if pass_at_1 is not None else pass_at_k
+                    pass_rate_val = float(pass_rate) if pass_rate is not None and isinstance(pass_rate, (int, float)) else 0.0
+
+                    passed_at_k = result.get('passed_at_k', 0)
+                    passed_val = int(passed_at_k) if isinstance(passed_at_k, (int, float)) else 0
+
+                    total_tasks = result.get('total_tasks', 0)
+                    total_val = int(total_tasks) if isinstance(total_tasks, (int, float)) else 0
+
+                    print(f"{name:20s}: {pass_rate_val*100:5.1f}% ({passed_val}/{total_val})")
+                else:
+                    error = result.get('error', 'Unknown')
+                    print(f"{name:20s}: ERROR - {error}")
 
         # Targets
-        targets = report.get('targets_met', {})
-        if targets:
-            print(f"\n🎯 Targets Met")
-            print(f"{'─'*60}")
+        targets = report.get('targets_met')
+        if targets is not None and isinstance(targets, dict):
+            print(f"\nTargets Met")
+            print(f"{'='*60}")
             for target, met in targets.items():
-                status = "✓" if met else "✗"
+                status = "OK" if met else "FAIL"
                 print(f"{status} {target}")
 
 
-def create_agent_callback():
+def create_agent_callback() -> AgentCallback:
     """
-    Créer un callback agent pour les benchmarks
+    Creer un callback agent pour les benchmarks
 
     Cette fonction devrait retourner une fonction qui prend un prompt
-    et retourne une réponse de l'agent.
+    et retourne une reponse de l'agent.
 
     Pour les tests, on utilise un mock simple.
     """
@@ -357,14 +409,17 @@ def create_agent_callback():
             """Agent callback"""
             try:
                 result = agent.run(prompt)
-                return result.get('response', '')
-            except Exception as e:
+                if isinstance(result, dict):
+                    response = result.get('response', '')
+                    return str(response) if response is not None else ''
+                return str(result) if result is not None else ''
+            except (RuntimeError, ValueError) as e:
                 return f"ERROR: {e}"
 
         return callback
 
-    except Exception as e:
-        print(f"⚠ Warning: Could not load agent, using mock: {e}")
+    except (ImportError, RuntimeError) as e:
+        print(f"Warning: Could not load agent, using mock: {e}")
 
         # Mock callback for testing
         def mock_callback(prompt: str) -> str:
@@ -374,7 +429,7 @@ def create_agent_callback():
         return mock_callback
 
 
-def main():
+def main() -> None:
     """Main entry point"""
     parser = argparse.ArgumentParser(description="Run FilAgent benchmarks")
 

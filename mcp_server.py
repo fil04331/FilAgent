@@ -4,6 +4,7 @@ Serveur MCP (Model Context Protocol) pour FilAgent
 Version sécurisée avec conformité Loi 25 et RGPD
 Auteur: Fil - Services IA pour PME Québécoises
 """
+from __future__ import annotations
 
 import json
 import sys
@@ -12,8 +13,16 @@ import logging
 import traceback
 import os
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional, Union
 from datetime import datetime
+
+# Type Aliases for strict typing
+JSONValue = Union[str, int, float, bool, None, Dict[str, "JSONValue"], List["JSONValue"]]
+MCPRequest = Dict[str, Union[str, int, Dict[str, JSONValue]]]
+MCPResponse = Dict[str, Union[str, int, bool, Dict[str, JSONValue], List[Dict[str, JSONValue]]]]
+ToolDefinition = Dict[str, Union[str, Dict[str, Union[str, Dict[str, str], List[str]]]]]
+ToolArguments = Dict[str, Union[str, int, float, bool]]
+ToolResult = Dict[str, Union[str, int, float, bool, List[str]]]
 
 # Configuration du logging
 logging.basicConfig(
@@ -30,15 +39,24 @@ class FilAgentMCPServer:
     Serveur MCP pour FilAgent avec gouvernance complète
     Safety by Design - Conformité Loi 25, RGPD, AI Act
     """
-    
-    def __init__(self):
+
+    project_root: Path
+    agent: Optional[object]
+    tools: Dict[str, ToolDefinition]
+    compliance_enabled: bool
+    config: Optional[object]
+    tool_registry: Union[object, Dict[str, object]]
+
+    def __init__(self) -> None:
         self.project_root = Path(__file__).parent
         self.agent = None
         self.tools = {}
         self.compliance_enabled = True
+        self.config = None
+        self.tool_registry = {}
         logger.info("Initialisation du serveur MCP FilAgent")
         
-    async def initialize(self):
+    async def initialize(self) -> MCPResponse:
         """Initialise les composants FilAgent avec vérification de conformité"""
         try:
             # Import des composants avec gestion d'erreur
@@ -46,7 +64,7 @@ class FilAgentMCPServer:
                 from runtime.agent import get_agent
                 from runtime.config import get_config
                 from tools.registry import get_tool_registry
-                
+
                 self.agent = get_agent()
                 self.config = get_config()
                 self.tool_registry = get_tool_registry()
@@ -55,10 +73,10 @@ class FilAgentMCPServer:
                 logger.warning(f"Mode standalone - composants non disponibles: {e}")
                 # Mode dégradé mais fonctionnel
                 self.tool_registry = {}
-                
+
             # Enregistrer les outils de base
             self._register_base_tools()
-            
+
             return {
                 "name": "filagent",
                 "version": "1.0.0",
@@ -78,7 +96,7 @@ class FilAgentMCPServer:
                 }
             }
     
-    def _register_base_tools(self):
+    def _register_base_tools(self) -> None:
         """Enregistre les outils de base du MCP"""
         self.tools = {
             "analyze_document": {
@@ -129,14 +147,15 @@ class FilAgentMCPServer:
             }
         }
         logger.info(f"Outils enregistrés: {list(self.tools.keys())}")
-    
-    async def handle_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def handle_request(self, message: MCPRequest) -> MCPResponse:
         """
         Traite une requête MCP avec validation de conformité
         """
         method = message.get("method")
-        params = message.get("params", {})
-        id = message.get("id")
+        params_raw = message.get("params", {})
+        params: Dict[str, JSONValue] = params_raw if isinstance(params_raw, dict) else {}
+        request_id = message.get("id")
         
         logger.debug(f"Requête reçue: {method}")
         
@@ -161,8 +180,10 @@ class FilAgentMCPServer:
                 }
                 
             elif method == "tools/call":
-                tool_name = params.get("name")
-                arguments = params.get("arguments", {})
+                tool_name_raw = params.get("name")
+                tool_name = str(tool_name_raw) if tool_name_raw is not None else ""
+                arguments_raw = params.get("arguments", {})
+                arguments: ToolArguments = arguments_raw if isinstance(arguments_raw, dict) else {}
                 result = await self._execute_tool(tool_name, arguments)
                 return {"result": result}
                 
@@ -188,9 +209,15 @@ class FilAgentMCPServer:
                 }
                 
             elif method == "prompts/get":
-                prompt_name = params.get("name")
-                arguments = params.get("arguments", {})
-                prompt = self._generate_prompt(prompt_name, arguments)
+                prompt_name_raw = params.get("name")
+                prompt_name = str(prompt_name_raw) if prompt_name_raw is not None else ""
+                prompt_args_raw = params.get("arguments", {})
+                prompt_args: Dict[str, str] = (
+                    {k: str(v) for k, v in prompt_args_raw.items()}
+                    if isinstance(prompt_args_raw, dict)
+                    else {}
+                )
+                prompt = self._generate_prompt(prompt_name, prompt_args)
                 return {"messages": [{"role": "user", "content": prompt}]}
                 
             else:
@@ -210,19 +237,19 @@ class FilAgentMCPServer:
                     "message": str(e)
                 }
             }
-    
-    async def _execute_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _execute_tool(self, name: str, arguments: ToolArguments) -> ToolResult:
         """
         Exécute un outil avec traçabilité complète
         """
         logger.info(f"Exécution outil: {name}")
-        
+
         # Logging de conformité
         self._log_tool_execution(name, arguments)
-        
+
         if name == "analyze_document":
-            content = arguments.get("content", "")
-            framework = arguments.get("framework", "Loi25")
+            content = str(arguments.get("content", ""))
+            framework = str(arguments.get("framework", "Loi25"))
             return {
                 "analysis": f"Document analysé selon {framework}",
                 "compliance_score": 0.85,
@@ -233,11 +260,14 @@ class FilAgentMCPServer:
                 ],
                 "decision_record_id": f"DR-{datetime.now().isoformat()}"
             }
-            
+
         elif name == "calculate_taxes_quebec":
-            amount = arguments.get("amount", 0)
-            gst = amount * 0.05 if arguments.get("include_gst", True) else 0
-            qst = amount * 0.09975 if arguments.get("include_qst", True) else 0
+            amount_raw = arguments.get("amount", 0)
+            amount = float(amount_raw) if amount_raw is not None else 0.0
+            include_gst = bool(arguments.get("include_gst", True))
+            include_qst = bool(arguments.get("include_qst", True))
+            gst = amount * 0.05 if include_gst else 0.0
+            qst = amount * 0.09975 if include_qst else 0.0
             return {
                 "subtotal": amount,
                 "gst": round(gst, 2),
@@ -245,19 +275,21 @@ class FilAgentMCPServer:
                 "total": round(amount + gst + qst, 2),
                 "calculation_date": datetime.now().isoformat()
             }
-            
+
         elif name == "generate_decision_record":
             return {
                 "id": f"DR-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                "decision": arguments.get("decision"),
-                "context": arguments.get("context"),
+                "decision": str(arguments.get("decision", "")),
+                "context": str(arguments.get("context", "")),
                 "timestamp": datetime.now().isoformat(),
                 "signature": "EdDSA-signature-placeholder",
                 "provenance_graph": "W3C-PROV-JSON-placeholder",
                 "audit_trail": "WORM-log-reference"
             }
-            
+
         elif name == "audit_trail":
+            start_date = str(arguments.get("start_date", "all"))
+            end_date = str(arguments.get("end_date", "now"))
             return {
                 "entries": [
                     {
@@ -268,13 +300,13 @@ class FilAgentMCPServer:
                     }
                 ],
                 "total_entries": 1,
-                "period": f"{arguments.get('start_date', 'all')} to {arguments.get('end_date', 'now')}"
+                "period": f"{start_date} to {end_date}"
             }
-            
+
         else:
             raise ValueError(f"Outil non trouvé: {name}")
-    
-    def _generate_prompt(self, name: str, arguments: Dict[str, Any]) -> str:
+
+    def _generate_prompt(self, name: str, arguments: Dict[str, str]) -> str:
         """Génère un prompt contextuel pour PME Québec"""
         
         templates = {
@@ -303,19 +335,19 @@ Format requis pour déclaration gouvernementale."""
         
         template = templates.get(name, "Requête: {content}")
         return template.format(**arguments)
-    
-    def _log_tool_execution(self, tool: str, arguments: Dict[str, Any]):
+
+    def _log_tool_execution(self, tool: str, arguments: ToolArguments) -> None:
         """Log d'exécution avec conformité WORM"""
-        log_entry = {
+        log_entry: Dict[str, Union[str, int, bool]] = {
             "timestamp": datetime.now().isoformat(),
             "tool": tool,
-            "arguments_hash": hash(json.dumps(arguments, sort_keys=True)),
+            "arguments_hash": hash(json.dumps(arguments, sort_keys=True, default=str)),
             "compliance_checked": True,
             "pii_redacted": True
         }
         logger.info(f"Audit log: {json.dumps(log_entry)}")
-    
-    async def run(self):
+
+    async def run(self) -> None:
         """Boucle principale du serveur MCP"""
         logger.info("Démarrage du serveur MCP FilAgent...")
         
@@ -385,9 +417,9 @@ Format requis pour déclaration gouvernementale."""
                 writer.write(json.dumps(error_response) + "\n")
                 writer.flush()
 
-def main():
+def main() -> None:
     """Point d'entrée principal avec gestion de la conformité"""
-    
+
     # Configuration du logging selon l'environnement
     log_level = os.environ.get("FILAGENT_LOG_LEVEL", "INFO")
     logging.getLogger().setLevel(getattr(logging, log_level))

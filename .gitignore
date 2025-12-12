@@ -46,6 +46,7 @@ __pypackages__/
 .env
 *.key
 *.pem
+.env\n.mcp.json
 
 # Modèles (gros fichiers)
 models/weights/*.gguf

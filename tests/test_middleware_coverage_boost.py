@@ -78,35 +78,38 @@ class TestLoggingMiddleware:
 @pytest.mark.coverage
 class TestAuditTrailMiddleware:
     """Tests for audit trail middleware"""
-    
+
     def test_decision_record_manager_initialization(self):
-        """Test DecisionRecordManager initialization"""
-        from runtime.middleware.audittrail import DecisionRecordManager
-        
-        dr_manager = DecisionRecordManager()
+        """Test DRManager initialization"""
+        from runtime.middleware.audittrail import DRManager
+
+        dr_manager = DRManager()
         assert dr_manager is not None
-    
+
     def test_generate_decision_record(self):
         """Test generating a decision record"""
-        from runtime.middleware.audittrail import DecisionRecordManager
-        
-        dr_manager = DecisionRecordManager()
-        dr_id = dr_manager.generate_dr(
-            decision_type="tool_execution",
-            context={"query": "test query"},
-            metadata={"test": "data"}
+        from runtime.middleware.audittrail import DRManager
+
+        dr_manager = DRManager()
+        dr = dr_manager.create_dr(
+            actor="test_actor",
+            task_id="test-task-123",
+            decision="tool_execution",
+            prompt_hash="abc123"
         )
-        
-        # Should return a DR ID
-        assert isinstance(dr_id, str)
-    
+
+        # Should return a DecisionRecord with dr_id
+        assert dr is not None
+        assert hasattr(dr, 'dr_id')
+        assert isinstance(dr.dr_id, str)
+
     def test_get_dr_manager_singleton(self):
         """Test DR manager singleton pattern"""
         from runtime.middleware.audittrail import get_dr_manager
-        
+
         dr1 = get_dr_manager()
         dr2 = get_dr_manager()
-        
+
         assert dr1 is dr2
 
 
@@ -115,35 +118,36 @@ class TestAuditTrailMiddleware:
 @pytest.mark.coverage
 class TestProvenanceMiddleware:
     """Tests for provenance middleware"""
-    
+
     def test_provenance_tracker_initialization(self):
         """Test ProvenanceTracker initialization"""
         from runtime.middleware.provenance import ProvenanceTracker
-        
+
         tracker = ProvenanceTracker()
         assert tracker is not None
-    
-    def test_track_activity(self):
-        """Test tracking an activity"""
+
+    def test_track_generation(self):
+        """Test tracking a generation activity"""
         from runtime.middleware.provenance import ProvenanceTracker
-        
+
         tracker = ProvenanceTracker()
-        tracker.track_activity(
-            activity_type="test",
-            entity_id="test-123",
-            metadata={"key": "value"}
+        # track_generation is the actual method available
+        trace_id = tracker.track_generation(
+            conversation_id="test-conv-123",
+            input_message="Test message"
         )
-        
-        # Should not raise exception
-        assert True
-    
+
+        # Should return a trace ID
+        assert trace_id is not None
+        assert isinstance(trace_id, str)
+
     def test_get_tracker_singleton(self):
         """Test tracker singleton pattern"""
         from runtime.middleware.provenance import get_tracker
-        
+
         tracker1 = get_tracker()
         tracker2 = get_tracker()
-        
+
         assert tracker1 is tracker2
 
 
@@ -219,15 +223,18 @@ class TestModelInterface:
     def test_generation_result_creation(self):
         """Test GenerationResult creation"""
         from runtime.model_interface import GenerationResult
-        
+
         result = GenerationResult(
             text="Test response",
-            usage={"tokens": 10},
-            metadata={}
+            finish_reason="stop",
+            tokens_generated=10,
+            prompt_tokens=5,
+            total_tokens=15
         )
-        
+
         assert result.text == "Test response"
-        assert result.usage["tokens"] == 10
+        assert result.finish_reason == "stop"
+        assert result.total_tokens == 15
 
 
 @pytest.mark.unit
@@ -316,26 +323,36 @@ class TestToolsDetailed:
     def test_file_reader_nonexistent_file(self):
         """Test file reader with nonexistent file"""
         from tools.file_reader import FileReaderTool
-        
+
         reader = FileReaderTool()
-        result = reader.execute(arguments={"path": "/nonexistent/file.txt"})
-        
-        # Should handle error
-        assert result.status.name in ["ERROR", "FAILURE"]
-    
+        # Use file_path (correct parameter name)
+        result = reader.execute(arguments={"file_path": "/nonexistent/file.txt"})
+
+        # Should handle error - BLOCKED for paths outside allowlist
+        assert result.status.name in ["ERROR", "FAILURE", "BLOCKED"]
+
     def test_file_reader_with_valid_file(self, tmp_path):
-        """Test file reader with valid file"""
+        """Test file reader with valid file in allowed path"""
         from tools.file_reader import FileReaderTool
-        
-        # Create test file
-        test_file = tmp_path / "test.txt"
+        from pathlib import Path
+
+        # Create test file in working_set (allowed directory)
+        working_set = Path("working_set")
+        working_set.mkdir(exist_ok=True)
+        test_file = working_set / "test_middleware_temp.txt"
         test_file.write_text("Test content")
-        
-        reader = FileReaderTool()
-        result = reader.execute(arguments={"path": str(test_file)})
-        
-        assert result.status.name == "SUCCESS"
-        assert "Test content" in str(result.output)
+
+        try:
+            reader = FileReaderTool()
+            # Use file_path (correct parameter name)
+            result = reader.execute(arguments={"file_path": "working_set/test_middleware_temp.txt"})
+
+            assert result.status.name == "SUCCESS"
+            assert "Test content" in str(result.output)
+        finally:
+            # Cleanup
+            if test_file.exists():
+                test_file.unlink()
 
 
 @pytest.mark.unit

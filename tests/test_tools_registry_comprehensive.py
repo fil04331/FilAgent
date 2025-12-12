@@ -21,17 +21,17 @@ from tools.base import BaseTool, ToolResult, ToolStatus
 
 class MockTool(BaseTool):
     """Mock tool for testing"""
-    
+
     def __init__(self, name="mock_tool", description="Mock tool for testing"):
         super().__init__(name=name, description=description)
-    
-    def execute(self, **kwargs):
+
+    def execute(self, arguments: dict = None):
         return ToolResult(
             status=ToolStatus.SUCCESS,
             output="Mock output",
             metadata={}
         )
-    
+
     def _get_parameters_schema(self):
         """Return parameter schema for this tool"""
         return {
@@ -39,10 +39,10 @@ class MockTool(BaseTool):
             "properties": {},
             "required": []
         }
-    
-    def validate_arguments(self, **kwargs):
+
+    def validate_arguments(self, arguments: dict = None):
         """Validate tool arguments"""
-        return True
+        return True, None
 
 
 @pytest.fixture
@@ -222,8 +222,8 @@ class TestToolExecution:
         
         if calc_name:
             calc = registry.get(calc_name)
-            # Test calculator execution
-            result = calc.execute(expression="2 + 2")
+            # Test calculator execution - pass arguments as dict per BaseTool interface
+            result = calc.execute({"expression": "2 + 2"})
             assert isinstance(result, ToolResult)
     
     def test_tool_execution_error_handling(self, registry):
@@ -231,22 +231,22 @@ class TestToolExecution:
         class ErrorTool(BaseTool):
             def __init__(self):
                 super().__init__(name="error_tool", description="Tool that errors")
-            
-            def execute(self, **kwargs):
+
+            def execute(self, arguments: dict = None):
                 raise ValueError("Intentional error")
-            
+
             def _get_parameters_schema(self):
                 return {"type": "object", "properties": {}}
-            
-            def validate_arguments(self, **kwargs):
-                return True
-        
+
+            def validate_arguments(self, arguments: dict = None):
+                return True, None
+
         error_tool = ErrorTool()
         registry.register(error_tool)
-        
+
         tool = registry.get("error_tool")
         with pytest.raises(ValueError):
-            tool.execute()
+            tool.execute({})
 
 
 @pytest.mark.unit
@@ -399,7 +399,7 @@ class TestToolRegistryIntegration:
         results = []
         if calc_name:
             calc = registry.get(calc_name)
-            result = calc.execute(expression="1 + 1")
+            result = calc.execute({"expression": "1 + 1"})
             results.append(result)
         
         # Should have executed at least one tool

@@ -4,6 +4,7 @@ Script de Test Automatisé des Capacités FilAgent
 ================================================
 Test complet de toutes les fonctionnalités et intégrations
 """
+from __future__ import annotations
 
 import os
 import sys
@@ -13,9 +14,14 @@ import requests
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Optional, Union
 import random
 import string
+
+# Type aliases stricts
+TestResultValue = Union[str, int, float, bool, None]
+TestResultDict = Dict[str, Union[TestResultValue, List[TestResultValue], "TestResultDict"]]
+CapabilityResult = Dict[str, Union[str, int, float, bool, Dict[str, bool]]]
 
 # Configuration
 PROJECT_ROOT = Path(__file__).parent

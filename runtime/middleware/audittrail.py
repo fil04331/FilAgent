@@ -1,22 +1,32 @@
 """
 Middleware pour Decision Records (DR)
-Génération de DR signés pour traçabilité décisionnelle
+Generation de DR signes pour tracabilite decisionnelle
 """
+
+from __future__ import annotations
 
 import json
 import hashlib
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 import threading
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 
+# Type aliases for strict typing
+DRConstraintValue = Union[str, int, float, bool, None]
+DRConstraints = Dict[str, DRConstraintValue]
+DRMetadata = Dict[str, Union[str, int, float, bool, None]]
+SignatureDict = Dict[str, str]
+DRRecordDict = Dict[str, Union[str, int, float, bool, None, List[str], DRConstraints, SignatureDict]]
+
+
 class DecisionRecord:
     """
-    Decision Record (DR) pour une décision automatisée
-    Format conforme aux spécifications de FilAgent.md
+    Decision Record (DR) pour une decision automatisee
+    Format conforme aux specifications de FilAgent.md
     """
 
     def __init__(
@@ -29,10 +39,10 @@ class DecisionRecord:
         model_fingerprint: str = "",
         tools_used: Optional[List[str]] = None,
         alternatives_considered: Optional[List[str]] = None,
-        constraints: Optional[Dict[str, Any]] = None,
+        constraints: Optional[DRConstraints] = None,
         expected_risk: Optional[List[str]] = None,
         reasoning_markers: Optional[List[str]] = None,
-    ):
+    ) -> None:
         self.dr_id = self._generate_dr_id()
         self.timestamp = datetime.now().isoformat()
         self.actor = actor
@@ -46,17 +56,17 @@ class DecisionRecord:
         self.decision = decision
         self.constraints = constraints or {}
         self.expected_risk = expected_risk or []
-        self.signature = None
+        self.signature: Optional[str] = None
 
     def _generate_dr_id(self) -> str:
-        """Générer un ID unique pour le DR"""
+        """Generer un ID unique pour le DR"""
         timestamp = datetime.now().strftime("%Y%m%d")
         random = hashlib.md5(datetime.now().isoformat().encode()).hexdigest()[:6]
         return f"DR-{timestamp}-{random}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> DRRecordDict:
         """Convertir en dictionnaire"""
-        data = {
+        data: DRRecordDict = {
             "dr_id": self.dr_id,
             "ts": self.timestamp,
             "actor": self.actor,
@@ -77,19 +87,19 @@ class DecisionRecord:
 
         return data
 
-    def sign(self, private_key: ed25519.Ed25519PrivateKey):
-        """Signer le DR avec une clé privée EdDSA"""
-        # Créer un dictionnaire sans signature
+    def sign(self, private_key: ed25519.Ed25519PrivateKey) -> None:
+        """Signer le DR avec une cle privee EdDSA"""
+        # Creer un dictionnaire sans signature
         data = self.to_dict()
         data.pop("signature", None)
 
-        # Sérialiser et signer
+        # Serialiser et signer
         data_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
         signature = private_key.sign(data_bytes)
         self.signature = f"ed25519:{signature.hex()}"
 
     def verify(self, public_key: ed25519.Ed25519PublicKey) -> bool:
-        """Vérifier la signature du DR"""
+        """Verifier la signature du DR"""
         if not self.signature:
             return False
 
@@ -98,12 +108,12 @@ class DecisionRecord:
             sig_hex = self.signature.replace("ed25519:", "")
             signature_bytes = bytes.fromhex(sig_hex)
 
-            # Créer un dictionnaire sans signature
+            # Creer un dictionnaire sans signature
             data = self.to_dict()
             data.pop("signature", None)
             data_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
 
-            # Vérifier
+            # Verifier
             public_key.verify(signature_bytes, data_bytes)
             return True
         except Exception:
@@ -113,24 +123,24 @@ class DecisionRecord:
 class DRManager:
     """Gestionnaire de Decision Records"""
 
-    def __init__(self, output_dir: str = "logs/decisions"):
+    def __init__(self, output_dir: str = "logs/decisions") -> None:
         self.dr_dir = Path(output_dir)
         self.dr_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 
-        # Clés EdDSA (générer une nouvelle paire au démarrage)
+        # Cles EdDSA (generer une nouvelle paire au demarrage)
         self.private_key, self.public_key = self._generate_keypair()
         self._save_keys()
 
-    def _generate_keypair(self):
-        """Générer une paire de clés EdDSA"""
+    def _generate_keypair(self) -> tuple[ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey]:
+        """Generer une paire de cles EdDSA"""
         private_key = ed25519.Ed25519PrivateKey.generate()
         public_key = private_key.public_key()
         return private_key, public_key
 
-    def _save_keys(self):
-        """Sauvegarder les clés (en production, utiliser un vault)"""
-        # Sauvegarder la clé privée (chiffrée en production)
+    def _save_keys(self) -> None:
+        """Sauvegarder les cles (en production, utiliser un vault)"""
+        # Sauvegarder la cle privee (chiffree en production)
         private_pem = self.private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
@@ -143,7 +153,7 @@ class DRManager:
         with open(key_file, "wb") as f:
             f.write(private_pem)
 
-        # Sauvegarder la clé publique
+        # Sauvegarder la cle publique
         public_pem = self.public_key.public_bytes(
             encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
@@ -152,14 +162,39 @@ class DRManager:
         with open(public_key_file, "wb") as f:
             f.write(public_pem)
 
-    def create_dr(self, actor: str, task_id: str, decision: str, prompt_hash: str, **kwargs) -> DecisionRecord:
+    def create_dr(
+        self,
+        actor: str,
+        task_id: str,
+        decision: str,
+        prompt_hash: str,
+        policy_version: str = "policies@0.1.0",
+        model_fingerprint: str = "",
+        tools_used: Optional[List[str]] = None,
+        alternatives_considered: Optional[List[str]] = None,
+        constraints: Optional[DRConstraints] = None,
+        expected_risk: Optional[List[str]] = None,
+        reasoning_markers: Optional[List[str]] = None,
+    ) -> DecisionRecord:
         """
-        Créer un nouveau Decision Record
+        Creer un nouveau Decision Record
 
         Returns:
-            DecisionRecord signé
+            DecisionRecord signe
         """
-        dr = DecisionRecord(actor=actor, task_id=task_id, decision=decision, prompt_hash=prompt_hash, **kwargs)
+        dr = DecisionRecord(
+            actor=actor,
+            task_id=task_id,
+            decision=decision,
+            prompt_hash=prompt_hash,
+            policy_version=policy_version,
+            model_fingerprint=model_fingerprint,
+            tools_used=tools_used,
+            alternatives_considered=alternatives_considered,
+            constraints=constraints,
+            expected_risk=expected_risk,
+            reasoning_markers=reasoning_markers,
+        )
 
         # Signer
         dr.sign(self.private_key)
@@ -173,31 +208,31 @@ class DRManager:
         self,
         conversation_id: str,
         decision_type: str,
-        context: Dict[str, Any],
+        context: DRConstraints,
         rationale: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[DRMetadata] = None,
     ) -> str:
         """
-        Créer un Decision Record avec une API simplifiée pour les tests
+        Creer un Decision Record avec une API simplifiee pour les tests
 
         Args:
             conversation_id: ID de conversation
-            decision_type: Type de décision (e.g., "tool_invocation")
-            context: Contexte de la décision
-            rationale: Justification de la décision
-            metadata: Métadonnées optionnelles
+            decision_type: Type de decision (e.g., "tool_invocation")
+            context: Contexte de la decision
+            rationale: Justification de la decision
+            metadata: Metadonnees optionnelles
 
         Returns:
-            ID du Decision Record créé
+            ID du Decision Record cree
         """
         import base64
 
-        # Générer un ID unique
+        # Generer un ID unique
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         decision_id = f"DR-{conversation_id}-{timestamp}"
 
         # Construire le record
-        record = {
+        record: Dict[str, Union[str, DRConstraints, DRMetadata, SignatureDict]] = {
             "decision_id": decision_id,
             "timestamp": datetime.now().isoformat(),
             "conversation_id": conversation_id,
@@ -233,7 +268,7 @@ class DRManager:
 
         return decision_id
 
-    def save_dr(self, dr: DecisionRecord):
+    def save_dr(self, dr: DecisionRecord) -> None:
         """Sauvegarder un DR dans un fichier JSON"""
         with self._lock:
             filename = f"{dr.dr_id}.json"
@@ -255,11 +290,14 @@ class DRManager:
             data = json.load(f)
 
         # Reconstruire le DR
+        prompt_hash_raw = data.get("prompt_hash", "")
+        prompt_hash = prompt_hash_raw.replace("sha256:", "") if isinstance(prompt_hash_raw, str) else ""
+
         dr = DecisionRecord(
-            actor=data["actor"],
-            task_id=data["task_id"],
-            decision=data["decision"],
-            prompt_hash=data["prompt_hash"].replace("sha256:", ""),
+            actor=data.get("actor", ""),
+            task_id=data.get("task_id", ""),
+            decision=data.get("decision", ""),
+            prompt_hash=prompt_hash,
             policy_version=data.get("policy_version", ""),
             model_fingerprint=data.get("model_fingerprint", ""),
             tools_used=data.get("tools_used", []),
@@ -268,8 +306,8 @@ class DRManager:
             expected_risk=data.get("expected_risk", []),
             reasoning_markers=data.get("reasoning_markers", []),
         )
-        dr.dr_id = data["dr_id"]
-        dr.timestamp = data["ts"]
+        dr.dr_id = data.get("dr_id", "")
+        dr.timestamp = data.get("ts", "")
         dr.signature = data.get("signature")
 
         return dr
@@ -280,7 +318,7 @@ _dr_manager: Optional[DRManager] = None
 
 
 def get_dr_manager() -> DRManager:
-    """Récupérer l'instance globale du DR manager"""
+    """Recuperer l'instance globale du DR manager"""
     global _dr_manager
     if _dr_manager is None:
         _dr_manager = DRManager()

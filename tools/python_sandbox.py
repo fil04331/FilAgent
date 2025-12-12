@@ -1,7 +1,9 @@
 """
-Sandbox Python pour exécution sûre de code Python
-Limites CPU, mémoire, et filesystem
+Sandbox Python pour execution sure de code Python
+Limites CPU, memoire, et filesystem
 """
+
+from __future__ import annotations
 
 import subprocess
 import tempfile
@@ -9,9 +11,9 @@ import os
 import time
 import ast
 import sys
-from typing import Dict, Any, Optional, List
+from typing import Dict, List, Optional, Union
 
-from .base import BaseTool, ToolResult, ToolStatus
+from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
 
 # Import resource module for Unix systems
 try:
@@ -20,16 +22,25 @@ try:
 except ImportError:
     RESOURCE_AVAILABLE = False
 
+# Types stricts pour le sandbox Python
+ParameterSchemaValue = Union[str, Dict[str, str], List[str]]
+SandboxMetadataValue = Union[str, int, float, bool]
+
 
 class PythonSandboxTool(BaseTool):
     """
-    Outil pour exécuter du code Python en sandbox
-    Limites : CPU, mémoire, timeout
+    Outil pour executer du code Python en sandbox
+    Limites : CPU, memoire, timeout
     """
 
-    def __init__(self, dangerous_patterns: Optional[List[str]] = None):
+    max_memory_mb: int
+    max_cpu_time: int
+    timeout: int
+    dangerous_patterns: List[str]
+
+    def __init__(self, dangerous_patterns: Optional[List[str]] = None) -> None:
         super().__init__(
-            name="python_sandbox", description="Exécuter du code Python de manière sécurisée dans un sandbox"
+            name="python_sandbox", description="Executer du code Python de maniere securisee dans un sandbox"
         )
         # Limites de ressources
         self.max_memory_mb = 512
@@ -52,10 +63,10 @@ class PythonSandboxTool(BaseTool):
         else:
             self.dangerous_patterns = dangerous_patterns
 
-    def _set_resource_limits(self):
+    def _set_resource_limits(self) -> None:
         """
-        Définir les limites de ressources pour le processus sandbox
-        Appelé via preexec_fn dans subprocess (Unix uniquement)
+        Definir les limites de ressources pour le processus sandbox
+        Appele via preexec_fn dans subprocess (Unix uniquement)
         """
         if not RESOURCE_AVAILABLE:
             return
@@ -64,46 +75,46 @@ class PythonSandboxTool(BaseTool):
             # Limite CPU time (secondes)
             resource.setrlimit(resource.RLIMIT_CPU, (self.max_cpu_time, self.max_cpu_time))
 
-            # Limite mémoire (bytes)
+            # Limite memoire (bytes)
             max_memory_bytes = self.max_memory_mb * 1024 * 1024
             resource.setrlimit(resource.RLIMIT_AS, (max_memory_bytes, max_memory_bytes))
 
-            # Limite nombre de processus/threads (empêcher fork bombs)
+            # Limite nombre de processus/threads (empecher fork bombs)
             resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
 
-            # Limite taille de fichier (empêcher création de gros fichiers)
+            # Limite taille de fichier (empecher creation de gros fichiers)
             resource.setrlimit(resource.RLIMIT_FSIZE, (10 * 1024 * 1024, 10 * 1024 * 1024))  # 10 MB
 
             # Limite nombre de fichiers ouverts
             resource.setrlimit(resource.RLIMIT_NOFILE, (10, 10))
-        except Exception as e:
-            # Si les limites échouent, on continue mais on log
+        except (ValueError, OSError) as e:
+            # Si les limites echouent, on continue mais on log
             print(f"Warning: Failed to set resource limits: {e}")
 
-    def execute(self, arguments: Dict[str, Any]) -> ToolResult:
-        """Exécuter le code Python"""
+    def execute(self, arguments: Dict[str, ToolParamValue]) -> ToolResult:
+        """Executer le code Python"""
         # Valider les arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}")
 
-        code = arguments["code"]
+        code = str(arguments["code"])
 
         try:
-            # Créer un fichier temporaire
+            # Creer un fichier temporaire
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
                 f.write(code)
                 temp_file = f.name
 
             try:
-                # Exécuter avec timeout et limites de ressources
+                # Executer avec timeout et limites de ressources
                 start_time = time.time()
 
-                # Préparer l'environnement sécurisé
+                # Preparer l'environnement securise
                 env = os.environ.copy()
                 env['PYTHONDONTWRITEBYTECODE'] = '1'  # Pas de fichiers .pyc
 
-                # Exécuter avec limites de ressources (Unix) ou simple timeout (Windows)
+                # Executer avec limites de ressources (Unix) ou simple timeout (Windows)
                 if RESOURCE_AVAILABLE and sys.platform != 'win32':
                     result = subprocess.run(
                         ["python3", temp_file],
@@ -112,7 +123,7 @@ class PythonSandboxTool(BaseTool):
                         timeout=self.timeout,
                         cwd=os.path.dirname(temp_file),
                         env=env,
-                        preexec_fn=self._set_resource_limits,  # Appliquer limites CPU/mémoire
+                        preexec_fn=self._set_resource_limits,  # Appliquer limites CPU/memoire
                     )
                 else:
                     # Windows ou resource non disponible - seulement timeout
@@ -127,42 +138,53 @@ class PythonSandboxTool(BaseTool):
 
                 elapsed_time = time.time() - start_time
 
-                # Vérifier le résultat
+                # Verifier le resultat
                 if result.returncode == 0:
                     output = result.stdout
                     if not output:
-                        output = "[Code exécuté avec succès, pas de sortie]"
+                        output = "[Code execute avec succes, pas de sortie]"
+
+                    metadata: Dict[str, ToolMetadataValue] = {
+                        "returncode": result.returncode,
+                        "elapsed_time": str(round(elapsed_time, 3)),
+                        "timeout": False,
+                    }
 
                     return ToolResult(
                         status=ToolStatus.SUCCESS,
                         output=output,
-                        metadata={"returncode": result.returncode, "elapsed_time": elapsed_time, "timeout": False},
+                        metadata=metadata,
                     )
                 else:
+                    error_metadata: Dict[str, ToolMetadataValue] = {
+                        "returncode": result.returncode,
+                        "stderr": result.stderr,
+                    }
                     return ToolResult(
                         status=ToolStatus.ERROR,
                         output="",
                         error=f"Execution failed: {result.stderr}",
-                        metadata={"returncode": result.returncode, "stderr": result.stderr},
+                        metadata=error_metadata,
                     )
 
             except subprocess.TimeoutExpired:
+                timeout_metadata: Dict[str, ToolMetadataValue] = {"timeout": True}
                 return ToolResult(
                     status=ToolStatus.TIMEOUT,
                     output="",
                     error=f"Execution timeout after {self.timeout}s",
-                    metadata={"timeout": True},
+                    metadata=timeout_metadata,
                 )
-            except Exception as e:
+            except OSError as e:
                 return ToolResult(status=ToolStatus.ERROR, output="", error=f"Execution error: {str(e)}")
             finally:
                 # Nettoyer le fichier temporaire
                 try:
                     os.unlink(temp_file)
-                except Exception:
+                except OSError:
                     pass
 
-        except Exception as e:
+        except OSError as e:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Failed to execute Python code: {str(e)}")
 
     def _validate_ast(self, code: str) -> tuple[bool, Optional[str]]:
@@ -225,7 +247,7 @@ class PythonSandboxTool(BaseTool):
 
         return True, None
 
-    def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"
@@ -239,12 +261,12 @@ class PythonSandboxTool(BaseTool):
         if len(arguments["code"]) > 50000:  # Limiter la taille
             return False, "Code too long (max 50000 characters)"
 
-        # Validation AST (plus sûre que les patterns)
+        # Validation AST (plus sure que les patterns)
         is_valid, error = self._validate_ast(arguments["code"])
         if not is_valid:
             return False, error
 
-        # Bloquer certaines opérations dangereuses (double vérification)
+        # Bloquer certaines operations dangereuses (double verification)
         code_lower = arguments["code"].lower()
         for pattern in self.dangerous_patterns:
             if pattern.lower() in code_lower:
@@ -252,10 +274,10 @@ class PythonSandboxTool(BaseTool):
 
         return True, None
 
-    def _get_parameters_schema(self) -> Dict[str, Any]:
-        """Schéma des paramètres"""
+    def _get_parameters_schema(self) -> ToolSchemaDict:
+        """Schema des parametres"""
         return {
             "type": "object",
-            "properties": {"code": {"type": "string", "description": "Code Python à exécuter"}},
+            "properties": {"code": {"type": "string", "description": "Code Python a executer"}},
             "required": ["code"],
         }

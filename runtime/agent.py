@@ -3,11 +3,13 @@ Agent core : Intègre le modèle et les outils
 Gère les boucles de raisonnement et les appels d'outils
 """
 
+from __future__ import annotations
+
 import json
 import re
 import hashlib
 import textwrap
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Union, Callable
 from datetime import datetime
 
 from .config import get_config
@@ -15,6 +17,12 @@ from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry
 from tools.base import ToolResult, ToolStatus
+
+
+# Types stricts pour l'agent
+AgentMetadataValue = Union[str, int, float, bool, List[str]]
+ToolCallDict = Dict[str, Union[str, Dict[str, str]]]
+ChatResponseValue = Union[str, int, List[str], Dict[str, Union[str, int]]]
 
 # Import des middlewares de conformité
 from .middleware.logging import get_logger
@@ -84,7 +92,7 @@ class Agent:
         self.verifier = None
 
     @staticmethod
-    def _is_mock(obj: Any) -> bool:
+    def _is_mock(obj: object) -> bool:
         """Déterminer si l'objet est un mock unittest."""
         return hasattr(obj, "__class__") and getattr(obj.__class__, "__module__", "").startswith("unittest.mock")
 
@@ -190,7 +198,7 @@ class Agent:
         )
         print("✓ HTN system initialized")
 
-    def _resolve_verification_level(self, verif_config: Any) -> VerificationLevel:
+    def _resolve_verification_level(self, verif_config: object) -> VerificationLevel:
         """Normalise le niveau de vérification issu de la configuration."""
         if not verif_config or self._is_mock(verif_config):
             return VerificationLevel.STRICT
@@ -216,7 +224,7 @@ class Agent:
         # Gestion des mocks ou valeurs inattendues
         return VerificationLevel.STRICT
 
-    def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Analyser un message utilisateur et orchestrer la réponse de l'agent."""
 
         # Métriques: compter requête totale
@@ -282,7 +290,7 @@ class Agent:
 
         return result
 
-    def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Exécution avec planification HTN"""
 
         # Rafraîchir les middlewares patchables
@@ -371,7 +379,7 @@ class Agent:
 
         return response
 
-    def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
 
         # Rafraîchir les middlewares patchables (important pour les tests)
@@ -793,7 +801,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
 
         return textwrap.dedent(raw_prompt).strip()
 
-    def _parse_tool_calls(self, text: str) -> List[Dict[str, Any]]:
+    def _parse_tool_calls(self, text: str) -> List[ToolCallDict]:
         """
         Parser le texte pour détecter les appels d'outils
         Format attendu:
@@ -804,7 +812,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
         pattern = r"<tool_call>(.*?)</tool_call>"
         matches = re.findall(pattern, text, re.DOTALL)
 
-        tool_calls = []
+        tool_calls: List[ToolCallDict] = []
         for match in matches:
             try:
                 tool_json = json.loads(match.strip())
@@ -815,7 +823,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
 
         return tool_calls
 
-    def _execute_tool(self, tool_call: Dict[str, Any]) -> ToolResult:
+    def _execute_tool(self, tool_call: ToolCallDict) -> ToolResult:
         """Exécuter un outil"""
         tool_name = tool_call.get("tool")
         arguments = tool_call.get("arguments", {})
@@ -839,16 +847,14 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
                 formatted.append(f"Outil {i}: ERROR\n{result.error}")
         return "\n---\n".join(formatted)
 
-    def _build_action_registry(self) -> Dict[str, Any]:
+    def _build_action_registry(self) -> Dict[str, Callable[[Dict[str, str]], object]]:
         """
         Mappe les actions HTN aux outils FilAgent
 
         Returns:
             Dict[action_name, fonction_executable]
         """
-        from typing import Callable
-
-        registry: Dict[str, Callable] = {}
+        registry: Dict[str, Callable[[Dict[str, str]], object]] = {}
 
         # Mapper chaque outil du registre
         tools = self.tool_registry.list_all()
@@ -867,12 +873,12 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
 
         return registry
 
-    def _generic_execute(self, params: Dict) -> Any:
+    def _generic_execute(self, params: Dict[str, str]) -> str:
         """Action générique pour tâches non-mappées"""
         query = params.get("query", "")
         # Utiliser le mode simple pour exécuter la requête
         conversation_id = params.get("conversation_id", "default")
-        task_id = params.get("task_id")
+        task_id: Optional[str] = params.get("task_id")
 
         # DEBUG: Log avant exécution
         print(f"\n[HTN-DEBUG] _generic_execute INPUT:")
@@ -892,12 +898,12 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
 
     def _format_htn_response(
         self,
-        plan_result,
-        exec_result,
-        verifications: Dict[str, Any],
+        plan_result: object,
+        exec_result: object,
+        verifications: Dict[str, object],
         conversation_id: str,
         task_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, ChatResponseValue]:
         """Formate la réponse finale"""
 
         # Agréger les résultats
@@ -981,7 +987,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
             },
         }
 
-    def _generate_response_from_results(self, results: List[Dict[str, Any]]) -> str:
+    def _generate_response_from_results(self, results: List[Dict[str, object]]) -> str:
         """Génère un texte de réponse à partir des résultats des tâches"""
         if not results:
             return "Aucun résultat disponible."
@@ -1053,6 +1059,6 @@ def get_agent() -> Agent:
     return _agent_manager.get_agent()
 
 
-def init_model(backend: str, model_path: str, config: Dict[str, Any]):
+def init_model(backend: str, model_path: str, config: Dict[str, Union[str, int, bool]]) -> object:
     """Proxy vers runtime.model_interface.init_model pour compatibilité tests"""
     return _init_model(backend=backend, model_path=model_path, config=config)

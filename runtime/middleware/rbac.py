@@ -3,8 +3,10 @@ Middleware RBAC (Role-Based Access Control)
 Gestion des rôles et permissions selon config/policies.yaml
 """
 
-import yaml
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+import yaml  # type: ignore[import-untyped]
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -43,7 +45,7 @@ class RBACManager:
 
         self._load_config()
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Charger la configuration depuis policies.yaml"""
         if not self.config_path.exists():
             return

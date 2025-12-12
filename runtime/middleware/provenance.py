@@ -1,13 +1,27 @@
 """
 Middleware de provenance PROV-JSON
-Traçabilité des artefacts selon le standard W3C PROV
+Tracabilite des artefacts selon le standard W3C PROV
 """
+
+from __future__ import annotations
 
 import json
 import hashlib
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, List, Optional, Union
 from pathlib import Path
+
+
+# Type aliases for strict typing
+ProvAttributeValue = Union[str, int, float, bool, None]
+ProvAttributes = Dict[str, ProvAttributeValue]
+ProvEntity = Dict[str, Union[str, ProvAttributes]]
+ProvActivity = Dict[str, Union[str, ProvAttributes]]
+ProvAgent = Dict[str, Union[str, ProvAttributes]]
+ProvRelation = Dict[str, str]
+ProvJsonDocument = Dict[str, Union[Dict[str, ProvEntity], Dict[str, ProvActivity], Dict[str, ProvAgent], List[ProvRelation]]]
+ToolCallDict = Dict[str, Union[str, int, float, bool, None, List[str], Dict[str, str]]]
+MetadataDict = Dict[str, Union[str, int, float, bool, None]]
 
 
 class ProvBuilder:
@@ -16,44 +30,44 @@ class ProvBuilder:
     Format conforme W3C PROV
     """
 
-    def __init__(self):
-        self.entities: Dict[str, Dict] = {}
-        self.activities: Dict[str, Dict] = {}
-        self.agents: Dict[str, Dict] = {}
-        self.was_generated_by: List[Dict] = []
-        self.was_attributed_to: List[Dict] = []
-        self.used: List[Dict] = []
-        self.was_associated_with: List[Dict] = []
-        self.was_derived_from: List[Dict] = []
+    def __init__(self) -> None:
+        self.entities: Dict[str, ProvEntity] = {}
+        self.activities: Dict[str, ProvActivity] = {}
+        self.agents: Dict[str, ProvAgent] = {}
+        self.was_generated_by: List[ProvRelation] = []
+        self.was_attributed_to: List[ProvRelation] = []
+        self.used: List[ProvRelation] = []
+        self.was_associated_with: List[ProvRelation] = []
+        self.was_derived_from: List[ProvRelation] = []
 
-    def add_entity(self, entity_id: str, label: str, attributes: Optional[Dict] = None):
+    def add_entity(self, entity_id: str, label: str, attributes: Optional[ProvAttributes] = None) -> None:
         """
-        Ajouter une entité (artifact)
+        Ajouter une entite (artifact)
 
         Args:
-            entity_id: ID unique de l'entité
+            entity_id: ID unique de l'entite
             label: Label descriptif
             attributes: Attributs additionnels (hash, type, etc.)
         """
-        entity = {"prov:label": label}
+        entity: ProvEntity = {"prov:label": label}
 
         if attributes:
             entity.update(attributes)
 
         self.entities[entity_id] = entity
 
-    def add_activity(self, activity_id: str, start_time: str, end_time: str):
+    def add_activity(self, activity_id: str, start_time: str, end_time: str) -> None:
         """
-        Ajouter une activité (processus)
+        Ajouter une activite (processus)
 
         Args:
-            activity_id: ID unique de l'activité
-            start_time: Timestamp de début (ISO8601)
+            activity_id: ID unique de l'activite
+            start_time: Timestamp de debut (ISO8601)
             end_time: Timestamp de fin (ISO8601)
         """
         self.activities[activity_id] = {"prov:type": "Activity", "prov:startTime": start_time, "prov:endTime": end_time}
 
-    def add_agent(self, agent_id: str, agent_type: str = "softwareAgent", version: Optional[str] = None):
+    def add_agent(self, agent_id: str, agent_type: str = "softwareAgent", version: Optional[str] = None) -> None:
         """
         Ajouter un agent
 
@@ -62,36 +76,36 @@ class ProvBuilder:
             agent_type: Type (softwareAgent, person, organization)
             version: Version de l'agent
         """
-        agent = {"prov:type": agent_type}
+        agent: ProvAgent = {"prov:type": agent_type}
 
         if version:
             agent["version"] = version
 
         self.agents[agent_id] = agent
 
-    def link_generated(self, entity_id: str, activity_id: str):
-        """Lier une entité à l'activité qui l'a générée"""
+    def link_generated(self, entity_id: str, activity_id: str) -> None:
+        """Lier une entite a l'activite qui l'a generee"""
         self.was_generated_by.append({"prov:entity": entity_id, "prov:activity": activity_id})
 
-    def link_associated(self, activity_id: str, agent_id: str):
-        """Lier une activité à l'agent qui l'a exécutée"""
+    def link_associated(self, activity_id: str, agent_id: str) -> None:
+        """Lier une activite a l'agent qui l'a executee"""
         self.was_associated_with.append({"prov:activity": activity_id, "prov:agent": agent_id})
 
-    def link_attributed(self, entity_id: str, agent_id: str):
-        """Lier une entité à l'agent qui en est responsable"""
+    def link_attributed(self, entity_id: str, agent_id: str) -> None:
+        """Lier une entite a l'agent qui en est responsable"""
         self.was_attributed_to.append({"prov:entity": entity_id, "prov:agent": agent_id})
 
-    def link_used(self, activity_id: str, entity_id: str):
-        """Lier une activité à l'entité qu'elle a utilisée"""
+    def link_used(self, activity_id: str, entity_id: str) -> None:
+        """Lier une activite a l'entite qu'elle a utilisee"""
         self.used.append({"prov:activity": activity_id, "prov:entity": entity_id})
 
-    def link_derived(self, entity_id: str, source_entity_id: str):
-        """Lier une entité dérivée à sa source"""
+    def link_derived(self, entity_id: str, source_entity_id: str) -> None:
+        """Lier une entite derivee a sa source"""
         self.was_derived_from.append({"prov:generatedEntity": entity_id, "prov:usedEntity": source_entity_id})
 
-    def to_prov_json(self) -> Dict[str, Any]:
+    def to_prov_json(self) -> ProvJsonDocument:
         """Convertir en format PROV-JSON"""
-        prov = {"entity": self.entities, "activity": self.activities, "agent": self.agents}
+        prov: ProvJsonDocument = {"entity": self.entities, "activity": self.activities, "agent": self.agents}
 
         if self.was_generated_by:
             prov["wasGeneratedBy"] = self.was_generated_by
@@ -110,10 +124,10 @@ class ProvBuilder:
 class ProvenanceTracker:
     """
     Tracker de provenance pour l'agent
-    Enregistre la traçabilité complète des décisions
+    Enregistre la tracabilite complete des decisions
     """
 
-    def __init__(self, storage_dir: str = "logs/traces/otlp"):
+    def __init__(self, storage_dir: str = "logs/traces/otlp") -> None:
         self.output_dir = Path(storage_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -122,8 +136,8 @@ class ProvenanceTracker:
         conversation_id: Optional[str] = None,
         input_message: Optional[str] = None,
         output_message: Optional[str] = None,
-        tool_calls: Optional[List[Dict]] = None,
-        metadata: Optional[Dict] = None,
+        tool_calls: Optional[List[ToolCallDict]] = None,
+        metadata: Optional[MetadataDict] = None,
         # Legacy parameters for backward compatibility
         agent_id: Optional[str] = None,
         agent_version: Optional[str] = None,
@@ -134,7 +148,7 @@ class ProvenanceTracker:
         end_time: Optional[str] = None,
     ) -> str:
         """
-        Tracer une génération de texte
+        Tracer une generation de texte
 
         Supports two calling conventions:
         1. New API: conversation_id, input_message, output_message, tool_calls, metadata
@@ -173,6 +187,21 @@ class ProvenanceTracker:
         else:
             # Legacy API
             prov_id = f"prov-{task_id}-{uuid.uuid4().hex[:8]}"
+            # Ensure prompt_hash and response_hash have default values
+            if prompt_hash is None:
+                prompt_hash = "empty"
+            if response_hash is None:
+                response_hash = "empty"
+            if start_time is None:
+                start_time = datetime.now().isoformat()
+            if end_time is None:
+                end_time = datetime.now().isoformat()
+            if agent_id is None:
+                agent_id = "filagent"
+            if agent_version is None:
+                agent_version = "1.0.0"
+            if task_id is None:
+                task_id = "unknown"
 
         builder = ProvBuilder()
 
@@ -181,14 +210,16 @@ class ProvenanceTracker:
         prompt_entity_id = f"prompt:{task_id}"
         activity_id = f"gen:{task_id}"
 
-        # Entités
+        # Entites
         builder.add_entity(response_entity_id, "Response JSON", {"hash": f"sha256:{response_hash}"})
         builder.add_entity(prompt_entity_id, "Prompt", {"hash": f"sha256:{prompt_hash}"})
 
-        # Activité
+        # Activite
         builder.add_activity(activity_id, start_time, end_time)
         if metadata:
-            builder.activities[activity_id]["metadata"] = metadata
+            # Store metadata in the activity dict
+            activity_dict = self.activities[activity_id] if hasattr(self, 'activities') else builder.activities[activity_id]
+            activity_dict["metadata"] = metadata  # type: ignore[assignment]
 
         # Agent
         builder.add_agent(agent_id, "softwareAgent", agent_version)
@@ -213,9 +244,9 @@ class ProvenanceTracker:
 
     def track_tool_execution(
         self, tool_name: str, tool_input_hash: str, tool_output_hash: str, task_id: str, start_time: str, end_time: str
-    ) -> Dict[str, Any]:
+    ) -> ProvJsonDocument:
         """
-        Tracer l'exécution d'un outil
+        Tracer l'execution d'un outil
 
         Returns:
             Dict PROV-JSON
@@ -227,11 +258,11 @@ class ProvenanceTracker:
         output_id = f"tool_output:{task_id}:{tool_name}"
         activity_id = f"tool_exec:{task_id}:{tool_name}"
 
-        # Entités
+        # Entites
         builder.add_entity(input_id, f"Tool input: {tool_name}", {"hash": f"sha256:{tool_input_hash}"})
         builder.add_entity(output_id, f"Tool output: {tool_name}", {"hash": f"sha256:{tool_output_hash}"})
 
-        # Activité
+        # Activite
         builder.add_activity(activity_id, start_time, end_time)
 
         # Agent (l'outil)
@@ -260,7 +291,7 @@ _tracker: Optional[ProvenanceTracker] = None
 
 
 def get_tracker() -> ProvenanceTracker:
-    """Récupérer l'instance globale du tracker"""
+    """Recuperer l'instance globale du tracker"""
     global _tracker
     if _tracker is None:
         _tracker = ProvenanceTracker()
