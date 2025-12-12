@@ -83,7 +83,7 @@ dependencies = [
     "filelock>=3.13.0,<4",
 
     # Document processing
-    "PyPDF2>=3.0.0,<4",  # PDF document analysis for DocumentAnalyzerPME tool
+    "pypdf>=4.0.0,<6",  # PDF document analysis (successor to PyPDF2, fixes CVE)
     "python-docx>=1.1.0,<2",  # Word document analysis (imports as 'docx')
     "openpyxl>=3.0.0,<4",  # Excel document analysis for DocumentAnalyzerPME tool
     "openai>=2.8.0",

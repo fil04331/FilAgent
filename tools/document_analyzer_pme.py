@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pandas as pd
 from typing import Callable, Dict, List, Optional, Union
-import PyPDF2
+import pypdf
 import docx
 import re
 import logging
@@ -625,7 +625,7 @@ class DocumentAnalyzerPME(BaseTool):
         """Extract data from PDF file"""
         try:
             with open(file_path, "rb") as file:
-                reader = PyPDF2.PdfReader(file)
+                reader = pypdf.PdfReader(file)
 
                 # Extract text from all pages
                 text = ""
@@ -645,7 +645,7 @@ class DocumentAnalyzerPME(BaseTool):
                         pass
 
                 return {"text": text, "subtotal": subtotal, "raw_amounts": amounts}
-        except (OSError, PyPDF2.errors.PdfReadError) as e:
+        except (OSError, pypdf.errors.PdfReadError) as e:
             raise ValueError(f"Error reading PDF: {str(e)}") from e
 
     def _extract_excel(self, file_path: str) -> Dict[str, DocumentDataValue]:  # noqa: C901
