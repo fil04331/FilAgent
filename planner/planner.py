@@ -14,18 +14,42 @@ Conformité:
 - Logs structurés pour auditabilité (RGPD)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Optional, Any
+from typing import TYPE_CHECKING, List, Dict, Optional, Union, Protocol
 from datetime import datetime
 import json
 import re
 
-from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError
+from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError, TaskParamValue
 from .metrics import get_metrics
 import time
 
 from runtime.template_loader import get_template_loader, TemplateLoader
+
+
+# Protocol pour l'interface modèle (évite l'import circulaire)
+class ModelInterface(Protocol):
+    """Protocol pour les interfaces modèle LLM"""
+    def generate(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.3,
+        max_tokens: int = 1000,
+    ) -> Union[str, Dict[str, str]]: ...
+
+
+# Protocol pour le registre d'outils
+class ToolsRegistry(Protocol):
+    """Protocol pour le registre d'outils"""
+    def get_all(self) -> List[object]: ...
+
+
+# Types stricts pour le planificateur
+PlanningMetadataValue = Union[str, int, float, bool, List[str], Dict[str, str]]
+DecompositionTask = Dict[str, Union[str, int, List[int], Dict[str, str]]]
 
 
 class PlanningStrategy(str, Enum):
@@ -53,14 +77,14 @@ class PlanningResult:
     strategy_used: PlanningStrategy
     confidence: float
     reasoning: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, PlanningMetadataValue] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialise les métadonnées de traçabilité"""
         if "planned_at" not in self.metadata:
             self.metadata["planned_at"] = datetime.utcnow().isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Union[str, float, Dict[str, PlanningMetadataValue], object]]:
         """Sérialise pour logging/traçabilité"""
         return {
             "graph": self.graph.to_dict(),
@@ -93,8 +117,8 @@ class HierarchicalPlanner:
 
     def __init__(
         self,
-        model_interface: Optional[Any] = None,
-        tools_registry: Optional[Any] = None,
+        model_interface: Optional[ModelInterface] = None,
+        tools_registry: Optional[ToolsRegistry] = None,
         max_decomposition_depth: int = 3,
         enable_tracing: bool = True,
         template_loader: Optional[TemplateLoader] = None,
@@ -125,9 +149,9 @@ class HierarchicalPlanner:
         # Patterns courants pour règles prédéfinies
         self._init_rule_patterns()
 
-    def _init_rule_patterns(self):
+    def _init_rule_patterns(self) -> None:
         """Initialise les patterns de règles courantes"""
-        self.patterns = {
+        self.patterns: Dict[str, List[Dict[str, Union[str, int, List[int]]]]] = {
             # Pattern: "analyse X, génère Y, crée Z"
             r"analys[er]?\s+(.+?),\s+g[ée]n[ée]r[er]?\s+(.+?),\s+cr[ée][er]?\s+(.+)": [
                 {"action": "read_file", "extract": 1},
@@ -151,7 +175,7 @@ class HierarchicalPlanner:
         self,
         query: str,
         strategy: PlanningStrategy = PlanningStrategy.HYBRID,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[Dict[str, PlanningMetadataValue]] = None,
     ) -> PlanningResult:
         """
         Planifie l'exécution d'une requête complexe
@@ -224,7 +248,7 @@ class HierarchicalPlanner:
 
             raise TaskDecompositionError(f"Planning failed for query '{query[:50]}...': {str(e)}") from e
 
-    def _plan_rule_based(self, query: str, metadata: Dict[str, Any]) -> PlanningResult:
+    def _plan_rule_based(self, query: str, metadata: Dict[str, PlanningMetadataValue]) -> PlanningResult:
         """
         Planification basée sur des règles prédéfinies
 
@@ -284,7 +308,7 @@ class HierarchicalPlanner:
             metadata=metadata,
         )
 
-    def _plan_llm_based(self, query: str, metadata: Dict[str, Any]) -> PlanningResult:
+    def _plan_llm_based(self, query: str, metadata: Dict[str, PlanningMetadataValue]) -> PlanningResult:
         """
         Planification via LLM (décomposition intelligente)
 
@@ -330,7 +354,7 @@ class HierarchicalPlanner:
         except Exception as e:
             raise TaskDecompositionError(f"LLM-based planning failed: {str(e)}") from e
 
-    def _plan_hybrid(self, query: str, metadata: Dict[str, Any]) -> PlanningResult:
+    def _plan_hybrid(self, query: str, metadata: Dict[str, PlanningMetadataValue]) -> PlanningResult:
         """
         Planification hybride (règles + LLM)
 
@@ -440,32 +464,38 @@ Actions disponibles: {available_actions}
             "analyze_data", "generate_report", "execute_code"
         ]
     
-    def _parse_llm_response(self, response: Any) -> Dict[str, Any]:
+    def _parse_llm_response(self, response: Union[str, Dict[str, str], object]) -> Dict[str, Union[str, List[DecompositionTask]]]:
         """Parse la réponse JSON du LLM ou retourne directement un dictionnaire."""
+        response_text: str = ""
+
         if isinstance(response, dict):
             if "tasks" in response:
-                return response
+                return response  # type: ignore[return-value]
             if "text" in response and isinstance(response["text"], str):
-                response = response["text"]
+                response_text = response["text"]
             elif "content" in response and isinstance(response["content"], str):
-                response = response["content"]
+                response_text = response["content"]
             else:
                 raise TaskDecompositionError(
                     "Failed to parse LLM response: missing JSON payload"
                 )
-
-        if hasattr(response, "text") and isinstance(response.text, str):
-            response = response.text
-
-        if not isinstance(response, str):
+        elif hasattr(response, "text"):
+            text_attr = getattr(response, "text", None)
+            if isinstance(text_attr, str):
+                response_text = text_attr
+            else:
+                raise TaskDecompositionError(
+                    f"Failed to parse LLM response: unsupported type {type(response).__name__}"
+                )
+        elif isinstance(response, str):
+            response_text = response
+        else:
             raise TaskDecompositionError(
                 f"Failed to parse LLM response: unsupported type {type(response).__name__}"
             )
 
         # Nettoyer la réponse (enlever markdown, etc.)
-        if not isinstance(response, str):
-            response = str(response)
-        cleaned = response.strip()
+        cleaned = response_text.strip()
         if cleaned.startswith("```"):
             # Enlever les backticks markdown
             lines = cleaned.split("\n")
@@ -475,10 +505,10 @@ Actions disponibles: {available_actions}
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
             raise TaskDecompositionError(
-                f"Failed to parse LLM response: {str(e)}\nResponse: {response[:200]}"
+                f"Failed to parse LLM response: {str(e)}\nResponse: {response_text[:200]}"
             ) from e
 
-    def _build_graph_from_decomposition(self, decomposition: Dict[str, Any]) -> TaskGraph:
+    def _build_graph_from_decomposition(self, decomposition: Dict[str, Union[str, List[DecompositionTask]]]) -> TaskGraph:
         """Construit un TaskGraph depuis la décomposition LLM"""
         graph = TaskGraph()
         task_list = decomposition.get("tasks", [])

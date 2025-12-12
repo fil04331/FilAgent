@@ -9,6 +9,7 @@ Interface professionnelle pour FilAgent avec architecture modulaire,
 respect des bonnes pratiques et évolutivité garantie.
 Conforme aux standards: Loi 25, RGPD, AI Act, ISO 27001
 """
+from __future__ import annotations
 
 import asyncio
 import hashlib
@@ -19,11 +20,22 @@ import sqlite3
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
+
+# Type Aliases for strict typing
+JSONValue = Union[str, int, float, bool, None, Dict[str, "JSONValue"], List["JSONValue"]]
+MessageContent = Union[str, Dict[str, str], List[str]]
+APIResponse = Dict[str, Union[str, int, bool, List[str], Dict[str, JSONValue]]]
+ChatHistory = List[List[str]]
+MetadataDict = Dict[str, Union[str, int, float, bool, None]]
+ComplianceChecks = Dict[str, bool]
+ProvenanceData = Dict[str, str]
+IntentDict = Dict[str, Union[str, float, bool]]
+ToolMapping = Dict[str, List[str]]
 
 import gradio as gr
 import pandas as pd
@@ -257,7 +269,7 @@ def check_disk_space(required_bytes: int = 100 * 1024 * 1024) -> bool:
         return True  # Continuer par défaut si impossible de vérifier
 
 
-def cleanup_temp_files(*file_paths):
+def cleanup_temp_files(*file_paths: Optional[str]) -> None:
     """
     Nettoyer les fichiers temporaires
 
@@ -270,9 +282,9 @@ def cleanup_temp_files(*file_paths):
                 path = Path(file_path)
                 if path.exists() and path.is_file():
                     path.unlink()
-                    logger.debug(f"🗑️ Fichier temporaire supprimé: {file_path}")
+                    logger.debug(f"Fichier temporaire supprime: {file_path}")
             except Exception as e:
-                logger.warning(f"⚠️ Impossible de supprimer {file_path}: {e}")
+                logger.warning(f"Impossible de supprimer {file_path}: {e}")
 
 
 # ============================================================================
@@ -285,40 +297,44 @@ class FilAgentConfig:
     """Configuration centralisée de FilAgent"""
 
     # Paths - Use environment variable or detect from file location
-    base_dir: Path = Path(os.environ.get("FILAGENT_BASE_DIR", Path(__file__).parent.resolve()))
-    db_path: Path = None
-    logs_dir: Path = None
-    keys_dir: Path = None
-    models_dir: Path = None
+    base_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("FILAGENT_BASE_DIR", str(Path(__file__).parent.resolve()))
+        )
+    )
+    db_path: Optional[Path] = None
+    logs_dir: Optional[Path] = None
+    keys_dir: Optional[Path] = None
+    models_dir: Optional[Path] = None
 
     # API
     api_host: str = "localhost"
     api_port: int = 8000
     api_timeout: int = 30
 
-    # Sécurité
+    # Securite
     enable_pii_redaction: bool = True
     enable_audit_trail: bool = True
     enable_decision_records: bool = True
     max_message_length: int = 10000
 
-    # Conformité
+    # Conformite
     retention_days: int = 90
     jurisdiction: str = "QC-CA"
-    compliance_frameworks: List[str] = None
+    compliance_frameworks: List[str] = field(default_factory=list)
 
     # Performance
     max_workers: int = 4
     cache_ttl: int = 3600
     batch_size: int = 32
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.db_path = self.base_dir / "memory" / "episodic" / "conversations.db"
         self.logs_dir = self.base_dir / "logs"
         self.keys_dir = self.base_dir / "provenance" / "keys"
         self.models_dir = self.base_dir / "models" / "weights"
 
-        if self.compliance_frameworks is None:
+        if not self.compliance_frameworks:
             self.compliance_frameworks = ["LOI25", "GDPR", "AI_ACT", "ISO27001"]
 
 
@@ -338,7 +354,7 @@ class MessageRole(Enum):
 
 @dataclass
 class Message:
-    """Modèle de message avec métadonnées complètes"""
+    """Modele de message avec metadonnees completes"""
 
     id: str
     role: MessageRole
@@ -346,11 +362,11 @@ class Message:
     timestamp: datetime
     conversation_id: str
     pii_redacted: bool = False
-    metadata: Dict[str, Any] = None
+    metadata: Optional[MetadataDict] = None
     signature: Optional[str] = None
 
-    def to_dict(self) -> Dict:
-        """Convertir en dictionnaire pour sérialisation"""
+    def to_dict(self) -> Dict[str, Union[str, bool, MetadataDict, None]]:
+        """Convertir en dictionnaire pour serialisation"""
         data = asdict(self)
         data["role"] = self.role.value
         data["timestamp"] = self.timestamp.isoformat()
@@ -359,7 +375,7 @@ class Message:
 
 @dataclass
 class DecisionRecord:
-    """Enregistrement de décision pour conformité"""
+    """Enregistrement de decision pour conformite"""
 
     id: str
     conversation_id: str
@@ -369,9 +385,9 @@ class DecisionRecord:
     model_version: str
     temperature: float
     tools_used: List[str]
-    compliance_checks: Dict[str, bool]
+    compliance_checks: ComplianceChecks
     signature: str
-    provenance: Dict[str, Any]
+    provenance: ProvenanceData
 
 
 @dataclass
@@ -392,41 +408,58 @@ class ComplianceMetrics:
 
 
 class SecurityManager:
-    """Gestionnaire de sécurité avec signatures EdDSA"""
+    """Gestionnaire de securite avec signatures EdDSA"""
 
-    def __init__(self, config: FilAgentConfig):
+    config: FilAgentConfig
+    private_key: Optional[ed25519.Ed25519PrivateKey]
+    public_key: Optional[ed25519.Ed25519PublicKey]
+
+    def __init__(self, config: FilAgentConfig) -> None:
         self.config = config
         self.private_key = None
         self.public_key = None
         self._load_keys()
 
-    def _load_keys(self):
-        """Charger les clés EdDSA depuis le système de fichiers"""
+    def _load_keys(self) -> None:
+        """Charger les cles EdDSA depuis le systeme de fichiers"""
         try:
+            if self.config.keys_dir is None:
+                logger.warning("keys_dir non configure, generation des cles...")
+                self._generate_keys()
+                return
+
             private_key_path = self.config.keys_dir / "private_key.pem"
             public_key_path = self.config.keys_dir / "public_key.pem"
 
             if private_key_path.exists() and public_key_path.exists():
                 with open(private_key_path, "rb") as f:
-                    self.private_key = serialization.load_pem_private_key(f.read(), password=None)
+                    loaded_private = serialization.load_pem_private_key(f.read(), password=None)
+                    if isinstance(loaded_private, ed25519.Ed25519PrivateKey):
+                        self.private_key = loaded_private
 
                 with open(public_key_path, "rb") as f:
-                    self.public_key = serialization.load_pem_public_key(f.read())
+                    loaded_public = serialization.load_pem_public_key(f.read())
+                    if isinstance(loaded_public, ed25519.Ed25519PublicKey):
+                        self.public_key = loaded_public
 
-                logger.info("✅ Clés EdDSA chargées avec succès")
+                logger.info("Cles EdDSA chargees avec succes")
             else:
-                logger.warning("⚠️ Clés EdDSA non trouvées, génération...")
+                logger.warning("Cles EdDSA non trouvees, generation...")
                 self._generate_keys()
         except Exception as e:
-            logger.error(f"Erreur chargement clés: {e}")
+            logger.error(f"Erreur chargement cles: {e}")
             self._generate_keys()
 
-    def _generate_keys(self):
-        """Générer nouvelles clés EdDSA si nécessaire"""
+    def _generate_keys(self) -> None:
+        """Generer nouvelles cles EdDSA si necessaire"""
         self.private_key = ed25519.Ed25519PrivateKey.generate()
         self.public_key = self.private_key.public_key()
 
-        # Créer le répertoire si nécessaire
+        if self.config.keys_dir is None:
+            logger.warning("keys_dir non configure, cles en memoire uniquement")
+            return
+
+        # Creer le repertoire si necessaire
         self.config.keys_dir.mkdir(parents=True, exist_ok=True)
 
         # Sauvegarder les clés
@@ -444,21 +477,21 @@ class SecurityManager:
         (self.config.keys_dir / "private_key.pem").write_bytes(private_pem)
         (self.config.keys_dir / "public_key.pem").write_bytes(public_pem)
 
-        # Sécuriser la clé privée
+        # Securiser la cle privee
         (self.config.keys_dir / "private_key.pem").chmod(0o600)
 
-        logger.info("✅ Nouvelles clés EdDSA générées et sécurisées")
+        logger.info("Nouvelles cles EdDSA generees et securisees")
 
     def sign_data(self, data: str) -> str:
-        """Signer des données avec EdDSA"""
+        """Signer des donnees avec EdDSA"""
         if not self.private_key:
-            raise ValueError("Clé privée non disponible")
+            raise ValueError("Cle privee non disponible")
 
         signature = self.private_key.sign(data.encode())
         return signature.hex()
 
     def verify_signature(self, data: str, signature: str) -> bool:
-        """Vérifier une signature EdDSA"""
+        """Verifier une signature EdDSA"""
         try:
             if not self.public_key:
                 return False
@@ -473,12 +506,12 @@ class SecurityManager:
         import re
 
         redacted = text
-        pii_found = []
+        pii_found: List[str] = []
 
-        # Patterns PII québécois
-        patterns = {
+        # Patterns PII quebecois
+        patterns: Dict[str, str] = {
             "nas": r"\b\d{3}[-\s]?\d{3}[-\s]?\d{3}\b",  # NAS
-            "phone": r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b",  # Téléphone
+            "phone": r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b",  # Telephone
             "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
             "ramq": r"\b[A-Z]{4}\s?\d{8}\b",  # Carte RAMQ
             "postal": r"\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b",  # Code postal
@@ -499,16 +532,22 @@ class SecurityManager:
 
 
 class DatabaseManager:
-    """Gestionnaire de base de données avec pool de connexions"""
+    """Gestionnaire de base de donnees avec pool de connexions"""
 
-    def __init__(self, config: FilAgentConfig):
+    config: FilAgentConfig
+    connection_pool: List[sqlite3.Connection]
+    max_connections: int
+
+    def __init__(self, config: FilAgentConfig) -> None:
         self.config = config
         self.connection_pool = []
         self.max_connections = 5
         self._init_database()
 
-    def _init_database(self):
-        """Initialiser la base de données avec schéma complet"""
+    def _init_database(self) -> None:
+        """Initialiser la base de donnees avec schema complet"""
+        if self.config.db_path is None:
+            raise ValueError("db_path non configure")
         self.config.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with self._get_connection() as conn:
@@ -599,10 +638,12 @@ class DatabaseManager:
             )
 
             conn.commit()
-            logger.info("✅ Base de données initialisée avec schéma complet")
+            logger.info("Base de donnees initialisee avec schema complet")
 
     def _get_connection(self) -> sqlite3.Connection:
         """Obtenir une connexion depuis le pool"""
+        if self.config.db_path is None:
+            raise ValueError("db_path non configure")
         conn = sqlite3.connect(
             str(self.config.db_path),
             timeout=30,
@@ -615,7 +656,7 @@ class DatabaseManager:
         return conn
 
     def save_message(self, message: Message) -> bool:
-        """Sauvegarder un message avec métadonnées"""
+        """Sauvegarder un message avec metadonnees"""
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -709,7 +750,7 @@ class DatabaseManager:
         resource: str,
         action: str,
         outcome: str,
-        metadata: Dict = None,
+        metadata: Optional[MetadataDict] = None,
     ) -> bool:
         """Logger un événement d'audit avec chaîne de hash"""
         try:
@@ -799,88 +840,99 @@ class DatabaseManager:
 
 
 class FilAgentEngine:
-    """Moteur principal de FilAgent avec intégration LLM"""
+    """Moteur principal de FilAgent avec integration LLM"""
 
-    def __init__(self, config: FilAgentConfig):
+    config: FilAgentConfig
+    security: SecurityManager
+    database: DatabaseManager
+    executor: ThreadPoolExecutor
+    tools: Dict[str, Union[TaxCalculatorTool, DocumentAnalyzerTool, ComplianceCheckerTool, ReportGeneratorTool]]
+    model: Optional[object]
+    model_loaded: bool
+    generation_config: Optional[object]
+
+    def __init__(self, config: FilAgentConfig) -> None:
         self.config = config
         self.security = SecurityManager(config)
         self.database = DatabaseManager(config)
         self.executor = ThreadPoolExecutor(max_workers=config.max_workers)
         self.tools = self._initialize_tools()
+        self.generation_config = None
 
-        # Charger le modèle LLM local
+        # Charger le modele LLM local
         self.model = None
         self.model_loaded = self._load_model()
 
     def _load_model(self, backend: str = "perplexity", model_name: str = "sonar-pro") -> bool:
         """
-        Charger un modèle LLM via API (Perplexity ou OpenAI)
+        Charger un modele LLM via API (Perplexity ou OpenAI)
 
         Args:
             backend: "perplexity" ou "openai"
-            model_name: Nom du modèle selon le backend:
+            model_name: Nom du modele selon le backend:
                 - Perplexity: "sonar", "sonar-pro", "sonar-reasoning", etc.
                 - OpenAI: "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", etc.
 
         Returns:
-            True si succès, False sinon
+            True si succes, False sinon
         """
         from runtime.model_interface import init_model, GenerationConfig
 
         try:
-            logger.info(f"🔄 Chargement du backend: {backend}")
-            logger.info(f"🔄 Modèle: {model_name}")
+            logger.info(f"Chargement du backend: {backend}")
+            logger.info(f"Modele: {model_name}")
 
             self.model = init_model(
                 backend=backend, model_path=model_name, config={}  # API keys viennent de .env
             )
 
-            # Configuration de génération par défaut
+            # Configuration de generation par defaut
             self.generation_config = GenerationConfig(temperature=0.7, max_tokens=2048, seed=42)
 
-            logger.info(f"✅ Backend {backend} chargé avec succès")
-            logger.info(f"✅ Modèle {model_name} prêt")
+            logger.info(f"Backend {backend} charge avec succes")
+            logger.info(f"Modele {model_name} pret")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Erreur chargement {backend}/{model_name}: {e}")
-            logger.warning("⚠️ Mode dégradé activé (outils seulement)")
+            logger.error(f"Erreur chargement {backend}/{model_name}: {e}")
+            logger.warning("Mode degrade active (outils seulement)")
             return False
 
     def reload_model(self, backend: str, model_name: str) -> str:
         """
-        Recharger le modèle LLM avec un nouveau backend/modèle
+        Recharger le modele LLM avec un nouveau backend/modele
 
         Args:
             backend: "perplexity" ou "openai"
-            model_name: Nom du modèle
+            model_name: Nom du modele
 
         Returns:
             Message de statut
         """
         try:
-            logger.info(f"🔄 Rechargement: {backend}/{model_name}")
+            logger.info(f"Rechargement: {backend}/{model_name}")
 
-            # Décharger l'ancien modèle si présent
+            # Decharger l'ancien modele si present
             if self.model:
                 try:
-                    self.model.unload()
+                    if hasattr(self.model, "unload"):
+                        self.model.unload()
                 except Exception:
                     pass
 
-            # Charger le nouveau modèle
+            # Charger le nouveau modele
             self.model_loaded = self._load_model(backend=backend, model_name=model_name)
 
             if self.model_loaded:
-                return f"✅ Modèle chargé: {backend}/{model_name}"
+                return f"Modele charge: {backend}/{model_name}"
             else:
-                return f"❌ Échec chargement: {backend}/{model_name}"
+                return f"Echec chargement: {backend}/{model_name}"
 
         except Exception as e:
-            logger.error(f"❌ Erreur reload: {e}")
-            return f"❌ Erreur: {str(e)}"
+            logger.error(f"Erreur reload: {e}")
+            return f"Erreur: {str(e)}"
 
-    def _initialize_tools(self) -> Dict:
+    def _initialize_tools(self) -> Dict[str, Union[TaxCalculatorTool, DocumentAnalyzerTool, ComplianceCheckerTool, ReportGeneratorTool]]:
         """Initialiser les outils PME disponibles"""
         return {
             "tax_calculator": TaxCalculatorTool(),
@@ -890,7 +942,7 @@ class FilAgentEngine:
         }
 
     async def process_message(
-        self, message: str, conversation_id: str, history: List[List[str]] = None
+        self, message: str, conversation_id: str, history: Optional[ChatHistory] = None
     ) -> Tuple[str, DecisionRecord]:
         """
         Traiter un message avec pipeline complet de conformité
@@ -972,12 +1024,12 @@ class FilAgentEngine:
 
         return response, decision_record
 
-    def _detect_intent(self, message: str) -> Dict:
-        """Détecter l'intention du message"""
+    def _detect_intent(self, message: str) -> IntentDict:
+        """Detecter l'intention du message"""
         message_lower = message.lower()
 
         # Patterns d'intention
-        intents = {
+        intents: Dict[str, bool] = {
             "tax_calculation": any(
                 word in message_lower for word in ["tps", "tvq", "taxe", "taxes", "calcul"]
             ),
@@ -986,12 +1038,12 @@ class FilAgentEngine:
             ),
             "compliance_check": any(
                 word in message_lower
-                for word in ["conformité", "loi 25", "rgpd", "audit", "compliance"]
+                for word in ["conformite", "loi 25", "rgpd", "audit", "compliance"]
             ),
             "report_generation": any(
-                word in message_lower for word in ["rapport", "report", "générer", "créer"]
+                word in message_lower for word in ["rapport", "report", "generer", "creer"]
             ),
-            "general_query": True,  # Défaut
+            "general_query": True,  # Defaut
         }
 
         # Trouver l'intention principale
@@ -1003,11 +1055,11 @@ class FilAgentEngine:
                     "tool_only": intent_type in ["tax_calculation"],
                 }
 
-        return {"type": "general_query", "confidence": 0.5}
+        return {"type": "general_query", "confidence": 0.5, "tool_only": False}
 
-    def _select_tools(self, intent: Dict) -> List[str]:
-        """Sélectionner les outils basés sur l'intention"""
-        tool_mapping = {
+    def _select_tools(self, intent: IntentDict) -> List[str]:
+        """Selectionner les outils bases sur l'intention"""
+        tool_mapping: ToolMapping = {
             "tax_calculation": ["tax_calculator"],
             "document_analysis": ["document_analyzer", "compliance_checker"],
             "compliance_check": ["compliance_checker", "report_generator"],
@@ -1015,11 +1067,12 @@ class FilAgentEngine:
             "general_query": [],
         }
 
-        return tool_mapping.get(intent["type"], [])
+        intent_type = str(intent.get("type", "general_query"))
+        return tool_mapping.get(intent_type, [])
 
-    async def _process_with_tools(self, message: str, intent: Dict, tools: List[str]) -> str:
+    async def _process_with_tools(self, message: str, intent: IntentDict, tools: List[str]) -> str:
         """Traiter avec outils directs (sans LLM)"""
-        responses = []
+        responses: List[str] = []
 
         for tool_name in tools:
             if tool_name in self.tools:
@@ -1036,7 +1089,7 @@ class FilAgentEngine:
             return self._generate_default_response(message, intent)
 
     async def _process_with_llm(
-        self, message: str, conversation_id: str, history: List, tools: List[str]
+        self, message: str, conversation_id: str, history: Optional[ChatHistory], tools: List[str]
     ) -> str:
         """Traiter avec le modèle LLM local"""
 
@@ -1094,14 +1147,14 @@ class FilAgentEngine:
     def _create_decision_record(
         self, conversation_id: str, input_msg: Message, response: str, tools_used: List[str]
     ) -> DecisionRecord:
-        """Créer un enregistrement de décision signé"""
+        """Creer un enregistrement de decision signe"""
 
-        # Hashes pour traçabilité
+        # Hashes pour tracabilite
         input_hash = hashlib.sha256(input_msg.content.encode()).hexdigest()
         output_hash = hashlib.sha256(response.encode()).hexdigest()
 
-        # Données de provenance
-        provenance = {
+        # Donnees de provenance
+        provenance: ProvenanceData = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "system_version": "1.0.0",
             "config_hash": hashlib.sha256(
@@ -1109,8 +1162,8 @@ class FilAgentEngine:
             ).hexdigest(),
         }
 
-        # Checks de conformité
-        compliance_checks = {
+        # Checks de conformite
+        compliance_checks: ComplianceChecks = {
             "pii_redacted": input_msg.pii_redacted,
             "audit_logged": True,
             "signature_valid": True,
@@ -1139,8 +1192,8 @@ class FilAgentEngine:
 
         return record
 
-    def _generate_default_response(self, message: str, intent: Dict) -> str:
-        """Générer une réponse par défaut structurée"""
+    def _generate_default_response(self, message: str, intent: IntentDict) -> str:
+        """Generer une reponse par defaut structuree"""
         return f"""Je suis FilAgent, votre assistant IA conforme pour PME québécoises.
 
 **Message reçu**: "{message[:100]}..."
@@ -1162,7 +1215,7 @@ Essayez: "Calcule les taxes sur 1000$" ou "Vérifie ma conformité Loi 25"
 """
 
     def _generate_error_response(self, error: Exception) -> str:
-        """Générer une réponse d'erreur sécurisée"""
+        """Generer une reponse d'erreur securisee"""
         error_id = str(uuid.uuid4())[:8]
 
         # Ne pas exposer les détails techniques en production
@@ -1190,13 +1243,16 @@ Le système reste opérationnel. Veuillez reformuler votre demande ou essayer un
 
 
 class TaxCalculatorTool:
-    """Outil de calcul des taxes québécoises"""
+    """Outil de calcul des taxes quebecoises"""
 
-    def __init__(self):
+    tps_rate: float
+    tvq_rate: float
+
+    def __init__(self) -> None:
         self.tps_rate = 0.05  # 5%
         self.tvq_rate = 0.09975  # 9.975%
 
-    async def execute(self, message: str, intent: Dict) -> str:
+    async def execute(self, message: str, intent: IntentDict) -> str:
         """Calculer TPS et TVQ sur un montant"""
         import re
 
@@ -1204,9 +1260,9 @@ class TaxCalculatorTool:
         amounts = re.findall(r"[\d,]+\.?\d*", message)
 
         if not amounts:
-            return "💡 Veuillez spécifier un montant pour le calcul des taxes."
+            return "Veuillez specifier un montant pour le calcul des taxes."
 
-        results = []
+        results: List[str] = []
         for amount_str in amounts[:3]:  # Limiter à 3 calculs
             try:
                 # Nettoyer et convertir le montant
@@ -1234,23 +1290,25 @@ class TaxCalculatorTool:
             except ValueError:
                 continue
 
-        return "\n\n".join(results) if results else "❌ Format de montant invalide"
+        return "\n\n".join(results) if results else "Format de montant invalide"
 
 
 class DocumentAnalyzerTool:
     """Outil d'analyse de documents PME - REAL IMPLEMENTATION"""
 
-    def __init__(self):
+    real_tool: DocumentAnalyzerPME
+
+    def __init__(self) -> None:
         """Initialiser avec le vrai outil d'analyse"""
         self.real_tool = DocumentAnalyzerPME()
-        logger.info("✅ DocumentAnalyzerTool initialisé avec vrai backend")
+        logger.info("DocumentAnalyzerTool initialise avec vrai backend")
 
     async def execute(  # noqa: C901
         self,
-        file_path: str = None,
+        file_path: Optional[str] = None,
         analysis_type: str = "invoice",
-        message: str = None,
-        intent: Dict = None,
+        message: Optional[str] = None,
+        intent: Optional[IntentDict] = None,
     ) -> str:
         """
         Analyser un document RÉEL avec gestion d'erreurs robuste (Phase 6.1)
@@ -1340,8 +1398,8 @@ class DocumentAnalyzerTool:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return self._format_error(str(e))
 
-    def _format_success(self, data: Dict, file_path: str) -> str:
-        """Formater les résultats avec succès"""
+    def _format_success(self, data: MetadataDict, file_path: str) -> str:
+        """Formater les resultats avec succes"""
         filename = Path(file_path).name
         analysis_type = data.get("analysis_type", "")
 
@@ -1526,9 +1584,9 @@ class DocumentAnalyzerTool:
 **Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
 
-    def _format_generic_data(self, data: Dict) -> str:
-        """Formater données génériques"""
-        output = []
+    def _format_generic_data(self, data: MetadataDict) -> str:
+        """Formater donnees generiques"""
+        output: List[str] = []
 
         for key, value in data.items():
             if key == "text":
@@ -1590,13 +1648,13 @@ class DocumentAnalyzerTool:
 
 
 class ComplianceCheckerTool:
-    """Outil de vérification de conformité"""
+    """Outil de verification de conformite"""
 
-    async def execute(self, message: str, intent: Dict) -> str:
-        """Vérifier la conformité"""
+    async def execute(self, message: str, intent: IntentDict) -> str:
+        """Verifier la conformite"""
 
-        # Simuler une vérification
-        checks = {
+        # Simuler une verification
+        checks: Dict[str, bool] = {
             "Loi 25 (Québec)": True,
             "RGPD (Europe)": True,
             "PIPEDA (Canada)": True,
@@ -1639,10 +1697,10 @@ class ComplianceCheckerTool:
 
 
 class ReportGeneratorTool:
-    """Générateur de rapports automatisés"""
+    """Generateur de rapports automatises"""
 
-    async def execute(self, message: str, intent: Dict) -> str:
-        """Générer un rapport"""
+    async def execute(self, message: str, intent: IntentDict) -> str:
+        """Generer un rapport"""
 
         return """📊 **Générateur de Rapports**
 
@@ -1684,16 +1742,22 @@ class ReportGeneratorTool:
 class FilAgentInterface:
     """Interface utilisateur Gradio professionnelle"""
 
-    def __init__(self):
+    config: FilAgentConfig
+    engine: FilAgentEngine
+    conversations: Dict[str, ChatHistory]
+    last_analysis_results: Optional[MetadataDict]
+    last_analyzed_file: Optional[str]
+
+    def __init__(self) -> None:
         self.config = FilAgentConfig()
         self.engine = FilAgentEngine(self.config)
         self.conversations = {}
-        self.last_analysis_results = None  # Stocker les résultats de la dernière analyse
-        self.last_analyzed_file = None  # Stocker le chemin du dernier fichier analysé
+        self.last_analysis_results = None  # Stocker les resultats de la derniere analyse
+        self.last_analyzed_file = None  # Stocker le chemin du dernier fichier analyse
 
     async def chat_handler(
-        self, message: str, history: List[List[str]], conversation_id: str = None
-    ) -> Tuple[str, List[List[str]]]:
+        self, message: str, history: ChatHistory, conversation_id: Optional[str] = None
+    ) -> Tuple[str, ChatHistory]:
         """Gestionnaire principal du chat"""
 
         if not message.strip():
@@ -1742,16 +1806,16 @@ class FilAgentInterface:
 • Sécurité: Niveau Maximum
 """
 
-    def clear_conversation(self) -> Tuple[str, List]:
+    def clear_conversation(self) -> Tuple[str, ChatHistory]:
         """Effacer la conversation actuelle"""
         return "", []
 
-    def export_conversation(self, history: List[List[str]]) -> str:
+    def export_conversation(self, history: ChatHistory) -> str:
         """Exporter la conversation en format JSON"""
         if not history:
-            return "Aucune conversation à exporter"
+            return "Aucune conversation a exporter"
 
-        export_data = {
+        export_data: Dict[str, Union[str, List[Dict[str, str]], Dict[str, Union[str, bool]]]] = {
             "timestamp": datetime.now().isoformat(),
             "messages": [
                 {"role": "user" if i % 2 == 0 else "assistant", "content": msg}
@@ -1985,15 +2049,15 @@ class FilAgentInterface:
                 f"<p style='color: #f44336; padding: 20px;'>❌ Erreur lecture Word: {error_str}</p>"
             )
 
-    def export_analysis_results(self, export_format: str) -> Tuple[str, Any]:  # noqa: C901
+    def export_analysis_results(self, export_format: str) -> Tuple[Optional[str], str]:  # noqa: C901
         """
-        Exporter les résultats d'analyse dans le format choisi (Phase 6.1: Enhanced)
+        Exporter les resultats d'analyse dans le format choisi (Phase 6.1: Enhanced)
 
         Args:
             export_format: Format d'export (JSON, CSV, Excel)
 
         Returns:
-            Tuple[str, Any]: (file_path, status_message) or (None, error_message)
+            Tuple[Optional[str], str]: (file_path, status_message) or (None, error_message)
         """
         if not self.last_analysis_results:
             return None, "⚠️ Aucune analyse disponible à exporter. Analysez d'abord un document."
@@ -2044,7 +2108,7 @@ class FilAgentInterface:
         """Exporter en JSON"""
         import tempfile
 
-        export_data = {
+        export_data: Dict[str, Union[str, MetadataDict, Dict[str, Union[str, bool]], None]] = {
             "timestamp": datetime.now().isoformat(),
             "filename": (
                 Path(self.last_analyzed_file).name if self.last_analyzed_file else "unknown"
@@ -2077,8 +2141,8 @@ class FilAgentInterface:
         import tempfile
         import csv
 
-        # Convertir les résultats en format tabulaire
-        rows = []
+        # Convertir les resultats en format tabulaire
+        rows: List[List[str]] = []
         if isinstance(self.last_analysis_results, dict):
             for key, value in self.last_analysis_results.items():
                 rows.append([key, str(value)])
@@ -2143,24 +2207,24 @@ class FilAgentInterface:
         logger.info(f"✅ Export Excel créé: {temp_file.name}")
         return temp_file.name, "✅ Export Excel créé avec succès"
 
-    def create_download_zip(self) -> Tuple[str, str]:  # noqa: C901
+    def create_download_zip(self) -> Tuple[Optional[str], str]:  # noqa: C901
         """
-        Créer un ZIP contenant le fichier analysé + résultats exportés (Phase 6.1: Enhanced)
+        Creer un ZIP contenant le fichier analyse + resultats exportes (Phase 6.1: Enhanced)
 
         Returns:
-            Tuple[str, str]: (zip_path, status_message) or (None, error_message)
+            Tuple[Optional[str], str]: (zip_path, status_message) or (None, error_message)
         """
         if not self.last_analyzed_file or not self.last_analysis_results:
             return None, "⚠️ Aucune analyse disponible pour créer le ZIP"
 
-        # Phase 6.1: Vérifier l'espace disque (100 MB pour être sûr)
+        # Phase 6.1: Verifier l'espace disque (100 MB pour etre sur)
         if not check_disk_space(required_bytes=100 * 1024 * 1024):
-            logger.error("❌ Espace disque insuffisant pour ZIP")
+            logger.error("Espace disque insuffisant pour ZIP")
             return None, ERROR_MESSAGES["disk_space"]
 
         # Variables pour cleanup en cas d'erreur
-        temp_files_to_cleanup = []
-        temp_zip_path = None
+        temp_files_to_cleanup: List[str] = []
+        temp_zip_path: Optional[str] = None
 
         try:
             import tempfile
@@ -2272,40 +2336,40 @@ https://github.com/your-org/filagent
 
     def change_model_handler(self, backend: str, model_choice: str) -> str:
         """
-        Gestionnaire pour changer de modèle dynamiquement
+        Gestionnaire pour changer de modele dynamiquement
 
         Args:
             backend: "perplexity" ou "openai"
-            model_choice: Nom complet du modèle choisi dans la liste
+            model_choice: Nom complet du modele choisi dans la liste
 
         Returns:
             Message de statut
         """
-        # Mappings des modèles selon le backend
-        PERPLEXITY_MODELS = {
+        # Mappings des modeles selon le backend
+        perplexity_models: Dict[str, str] = {
             "Sonar (Rapide)": "sonar",
-            "Sonar Pro (Équilibré) - Recommandé": "sonar-pro",
+            "Sonar Pro (Equilibre) - Recommande": "sonar-pro",
             "Sonar Reasoning (Raisonnement)": "sonar-reasoning",
             "Sonar Reasoning Pro (Expert DeepSeek)": "sonar-reasoning-pro",
             "Sonar Deep Research (Recherche Approfondie)": "sonar-deep-research",
         }
 
-        OPENAI_MODELS = {
-            "GPT-4o Mini (Rapide & Économique) - Recommandé": "gpt-4o-mini",
+        openai_models: Dict[str, str] = {
+            "GPT-4o Mini (Rapide & Economique) - Recommande": "gpt-4o-mini",
             "GPT-4o (Flagship Multimodal)": "gpt-4o",
-            "GPT-4 Turbo (Génération précédente)": "gpt-4-turbo",
-            "GPT-3.5 Turbo (Très économique)": "gpt-3.5-turbo",
+            "GPT-4 Turbo (Generation precedente)": "gpt-4-turbo",
+            "GPT-3.5 Turbo (Tres economique)": "gpt-3.5-turbo",
         }
 
-        # Extraire le nom du modèle
+        # Extraire le nom du modele
         if backend == "perplexity":
-            model_name = PERPLEXITY_MODELS.get(model_choice, "sonar-pro")
+            model_name = perplexity_models.get(model_choice, "sonar-pro")
         elif backend == "openai":
-            model_name = OPENAI_MODELS.get(model_choice, "gpt-4o-mini")
+            model_name = openai_models.get(model_choice, "gpt-4o-mini")
         else:
-            return f"❌ Backend inconnu: {backend}"
+            return f"Backend inconnu: {backend}"
 
-        # Recharger le modèle
+        # Recharger le modele
         return self.engine.reload_model(backend, model_name)
 
 
@@ -2762,7 +2826,7 @@ Téléversez un fichier pour commencer l'analyse.
 
         # === EVENT HANDLERS PARAMÈTRES MODÈLE ===
         # Changer visibilité des modèles selon le backend sélectionné
-        def toggle_model_visibility(backend):
+        def toggle_model_visibility(backend: str) -> Tuple[Dict[str, bool], Dict[str, bool]]:
             if backend == "perplexity":
                 return gr.update(visible=True), gr.update(visible=False)
             else:  # openai
@@ -2774,8 +2838,8 @@ Téléversez un fichier pour commencer l'analyse.
             outputs=[perplexity_models, openai_models],
         )
 
-        # Changer de modèle
-        def change_model(backend, perplexity_choice, openai_choice):
+        # Changer de modele
+        def change_model(backend: str, perplexity_choice: str, openai_choice: str) -> str:
             model_choice = perplexity_choice if backend == "perplexity" else openai_choice
             return interface.change_model_handler(backend, model_choice)
 
@@ -2803,12 +2867,14 @@ Téléversez un fichier pour commencer l'analyse.
 
         # ========== DOCUMENT ANALYZER EVENT HANDLERS ==========
 
-        def handle_document_analysis(file_path, analysis_type):
+        def handle_document_analysis(
+            file_path: Optional[str], analysis_type: str
+        ) -> Tuple[str, str, Dict[str, bool], Optional[str]]:
             """
             Handler pour l'analyse de documents avec vrai outil (Phase 6.1: Enhanced)
 
             Args:
-                file_path: Chemin du fichier téléversé (fourni par Gradio)
+                file_path: Chemin du fichier televerse (fourni par Gradio)
                 analysis_type: Type d'analyse ('invoice' ou 'extract')
 
             Returns:
@@ -2929,35 +2995,37 @@ Téléversez un fichier pour commencer l'analyse.
                     None,
                 )
 
-        def clear_document_analysis():
-            """Effacer les résultats d'analyse"""
+        def clear_document_analysis() -> Tuple[
+            None, str, str, Dict[str, bool], None
+        ]:
+            """Effacer les resultats d'analyse"""
             return (
                 None,  # Clear file upload
-                """📄 **En attente d'un document...**
+                """En attente d'un document...
 
-Téléversez un fichier pour commencer l'analyse.
+Televersez un fichier pour commencer l'analyse.
 
-**Capacités**:
-✅ Extraction automatique de montants
-✅ Calcul TPS (5%) et TVQ (9.975%)
-✅ Détection de numéros fiscaux
-✅ Redaction PII (conformité Loi 25)
+Capacites:
+- Extraction automatique de montants
+- Calcul TPS (5%) et TVQ (9.975%)
+- Detection de numeros fiscaux
+- Redaction PII (conformite Loi 25)
 
-🔒 *Traitement 100% local et sécurisé*""",
+Traitement 100% local et securise""",
                 (
                     "<p style='color: #999; padding: 20px; text-align: center;'>"
-                    "📄 Téléversez un document pour voir l'aperçu</p>"
+                    "Televersez un document pour voir l'apercu</p>"
                 ),  # Reset preview
                 gr.update(visible=False),  # Hide download button
                 None,  # Clear download file
             )
 
-        def show_file_preview(file_path):
-            """Afficher l'aperçu quand un fichier est téléversé"""
+        def show_file_preview(file_path: Optional[str]) -> str:
+            """Afficher l'apercu quand un fichier est televerse"""
             if not file_path:
-                return "<p style='color: #999; padding: 20px; text-align: center;'>📄 Aucun fichier sélectionné</p>"
+                return "<p style='color: #999; padding: 20px; text-align: center;'>Aucun fichier selectionne</p>"
 
-            preview_html, success = interface.render_file_preview(file_path)
+            preview_html, _success = interface.render_file_preview(file_path)
             return preview_html
 
         # Connexion des événements Document Analyzer
@@ -2990,14 +3058,16 @@ Téléversez un fichier pour commencer l'analyse.
 
         # ========== EXPORT EVENT HANDLERS (Phase 5) ==========
 
-        def handle_export_results(export_format):
-            """Handler pour exporter les résultats dans le format choisi"""
+        def handle_export_results(
+            export_format: str,
+        ) -> Tuple[Dict[str, Union[str, bool]], str]:
+            """Handler pour exporter les resultats dans le format choisi"""
             file_path, status_msg = interface.export_analysis_results(export_format)
 
             if file_path:
-                # Succès - retourner le fichier et le statut
+                # Succes - retourner le fichier et le statut
                 status_text = (
-                    f"✅ **{status_msg}**\n\n"
+                    f"**{status_msg}**\n\n"
                     f"Format: {export_format}\n"
                     f"Fichier: `{Path(file_path).name}`"
                 )
@@ -3012,19 +3082,19 @@ Téléversez un fichier pour commencer l'analyse.
                     f"**Erreur**\n\n{status_msg}",  # export_status
                 )
 
-        def handle_export_zip():
-            """Handler pour créer et télécharger le ZIP complet"""
+        def handle_export_zip() -> Tuple[Dict[str, Union[str, bool]], str]:
+            """Handler pour creer et telecharger le ZIP complet"""
             zip_path, status_msg = interface.create_download_zip()
 
             if zip_path:
-                # Succès
+                # Succes
                 zip_status = (
-                    f"✅ **{status_msg}**\n\n"
+                    f"**{status_msg}**\n\n"
                     "**Contenu du ZIP**:\n"
                     "- Document original\n"
-                    "- Résultats JSON (signé)\n"
-                    "- Résultats CSV\n"
-                    "- Résultats Excel\n"
+                    "- Resultats JSON (signe)\n"
+                    "- Resultats CSV\n"
+                    "- Resultats Excel\n"
                     "- README.txt"
                 )
                 return (
@@ -3053,30 +3123,30 @@ Téléversez un fichier pour commencer l'analyse.
         calculator_tool = CalculatorTool()
 
         def handle_calculator(expression: str) -> str:
-            """Handler pour le calculateur mathématique"""
+            """Handler pour le calculateur mathematique"""
             if not expression or not expression.strip():
-                return "**Résultat**: Veuillez entrer une expression mathématique"
+                return "**Resultat**: Veuillez entrer une expression mathematique"
 
             try:
                 result = calculator_tool.execute({"expression": expression.strip()})
 
                 if result.status == ToolStatus.SUCCESS:
-                    metadata = result.metadata or {}
-                    return f"""**Résultat**: `{result.output}`
+                    metadata: MetadataDict = result.metadata or {}
+                    return f"""**Resultat**: `{result.output}`
 
 ---
 
-| Détail | Valeur |
+| Detail | Valeur |
 |--------|--------|
 | Expression | `{metadata.get('expression', expression)}` |
 | Type | {metadata.get('result_type', 'number')} |
 
-*Calculé de manière sécurisée*
+*Calcule de maniere securisee*
 """
                 else:
                     return f"""**Erreur**: {result.error}
 
-*Vérifiez la syntaxe de l'expression*
+*Verifiez la syntaxe de l'expression*
 """
             except Exception as e:
                 logger.error(f"Erreur calculateur: {e}")
@@ -3084,7 +3154,7 @@ Téléversez un fichier pour commencer l'analyse.
 
         def clear_calculator() -> Tuple[str, str]:
             """Effacer le calculateur"""
-            return "", "**Résultat**: En attente d'une expression..."
+            return "", "**Resultat**: En attente d'une expression..."
 
         calc_execute_btn.click(
             handle_calculator,
@@ -3118,12 +3188,13 @@ Téléversez un fichier pour commencer l'analyse.
                 )
 
             try:
-                logger.info(f"Exécution sandbox: {len(code)} caractères")
+                logger.info(f"Execution sandbox: {len(code)} caracteres")
                 result = sandbox_tool.execute({"code": code})
 
                 if result.status == ToolStatus.SUCCESS:
-                    metadata = result.metadata or {}
-                    elapsed = metadata.get("elapsed_time", 0)
+                    metadata: MetadataDict = result.metadata or {}
+                    elapsed_raw = metadata.get("elapsed_time", 0)
+                    elapsed = float(elapsed_raw) if elapsed_raw is not None else 0.0
                     output_text = result.output or "[Aucune sortie]"
 
                     return (
@@ -3134,7 +3205,7 @@ Téléversez un fichier pour commencer l'analyse.
 """,
                         f"""**Statut**: Execution reussie
 
-| Métrique | Valeur |
+| Metrique | Valeur |
 |----------|--------|
 | Temps | {elapsed:.3f}s |
 | Code retour | {metadata.get('returncode', 0)} |
@@ -3199,13 +3270,14 @@ Téléversez un fichier pour commencer l'analyse.
                 result = file_reader_tool.execute({"file_path": file_path.strip()})
 
                 if result.status == ToolStatus.SUCCESS:
-                    metadata = result.metadata or {}
-                    file_size = metadata.get("file_size", 0)
+                    metadata: MetadataDict = result.metadata or {}
+                    file_size_raw = metadata.get("file_size", 0)
+                    file_size = int(file_size_raw) if file_size_raw is not None else 0
                     content = result.output or ""
 
                     # Tronquer si trop long pour l'affichage
                     if len(content) > 50000:
-                        content = content[:50000] + "\n\n... [Tronqué - fichier trop long]"
+                        content = content[:50000] + "\n\n... [Tronque - fichier trop long]"
 
                     return (
                         content,
@@ -3220,7 +3292,7 @@ Téléversez un fichier pour commencer l'analyse.
                 elif result.status == ToolStatus.BLOCKED:
                     return (
                         "",
-                        f"**Statut**: Bloqué\n\n{result.error}\n\n*Seuls les répertoires autorisés sont accessibles*",
+                        f"**Statut**: Bloque\n\n{result.error}\n\n*Seuls les repertoires autorises sont accessibles*",
                     )
                 else:
                     return (

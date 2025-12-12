@@ -15,9 +15,15 @@ Complexité:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Union
 from datetime import datetime, timezone
 import uuid
+
+
+# Types stricts pour les tâches HTN
+TaskParamValue = Union[str, int, float, bool, None, List[str], Dict[str, str]]
+TaskResultValue = Union[str, int, float, bool, None, List[str], Dict[str, str]]
+TaskMetadataValue = Union[str, int, float, bool, List[str]]
 
 
 class TaskStatus(str, Enum):
@@ -68,22 +74,22 @@ class Task:
     task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
     action: str = ""
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: Dict[str, TaskParamValue] = field(default_factory=dict)
     depends_on: List[str] = field(default_factory=list)
     priority: TaskPriority = TaskPriority.NORMAL
     status: TaskStatus = TaskStatus.PENDING
-    result: Optional[Any] = None
+    result: Optional[TaskResultValue] = None
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, TaskMetadataValue] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialise les métadonnées avec timestamps"""
         if "created_at" not in self.metadata:
             self.metadata["created_at"] = datetime.now(timezone.utc).isoformat()
         if "updated_at" not in self.metadata:
             self.metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    def update_status(self, new_status: TaskStatus, error: Optional[str] = None):
+    def update_status(self, new_status: TaskStatus, error: Optional[str] = None) -> None:
         """
         Met à jour le statut avec traçabilité
 
@@ -98,12 +104,12 @@ class Task:
             self.error = error
             self.metadata["error_timestamp"] = datetime.now(timezone.utc).isoformat()
 
-    def set_result(self, result: Any):
+    def set_result(self, result: TaskResultValue) -> None:
         """Enregistre le résultat avec timestamp"""
         self.result = result
         self.metadata["completed_at"] = datetime.now(timezone.utc).isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Union[str, int, None, List[str], Dict[str, TaskParamValue], Dict[str, TaskMetadataValue]]]:
         """Sérialise en dict pour logging/traçabilité"""
         return {
             "task_id": self.task_id,
@@ -145,7 +151,7 @@ class TaskGraph:
         - Dépendances valides (tâches existantes)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.tasks: Dict[str, Task] = {}  # task_id -> Task
         self.adjacency_list: Dict[str, List[str]] = {}  # task_id -> [dependent_task_ids]
         self.reverse_adjacency: Dict[str, List[str]] = {}  # task_id -> [dependency_task_ids]
@@ -313,7 +319,7 @@ class TaskGraph:
 
         return levels
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Union[Dict[str, Dict[str, Union[str, int, None, List[str], Dict[str, TaskParamValue], Dict[str, TaskMetadataValue]]]], Dict[str, List[str]], Dict[str, Union[int, str]]]]:
         """Sérialise le graphe complet pour traçabilité"""
         return {
             "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},

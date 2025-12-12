@@ -1,28 +1,39 @@
 """
 Metrics Aggregation and Dashboard for FilAgent Benchmarks
 
-Collecte, agrège et visualise les métriques de performance:
+Collecte, agrege et visualise les metriques de performance:
 - Pass rates par benchmark
-- Temps d'exécution moyens
+- Temps d'execution moyens
 - Trends historiques
 - Comparaison avec targets
-- Détection de régressions
+- Detection de regressions
 """
+from __future__ import annotations
+
 import json
+import statistics
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-import statistics
+from typing import Dict, List, Optional, Union
+
+
+# Type aliases for strict typing
+MetricValue = Union[str, int, float, bool, None]
+TrendData = Dict[str, Union[str, int, float, bool, List[float], List[str], None]]
+DashboardData = Dict[str, Union[str, int, float, Dict[str, TrendData], None]]
+ReportData = Dict[str, Union[str, int, float, bool, List[str], Dict[str, MetricValue], None]]
+AggregateStats = Dict[str, Union[int, float, None]]
+RegressionInfo = Dict[str, Union[str, float, None]]
 
 
 class MetricsAggregator:
     """
-    Agrégateur de métriques pour benchmarks
+    Agregateur de metriques pour benchmarks
 
-    Analyse les rapports historiques et génère des statistiques
+    Analyse les rapports historiques et genere des statistiques
     """
 
-    def __init__(self, reports_dir: str = "eval/reports"):
+    def __init__(self, reports_dir: str = "eval/reports") -> None:
         self.reports_dir = Path(reports_dir)
         self.reports_dir.mkdir(parents=True, exist_ok=True)
 
@@ -30,19 +41,19 @@ class MetricsAggregator:
         self,
         days: int = 30,
         benchmark_name: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ReportData]:
         """
-        Collecter les données historiques
+        Collecter les donnees historiques
 
         Args:
-            days: Nombre de jours à analyser
+            days: Nombre de jours a analyser
             benchmark_name: Filtrer par benchmark (None = tous)
 
         Returns:
             Liste de rapports historiques
         """
         cutoff_date = datetime.now() - timedelta(days=days)
-        historical_data = []
+        historical_data: List[ReportData] = []
 
         # Find all report files
         if benchmark_name:
@@ -63,15 +74,15 @@ class MetricsAggregator:
             # Load report
             try:
                 with open(report_file) as f:
-                    report = json.load(f)
+                    report: ReportData = json.load(f)
                     report['_file'] = report_file.name
                     report['_mtime'] = file_mtime.isoformat()
                     historical_data.append(report)
-            except Exception as e:
-                print(f"⚠ Warning: Could not load {report_file}: {e}")
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Warning: Could not load {report_file}: {e}")
 
         # Sort by timestamp
-        historical_data.sort(key=lambda x: x.get('timestamp', ''))
+        historical_data.sort(key=lambda x: str(x.get('timestamp', '')))
 
         return historical_data
 
@@ -80,14 +91,14 @@ class MetricsAggregator:
         benchmark_name: str,
         metric_name: str = 'pass_at_1',
         days: int = 30
-    ) -> Dict[str, Any]:
+    ) -> TrendData:
         """
-        Calculer la tendance pour une métrique
+        Calculer la tendance pour une metrique
 
         Args:
             benchmark_name: Nom du benchmark
-            metric_name: Nom de la métrique (ex: 'pass_at_1')
-            days: Période d'analyse
+            metric_name: Nom de la metrique (ex: 'pass_at_1')
+            days: Periode d'analyse
 
         Returns:
             Statistiques de tendance
@@ -102,14 +113,15 @@ class MetricsAggregator:
             }
 
         # Extract metric values
-        values = []
-        timestamps = []
+        values: List[float] = []
+        timestamps: List[str] = []
 
         for report in data:
             value = report.get(metric_name)
-            if value is not None:
-                values.append(value)
-                timestamps.append(report.get('timestamp'))
+            if value is not None and isinstance(value, (int, float)):
+                values.append(float(value))
+                timestamp = report.get('timestamp')
+                timestamps.append(str(timestamp) if timestamp is not None else '')
 
         if not values:
             return {
@@ -126,7 +138,7 @@ class MetricsAggregator:
             'latest': values[-1],
             'mean': statistics.mean(values),
             'median': statistics.median(values),
-            'stdev': statistics.stdev(values) if len(values) > 1 else 0,
+            'stdev': statistics.stdev(values) if len(values) > 1 else 0.0,
             'min': min(values),
             'max': max(values),
             'trend': self._calculate_trend_direction(values),
@@ -167,14 +179,14 @@ class MetricsAggregator:
 
     def _detect_regression(self, values: List[float], threshold: float = 0.05) -> bool:
         """
-        Détecter une régression (drop > threshold)
+        Detecter une regression (drop > threshold)
 
         Args:
             values: Liste de valeurs
-            threshold: Seuil de régression (5% par défaut)
+            threshold: Seuil de regression (5% par defaut)
 
         Returns:
-            True si régression détectée
+            True si regression detectee
         """
         if len(values) < 2:
             return False
@@ -187,17 +199,17 @@ class MetricsAggregator:
 
         return drop > threshold
 
-    def generate_dashboard(self, days: int = 30) -> Dict[str, Any]:
+    def generate_dashboard(self, days: int = 30) -> DashboardData:
         """
-        Générer un dashboard de métriques
+        Generer un dashboard de metriques
 
         Args:
-            days: Période d'analyse
+            days: Periode d'analyse
 
         Returns:
-            Dashboard avec toutes les métriques
+            Dashboard avec toutes les metriques
         """
-        dashboard = {
+        dashboard: DashboardData = {
             'generated_at': datetime.now().isoformat(),
             'period_days': days,
             'benchmarks': {},
@@ -211,37 +223,43 @@ class MetricsAggregator:
             return dashboard
 
         # Get unique benchmark names
-        benchmark_names = set()
+        benchmark_names: set[str] = set()
         for report in all_data:
-            if 'benchmarks' in report:
+            benchmarks_field = report.get('benchmarks')
+            if benchmarks_field is not None and isinstance(benchmarks_field, dict):
                 # Aggregate report
-                benchmark_names.update(report['benchmarks'].keys())
+                benchmark_names.update(benchmarks_field.keys())
             else:
                 # Individual benchmark report
-                benchmark_names.add(report.get('benchmark'))
+                benchmark_val = report.get('benchmark')
+                if benchmark_val is not None and isinstance(benchmark_val, str):
+                    benchmark_names.add(benchmark_val)
 
         # Compute trends for each benchmark
+        benchmarks_dict: Dict[str, TrendData] = {}
         for benchmark_name in benchmark_names:
             if not benchmark_name:
                 continue
 
             trend = self.compute_trend(benchmark_name, days=days)
-            dashboard['benchmarks'][benchmark_name] = trend
+            benchmarks_dict[benchmark_name] = trend
+
+        dashboard['benchmarks'] = benchmarks_dict
 
         # Add aggregate statistics
         dashboard['aggregate'] = self._compute_aggregate_stats(all_data)
 
         return dashboard
 
-    def _compute_aggregate_stats(self, reports: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _compute_aggregate_stats(self, reports: List[ReportData]) -> AggregateStats:
         """
-        Calculer des statistiques agrégées
+        Calculer des statistiques agregees
 
         Args:
             reports: Liste de rapports
 
         Returns:
-            Statistiques agrégées
+            Statistiques agregees
         """
         if not reports:
             return {}
@@ -250,15 +268,18 @@ class MetricsAggregator:
         total_runs = len(reports)
 
         # Calculate average pass rate across all benchmarks
-        all_pass_rates = []
+        all_pass_rates: List[float] = []
         for report in reports:
             # Check different possible structures
-            if 'summary' in report:
-                pass_rate = report['summary'].get('overall_pass_rate')
-                if pass_rate is not None:
-                    all_pass_rates.append(pass_rate)
+            summary = report.get('summary')
+            if summary is not None and isinstance(summary, dict):
+                pass_rate = summary.get('overall_pass_rate')
+                if pass_rate is not None and isinstance(pass_rate, (int, float)):
+                    all_pass_rates.append(float(pass_rate))
             elif 'pass_at_1' in report:
-                all_pass_rates.append(report['pass_at_1'])
+                pass_at_1 = report['pass_at_1']
+                if pass_at_1 is not None and isinstance(pass_at_1, (int, float)):
+                    all_pass_rates.append(float(pass_at_1))
 
         return {
             'total_runs': total_runs,
@@ -266,7 +287,7 @@ class MetricsAggregator:
             'median_pass_rate': statistics.median(all_pass_rates) if all_pass_rates else None,
         }
 
-    def save_dashboard(self, dashboard: Dict[str, Any], output_path: Optional[str] = None):
+    def save_dashboard(self, dashboard: DashboardData, output_path: Optional[str] = None) -> None:
         """
         Sauvegarder le dashboard
 
@@ -276,21 +297,21 @@ class MetricsAggregator:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = self.reports_dir / f"dashboard_{timestamp}.json"
+            final_path = self.reports_dir / f"dashboard_{timestamp}.json"
         else:
-            output_path = Path(output_path)
+            final_path = Path(output_path)
 
-        with open(output_path, 'w') as f:
+        with open(final_path, 'w') as f:
             json.dump(dashboard, f, indent=2)
 
-        print(f"✓ Dashboard saved: {output_path}")
+        print(f" Dashboard saved: {final_path}")
 
         # Save as latest
         latest_path = self.reports_dir / "dashboard_latest.json"
         with open(latest_path, 'w') as f:
             json.dump(dashboard, f, indent=2)
 
-    def print_dashboard(self, dashboard: Dict[str, Any]):
+    def print_dashboard(self, dashboard: DashboardData) -> None:
         """
         Afficher le dashboard dans le terminal
 
@@ -298,28 +319,32 @@ class MetricsAggregator:
             dashboard: Dashboard data
         """
         print(f"\n{'='*60}")
-        print(f"📊 FilAgent Benchmarks Dashboard")
+        print("FilAgent Benchmarks Dashboard")
         print(f"{'='*60}\n")
 
         print(f"Generated: {dashboard['generated_at']}")
         print(f"Period: Last {dashboard['period_days']} days\n")
 
         # Aggregate stats
-        if 'aggregate' in dashboard:
-            agg = dashboard['aggregate']
-            print(f"📈 Aggregate Statistics")
-            print(f"{'─'*60}")
-            print(f"Total Runs: {agg.get('total_runs', 0)}")
-            if agg.get('avg_pass_rate') is not None:
-                print(f"Average Pass Rate: {agg['avg_pass_rate']*100:.1f}%")
+        aggregate = dashboard.get('aggregate')
+        if aggregate is not None and isinstance(aggregate, dict):
+            print("Aggregate Statistics")
+            print(f"{'='*60}")
+            print(f"Total Runs: {aggregate.get('total_runs', 0)}")
+            avg_pass_rate = aggregate.get('avg_pass_rate')
+            if avg_pass_rate is not None and isinstance(avg_pass_rate, (int, float)):
+                print(f"Average Pass Rate: {float(avg_pass_rate)*100:.1f}%")
             print()
 
         # Per-benchmark trends
-        if 'benchmarks' in dashboard:
-            print(f"📊 Per-Benchmark Trends")
-            print(f"{'─'*60}")
+        benchmarks = dashboard.get('benchmarks')
+        if benchmarks is not None and isinstance(benchmarks, dict):
+            print("Per-Benchmark Trends")
+            print(f"{'='*60}")
 
-            for benchmark_name, trend in dashboard['benchmarks'].items():
+            for benchmark_name, trend in benchmarks.items():
+                if not isinstance(trend, dict):
+                    continue
                 if 'error' in trend:
                     print(f"{benchmark_name:20s}: {trend['error']}")
                     continue
@@ -331,45 +356,58 @@ class MetricsAggregator:
 
                 # Format trend indicator
                 if trend_dir == 'improving':
-                    indicator = '↗'
+                    indicator = '^'
                 elif trend_dir == 'declining':
-                    indicator = '↘'
+                    indicator = 'v'
                 else:
-                    indicator = '→'
+                    indicator = '->'
 
                 # Format regression warning
-                warning = " ⚠ REGRESSION" if regression else ""
+                warning = " REGRESSION" if regression else ""
 
-                print(f"{benchmark_name:20s}: {latest*100:5.1f}% (avg: {mean*100:5.1f}%) {indicator}{warning}")
+                latest_val = float(latest) if isinstance(latest, (int, float)) else 0.0
+                mean_val = float(mean) if isinstance(mean, (int, float)) else 0.0
+
+                print(f"{benchmark_name:20s}: {latest_val*100:5.1f}% (avg: {mean_val*100:5.1f}%) {indicator}{warning}")
 
         print(f"\n{'='*60}\n")
 
-    def check_regressions(self, threshold: float = 0.05) -> List[Dict[str, Any]]:
+    def check_regressions(self, threshold: float = 0.05) -> List[RegressionInfo]:
         """
-        Vérifier les régressions dans tous les benchmarks
+        Verifier les regressions dans tous les benchmarks
 
         Args:
-            threshold: Seuil de régression (5% par défaut)
+            threshold: Seuil de regression (5% par defaut)
 
         Returns:
-            Liste des régressions détectées
+            Liste des regressions detectees
         """
         dashboard = self.generate_dashboard()
-        regressions = []
+        regressions: List[RegressionInfo] = []
 
-        for benchmark_name, trend in dashboard.get('benchmarks', {}).items():
+        benchmarks = dashboard.get('benchmarks')
+        if benchmarks is None or not isinstance(benchmarks, dict):
+            return regressions
+
+        for benchmark_name, trend in benchmarks.items():
+            if not isinstance(trend, dict):
+                continue
             if trend.get('regression_detected'):
+                latest = trend.get('latest')
+                mean = trend.get('mean')
+                latest_val = float(latest) if isinstance(latest, (int, float)) else 0.0
+                mean_val = float(mean) if isinstance(mean, (int, float)) else 0.0
                 regressions.append({
                     'benchmark': benchmark_name,
-                    'latest': trend.get('latest'),
-                    'mean': trend.get('mean'),
-                    'drop': trend.get('mean', 0) - trend.get('latest', 0),
+                    'latest': latest_val,
+                    'mean': mean_val,
+                    'drop': mean_val - latest_val,
                 })
 
         return regressions
 
 
-def main():
+def main() -> None:
     """Main entry point for metrics dashboard"""
     import argparse
 
@@ -405,12 +443,16 @@ def main():
         regressions = aggregator.check_regressions()
 
         if regressions:
-            print(f"\n⚠ {len(regressions)} regression(s) detected:\n")
+            print(f"\n {len(regressions)} regression(s) detected:\n")
             for reg in regressions:
-                print(f"  - {reg['benchmark']}: {reg['latest']*100:.1f}% (drop: {reg['drop']*100:.1f}%)")
+                latest = reg.get('latest')
+                drop = reg.get('drop')
+                latest_val = float(latest) if latest is not None else 0.0
+                drop_val = float(drop) if drop is not None else 0.0
+                print(f"  - {reg['benchmark']}: {latest_val*100:.1f}% (drop: {drop_val*100:.1f}%)")
             print()
         else:
-            print("\n✓ No regressions detected\n")
+            print("\n No regressions detected\n")
 
     elif args.benchmark:
         # Show trend for specific benchmark

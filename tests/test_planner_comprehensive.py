@@ -68,10 +68,11 @@ class TestHierarchicalPlanner:
             max_decomposition_depth=5,
             enable_tracing=True
         )
-        
-        assert planner.model_interface == mock_model
-        assert planner.tools_registry == mock_tools_registry
-        assert planner.max_decomposition_depth == 5
+
+        # HierarchicalPlanner stores these as shortened attribute names
+        assert planner.model == mock_model
+        assert planner.tools == mock_tools_registry
+        assert planner.max_depth == 5
         assert planner.enable_tracing is True
     
     def test_plan_with_rule_based_strategy(self, planner):

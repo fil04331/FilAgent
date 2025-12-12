@@ -3,10 +3,17 @@ Configuration management for FilAgent
 Loads and validates configuration from YAML files
 """
 
+from __future__ import annotations
+
 import yaml
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
+
+# TypeAlias for configuration values
+ConfigValue = Union[str, int, float, bool, list[str], dict[str, str]]
+MemoryConfigValue = Union[int, float]
+NestedConfigDict = dict[str, dict[str, MemoryConfigValue]]
 
 
 class GenerationConfig(BaseModel):
@@ -161,7 +168,7 @@ class AgentConfig(BaseModel):
         htn_verification_data = raw_config.get("htn_verification", {})
 
         # Adapter la configuration mémoire pour supporter les structures imbriquées
-        memory_kwargs: Dict[str, Any] = {}
+        memory_kwargs: dict[str, MemoryConfigValue] = {}
 
         # Support des anciens formats à clés aplaties (aliases pydantic)
         for field_name, field in MemoryConfig.model_fields.items():
@@ -225,13 +232,13 @@ class AgentConfig(BaseModel):
         """Compatibilité historique: expose les paramètres runtime via config.agent"""
         return self.runtime_settings
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, ConfigValue | dict[str, ConfigValue] | NestedConfigDict]:
         """
         Convert configuration to dictionary format suitable for YAML serialization.
         Dynamically builds the nested memory dictionary from MemoryConfig fields.
         """
         # Dynamically build the nested memory dictionary
-        memory_dict = {"episodic": {}, "semantic": {}}
+        memory_dict: NestedConfigDict = {"episodic": {}, "semantic": {}}
         for field_name in MemoryConfig.model_fields.keys():
             value = getattr(self.memory, field_name)
             if field_name.startswith("episodic_"):
@@ -268,7 +275,7 @@ class AgentConfig(BaseModel):
 
         return config_dict
 
-    def save(self, config_path: str = "config/agent.yaml"):
+    def save(self, config_path: str = "config/agent.yaml") -> None:
         """Save the current configuration to a YAML file"""
         config_file = Path(config_path)
 
