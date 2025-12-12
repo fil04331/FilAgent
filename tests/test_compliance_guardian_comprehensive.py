@@ -19,7 +19,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from planner.compliance_guardian import (
     ComplianceGuardian,
     ValidationResult,
-    ComplianceError
+    QueryValidationResult,
+    PlanValidationResult,
+    ValidationMetadata,
+    RiskLevel,
+    ComplianceError,
 )
 
 
@@ -89,12 +93,12 @@ class TestComplianceGuardian:
 
     def test_validate_query_compliant(self, guardian):
         """Test validation of compliant query"""
-        # validate_query returns Dict and raises ComplianceError if invalid
+        # validate_query returns QueryValidationResult (Pydantic model)
         result = guardian.validate_query("Calculate the sum of numbers")
 
-        assert isinstance(result, dict)
-        assert result['valid'] is True
-        assert len(result['errors']) == 0
+        assert isinstance(result, QueryValidationResult)
+        assert result.valid is True
+        assert len(result.errors) == 0
 
     def test_validate_query_with_forbidden_keyword(self, guardian):
         """Test validation with forbidden keyword"""
@@ -123,10 +127,10 @@ class TestComplianceGuardian:
             ]
         }
 
-        # validate_execution_plan returns Dict (not ValidationResult)
+        # validate_execution_plan returns PlanValidationResult (Pydantic model)
         result = guardian.validate_execution_plan(plan)
-        assert isinstance(result, dict)
-        assert result['valid'] is True
+        assert isinstance(result, PlanValidationResult)
+        assert result.valid is True
 
 
 @pytest.mark.unit
@@ -217,8 +221,8 @@ class TestForbiddenQueries:
         query = "Access confidential documents"
         # 'confidential' is NOT in the forbidden patterns, so this should pass
         result = guardian.validate_query(query)
-        assert isinstance(result, dict)
-        assert result['valid'] is True
+        assert isinstance(result, QueryValidationResult)
+        assert result.valid is True
 
     def test_case_insensitive_detection(self, guardian):
         """Test case-insensitive forbidden query detection"""
@@ -323,15 +327,16 @@ class TestValidationResult:
         assert result.warnings == ["Consider review"]
     
     def test_validation_result_with_metadata(self):
-        """Test ValidationResult with metadata"""
+        """Test ValidationResult with metadata (Pydantic ValidationMetadata)"""
         result = ValidationResult(
             is_compliant=True,
             violations=[],
-            risk_level="LOW",
-            metadata={"timestamp": "2024-01-01T00:00:00Z"}
+            risk_level=RiskLevel.LOW,
+            metadata=ValidationMetadata(timestamp="2024-01-01T00:00:00Z")
         )
-        
-        assert result.metadata["timestamp"] == "2024-01-01T00:00:00Z"
+
+        assert result.metadata is not None
+        assert result.metadata.timestamp == "2024-01-01T00:00:00Z"
 
 
 @pytest.mark.unit
@@ -391,22 +396,22 @@ class TestComplianceIntegration:
 
     def test_end_to_end_compliant_workflow(self, guardian):
         """Test complete compliant workflow"""
-        # Validate query - returns Dict
+        # Validate query - returns QueryValidationResult (Pydantic model)
         query_result = guardian.validate_query("Calculate sum of numbers")
-        assert isinstance(query_result, dict)
-        assert query_result['valid'] is True
+        assert isinstance(query_result, QueryValidationResult)
+        assert query_result.valid is True
 
-        # Validate task - returns ValidationResult
+        # Validate task - returns ValidationResult (Pydantic model)
         task = {"id": "task-1", "name": "Calculate", "tool": "calculator"}
         task_result = guardian.validate_task(task)
         assert isinstance(task_result, ValidationResult)
         assert task_result.is_compliant is True
 
-        # Validate execution plan - returns Dict
+        # Validate execution plan - returns PlanValidationResult (Pydantic model)
         plan = {"actions": [{"tool": "calculator"}]}
         plan_result = guardian.validate_execution_plan(plan)
-        assert isinstance(plan_result, dict)
-        assert plan_result['valid'] is True
+        assert isinstance(plan_result, PlanValidationResult)
+        assert plan_result.valid is True
 
     def test_end_to_end_non_compliant_workflow(self, guardian):
         """Test complete non-compliant workflow"""

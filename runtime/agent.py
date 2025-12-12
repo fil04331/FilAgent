@@ -9,26 +9,45 @@ import json
 import re
 import hashlib
 import textwrap
-from typing import List, Dict, Optional, Union, Callable
+from typing import TYPE_CHECKING, Any, List, Dict, Optional, Union, Callable, cast
 from datetime import datetime
 
-from .config import get_config
+from .config import get_config, AgentConfig
 from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
-from tools.registry import get_registry
-from tools.base import ToolResult, ToolStatus
+from tools.registry import get_registry, ToolRegistry
+from tools.base import ToolResult, ToolStatus, BaseTool
+
+if TYPE_CHECKING:
+    from .middleware.logging import EventLogger
+    from .middleware.audittrail import DRManager
+    from .middleware.provenance import ProvenanceTracker
+    from .model_interface import ModelInterface
+    from planner.planner import (
+        HierarchicalPlanner as HierarchicalPlannerType,
+        ModelInterface as PlannerModelInterface,
+    )
+    from planner.executor import TaskExecutor as TaskExecutorType
+    from planner.verifier import TaskVerifier as TaskVerifierType
 
 
 # Types stricts pour l'agent
 AgentMetadataValue = Union[str, int, float, bool, List[str]]
 ToolCallDict = Dict[str, Union[str, Dict[str, str]]]
-ChatResponseValue = Union[str, int, List[str], Dict[str, Union[str, int]]]
+# ChatResponseValue: Flexible type for complex HTN responses with nested dicts
+ChatResponseValue = Union[str, int, float, bool, None, List[str], Dict[str, object]]
+ToolArgsDict = Dict[str, str]
 
 # Import des middlewares de conformité
 from .middleware.logging import get_logger
 from .middleware.audittrail import get_dr_manager
 from .middleware.provenance import get_tracker
-from planner.compliance_guardian import ComplianceGuardian
+from planner.compliance_guardian import (
+    ComplianceGuardian,
+    ContextDict,
+    ExecutionResultDict,
+    PlanDict,
+)
 
 # Import du planificateur HTN
 from planner import (
@@ -36,8 +55,11 @@ from planner import (
     TaskExecutor,
     TaskVerifier,
     PlanningStrategy,
+    PlanningResult,
     ExecutionStrategy,
+    ExecutionResult,
     VerificationLevel,
+    VerificationResult,
 )
 from planner.task_graph import TaskStatus
 
@@ -47,11 +69,24 @@ class Agent:
     Agent LLM avec capacités d'appel d'outils
     """
 
-    def __init__(self, config=None):
+    # Type hints for instance attributes
+    config: AgentConfig
+    model: Optional[ModelInterface]
+    tool_registry: ToolRegistry
+    conversation_history: List[Dict[str, str]]
+    logger: Optional[EventLogger]
+    dr_manager: Optional[DRManager]
+    tracker: Optional[ProvenanceTracker]
+    compliance_guardian: Optional[ComplianceGuardian]
+    planner: Optional[HierarchicalPlannerType]
+    executor: Optional[TaskExecutorType]
+    verifier: Optional[TaskVerifierType]
+
+    def __init__(self, config: Optional[AgentConfig] = None) -> None:
         self.config = config or get_config()
         self.model = None  # Sera initialisé plus tard
         self.tool_registry = get_registry()
-        self.conversation_history: List[Dict[str, str]] = []
+        self.conversation_history = []
 
         # Initialiser les middlewares de conformité avec fallbacks
         try:
@@ -96,7 +131,7 @@ class Agent:
         """Déterminer si l'objet est un mock unittest."""
         return hasattr(obj, "__class__") and getattr(obj.__class__, "__module__", "").startswith("unittest.mock")
 
-    def _refresh_middlewares(self):
+    def _refresh_middlewares(self) -> None:
         """Synchroniser logger, DR manager et tracker avec les singletons (patchables)."""
         from .middleware import logging as logging_mw
         from .middleware import audittrail as audittrail_mw
@@ -135,7 +170,7 @@ class Agent:
         except Exception as e:
             print(f"⚠ Failed to refresh ComplianceGuardian: {e}")
 
-    def initialize_model(self):
+    def initialize_model(self) -> None:
         """Initialiser le modèle"""
         from .model_interface import init_model
 
@@ -149,7 +184,7 @@ class Agent:
         # Initialiser le planificateur HTN après l'initialisation du modèle
         self._initialize_htn()
 
-    def _initialize_htn(self):
+    def _initialize_htn(self) -> None:
         """Initialiser le système HTN (planificateur, exécuteur, vérificateur)"""
         # Récupérer la configuration HTN depuis config
         htn_config = getattr(self.config, "htn_planning", None)
@@ -175,8 +210,11 @@ class Agent:
             verif_level = VerificationLevel.STRICT
 
         # Ajouter le planificateur HTN
+        # Note: cast nécessaire car runtime.ModelInterface (ABC) et planner.ModelInterface (Protocol)
+        # sont structurellement compatibles mais mypy ne le détecte pas automatiquement
+        model_for_planner = cast("PlannerModelInterface | None", self.model)
         self.planner = HierarchicalPlanner(
-            model_interface=self.model,
+            model_interface=model_for_planner,
             tools_registry=self.tool_registry,
             max_decomposition_depth=max_depth,
             enable_tracing=True,
@@ -293,6 +331,11 @@ class Agent:
     def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Exécution avec planification HTN"""
 
+        # Vérifier que HTN est initialisé
+        if self.planner is None or self.executor is None or self.verifier is None:
+            # Fallback au mode simple si HTN non initialisé
+            return self._run_simple(user_query, conversation_id, task_id)
+
         # Rafraîchir les middlewares patchables
         self._refresh_middlewares()
 
@@ -323,10 +366,15 @@ class Agent:
         elif strategy_str == "llm_based":
             strategy = PlanningStrategy.LLM_BASED
 
+        # Build context dict without None values
+        plan_context: Dict[str, str] = {"conversation_id": conversation_id}
+        if task_id is not None:
+            plan_context["task_id"] = task_id
+
         plan_result = self.planner.plan(
             query=user_query,
             strategy=strategy,
-            context={"conversation_id": conversation_id, "task_id": task_id},
+            context=plan_context,
         )
 
         # Log decision record (conformité Loi 25)
@@ -353,7 +401,7 @@ class Agent:
         # 2. Exécuter
         exec_result = self.executor.execute(
             graph=plan_result.graph,
-            context={"conversation_id": conversation_id, "task_id": task_id},
+            context=plan_context,
         )
 
         # 3. Vérifier
@@ -382,6 +430,10 @@ class Agent:
     def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
 
+        # Vérifier que le modèle est initialisé
+        if self.model is None:
+            raise RuntimeError("Model not initialized. Call initialize_model() first.")
+
         # Rafraîchir les middlewares patchables (important pour les tests)
         self._refresh_middlewares()
 
@@ -390,12 +442,12 @@ class Agent:
             try:
                 cg_config = getattr(self.config, 'compliance_guardian', None)
                 if cg_config and cg_config.validate_queries:
-                    context = {
+                    validation_context: ContextDict = {
                         'conversation_id': conversation_id,
-                        'task_id': task_id,
+                        'task_id': task_id or '',
                         'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
                     }
-                    self.compliance_guardian.validate_query(message, context)
+                    self.compliance_guardian.validate_query(message, validation_context)
             except Exception as e:
                 # En mode strict, propager l'erreur
                 cg_config = getattr(self.config, 'compliance_guardian', None)
@@ -570,13 +622,15 @@ class Agent:
 
         response_hash = hashlib.sha256(final_response.encode("utf-8")).hexdigest()
         unique_tools = list(dict.fromkeys(tools_used))
+        # Ensure prompt_hash has a value for logging
+        prompt_hash_for_logging = final_prompt_hash or hashlib.sha256(message.encode("utf-8")).hexdigest()
 
         if self.logger:
             try:
                 self.logger.log_generation(
                     conversation_id=conversation_id,
                     task_id=task_id,
-                    prompt_hash=final_prompt_hash,
+                    prompt_hash=prompt_hash_for_logging,
                     response_hash=response_hash,
                     tokens_used=usage["total_tokens"],
                 )
@@ -589,7 +643,7 @@ class Agent:
                     agent_id="agent:llmagenta",
                     agent_version=self.config.version,
                     task_id=task_id or conversation_id,
-                    prompt_hash=final_prompt_hash,
+                    prompt_hash=prompt_hash_for_logging,
                     response_hash=response_hash,
                     start_time=start_time,
                     end_time=end_time,
@@ -611,7 +665,7 @@ class Agent:
                     actor="agent.core",
                     task_id=task_id or conversation_id,
                     decision="generate_response_with_tools" if unique_tools else "generate_response",
-                    prompt_hash=final_prompt_hash,
+                    prompt_hash=prompt_hash_for_logging,
                     tools_used=unique_tools,
                     reasoning_markers=[f"iterations:{iterations}"],
                     alternatives_considered=["do_nothing", "ask_clarification"],
@@ -644,36 +698,36 @@ class Agent:
                 
                 # Auditer l'exécution
                 if cg_config and cg_config.audit_executions:
-                    exec_result = {
+                    exec_result_audit: ExecutionResultDict = {
                         'success': final_response is not None and "Erreur" not in final_response,
                         'errors': [] if final_response is not None else ['No response generated']
                     }
-                    audit_context = {
+                    audit_context: ContextDict = {
                         'conversation_id': conversation_id,
-                        'task_id': task_id,
+                        'task_id': task_id or '',
                     }
-                    self.compliance_guardian.audit_execution(exec_result, audit_context)
-                
+                    self.compliance_guardian.audit_execution(exec_result_audit, audit_context)
+
                 # Générer Decision Record
                 if cg_config and cg_config.auto_generate_dr:
-                    plan = {
-                        'actions': [{'tool': tool, 'params': {}} for tool in unique_tools],
-                        'tools_used': unique_tools
+                    dr_plan: PlanDict = {
+                        'actions': [{'tool': tool, 'params': ''} for tool in unique_tools],
+                        'tools_used': set(unique_tools)
                     }
-                    exec_result = {
+                    exec_result_dr: ExecutionResultDict = {
                         'success': final_response is not None and "Erreur" not in final_response,
                         'errors': [] if final_response is not None else ['No response generated']
                     }
-                    dr_context = {
+                    dr_context: ContextDict = {
                         'actor': 'agent.core',
                         'conversation_id': conversation_id,
-                        'task_id': task_id,
+                        'task_id': task_id or '',
                     }
                     self.compliance_guardian.generate_decision_record(
                         decision_type='simple_execution',
                         query=message,
-                        plan=plan,
-                        execution_result=exec_result,
+                        plan=dr_plan,
+                        execution_result=exec_result_dr,
                         context=dr_context
                     )
             except Exception as e:
@@ -710,7 +764,7 @@ class Agent:
             return f"Utilisateur: {message}\n{assistant_header}\n"
         return f"{context}\n\nUtilisateur: {message}\n{assistant_header}\n"
 
-    def _build_context(self, history: List[Dict], conversation_id: str, task_id: Optional[str]) -> str:
+    def _build_context(self, history: List[Dict[str, str]], conversation_id: str, task_id: Optional[str]) -> str:
         """Construire le contexte conversationnel pour le modèle."""
         role_labels = {
             "user": "Utilisateur",
@@ -860,8 +914,8 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
         tools = self.tool_registry.list_all()
         for tool_name, tool in tools.items():
             # Wrapper pour adapter l'interface (avec closure corrigée)
-            def make_tool_wrapper(t):
-                def wrapper(params: Dict):
+            def make_tool_wrapper(t: BaseTool) -> Callable[[Dict[str, str]], ToolResult]:
+                def wrapper(params: Dict[str, str]) -> ToolResult:
                     return t.execute(params)
 
                 return wrapper
@@ -898,9 +952,9 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
 
     def _format_htn_response(
         self,
-        plan_result: object,
-        exec_result: object,
-        verifications: Dict[str, object],
+        plan_result: PlanningResult,
+        exec_result: ExecutionResult,
+        verifications: Dict[str, VerificationResult],
         conversation_id: str,
         task_id: Optional[str] = None,
     ) -> Dict[str, ChatResponseValue]:
@@ -1010,9 +1064,9 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
             verified = result.get("verified", None)
 
             response_parts.append(f"{i}. {task_name}")
-            if verified and verified.get("passed", False):
+            if verified and isinstance(verified, dict) and verified.get("passed", False):
                 response_parts.append("   ✓ Vérifié")
-            elif verified:
+            elif verified and isinstance(verified, dict):
                 response_parts.append(f"   ⚠ Vérification: {verified.get('reason', 'Échec')}")
 
             if task_result:
@@ -1034,7 +1088,7 @@ Réponds toujours de manière professionnelle, concrète et utile pour un propri
 class AgentManager:
     """Gestionnaire de l'agent (singleton)"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.agent: Optional[Agent] = None
 
     def get_agent(self) -> Agent:
@@ -1044,14 +1098,14 @@ class AgentManager:
             self.agent.initialize_model()
         return self.agent
 
-    def reload_agent(self):
+    def reload_agent(self) -> Agent:
         """Recharger l'agent (utile pour les tests)"""
         self.agent = None
         return self.get_agent()
 
 
 # Instance globale
-_agent_manager = AgentManager()
+_agent_manager: AgentManager = AgentManager()
 
 
 def get_agent() -> Agent:
@@ -1059,6 +1113,6 @@ def get_agent() -> Agent:
     return _agent_manager.get_agent()
 
 
-def init_model(backend: str, model_path: str, config: Dict[str, Union[str, int, bool]]) -> object:
+def init_model(backend: str, model_path: str, config: Dict[str, Union[str, int, bool]]) -> ModelInterface:
     """Proxy vers runtime.model_interface.init_model pour compatibilité tests"""
     return _init_model(backend=backend, model_path=model_path, config=config)

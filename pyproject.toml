@@ -118,6 +118,7 @@ dev = [
     "bandit>=1.9.1",
     "safety>=3.0.0,<4",
     "pylint>=4.0.3",
+    "types-PyYAML>=6.0.12.20250915",
 ]
 
 # Benchmarking dependencies
