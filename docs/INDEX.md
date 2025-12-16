@@ -1,7 +1,7 @@
 # FilAgent Documentation Index
 
-**Version**: 2.0.0
-**Last Updated**: 2025-12-08
+**Version**: 2.1.0
+**Last Updated**: 2025-12-16
 
 This index provides a comprehensive overview of all documentation available for FilAgent.
 
@@ -209,9 +209,17 @@ Historical documentation has been moved to [docs/archive/](/docs/archive/) to ke
 ### Archive Categories
 
 - **Phase Reports** ([docs/archive/phases/](/docs/archive/phases/)) - Development phase status reports (Phase 0-5)
-- **Technical Reports** ([docs/archive/reports/](/docs/archive/reports/)) - Historical audit and analysis reports
+- **Technical Reports** ([docs/archive/reports/](/docs/archive/reports/)) - Historical audit and analysis reports, including:
+  - Test analysis reports (ANALYSE_TESTS_RESUME, COVERAGE_REPORT, TEST_DIAGNOSTIC_REPORT)
+  - Implementation summaries (OPENTELEMETRY_IMPLEMENTATION_SUMMARY, SEMANTIC_CACHE_IMPLEMENTATION, TEMPLATE_MIGRATION_SUMMARY)
+  - Development reports (IMPLEMENTATION_REPORT_DEC8, REFACTORING_SUMMARY)
 - **Guides** ([docs/archive/guides/](/docs/archive/guides/)) - Consolidated or replaced user guides
-- **Development** ([docs/archive/development/](/docs/archive/development/)) - Development artifacts and task cards
+- **Development** ([docs/archive/development/](/docs/archive/development/)) - Development artifacts and task cards, including:
+  - Action plans (PLAN-ACTION-DEC8)
+  - Verification checklists (CI_CD_VERIFICATION_CHECKLIST)
+  - Architecture overviews (ARCHITECTURE_OVERVIEW)
+
+**Recent Archiving** (2025-12-16): 11 documents déplacés de la racine vers l'archive pour améliorer la lisibilité et réduire le bruit documentaire.
 
 **Why Archive?** Archived documents preserve project history and context while keeping the main documentation current and focused. See the [Archive README](/docs/archive/README.md) for the full archival policy.
 
@@ -222,6 +230,16 @@ Historical documentation has been moved to [docs/archive/](/docs/archive/) to ke
 **Questions or Issues?**
 - GitHub Issues: https://github.com/fil04331/FilAgent/issues
 - Security: See [SECURITY.md](/SECURITY.md)
+
+---
+
+## Recent Updates
+
+### 2025-12-16 - Documentation Cleanup
+- Archived 11 historical and temporary documents from root to `docs/archive/`
+- Updated archive README with detailed listing of new archived documents
+- Root directory now contains only 6 essential markdown files
+- Improved discoverability and reduced cognitive load for new contributors
 
 ---
 
