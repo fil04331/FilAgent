@@ -9,6 +9,7 @@
 - Install: `pdm install --dev` (or `pip install -r requirements.txt` plus `requirements-dev.txt` if PDM is unavailable).
 - Run locally: `pdm run server-dev` for hot reload (localhost:8000) or `pdm run server` for production-like start.
 - Tests: `pdm run test` for the full suite; `pdm run test-unit`, `test-integration`, `test-compliance`, `test-e2e`, or `test-performance` for scoped runs. Coverage: `pdm run test-cov` (HTML in `htmlcov/`).
+  - *Fallback if PDM is missing*: Use `python -m pytest` instead of `pytest` to ensure proper environment resolution (e.g., `python -m pytest tests/`).
 - Quality: `pdm run format` (Black), `pdm run lint` (Flake8), `pdm run typecheck` (mypy); use `pdm run check` before opening a PR.
 
 ## Coding Style & Naming
