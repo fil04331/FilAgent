@@ -99,7 +99,7 @@ jobs:
 
       - name: Dependency audit with pip-audit
         run: |
-          pdm run pip-audit --require-hashes --disable-pip --format json > pip-audit-report.json || true
+          pdm run pip-audit --disable-pip --format json > pip-audit-report.json || true
           pdm run pip-audit --desc
         continue-on-error: false
 
