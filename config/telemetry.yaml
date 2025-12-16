@@ -1,0 +1,135 @@
+# OpenTelemetry Configuration
+# Configuration for distributed tracing with OpenTelemetry
+#
+# This file configures:
+# - Trace collection and sampling
+# - Exporter configuration (Jaeger, OTLP)
+# - Service metadata
+# - Propagation context
+
+# Service identification
+service:
+  name: "filagent"
+  version: "2.0.0"
+  namespace: "production"  # production, staging, development
+  environment: "production"  # Can be overridden by FILAGENT_ENV
+
+# Tracing configuration
+tracing:
+  enabled: true
+  
+  # Sampling strategy
+  # - always_on: Sample all traces (development)
+  # - always_off: Disable tracing
+  # - trace_id_ratio: Sample based on ratio (0.0 to 1.0)
+  sampler:
+    type: "always_on"  # Options: always_on, always_off, trace_id_ratio
+    ratio: 1.0  # Only used when type is trace_id_ratio
+  
+  # Span limits
+  max_attributes: 128
+  max_events: 128
+  max_links: 128
+  max_attribute_length: 1024
+
+# Exporter configuration
+exporter:
+  # Primary exporter type: jaeger, otlp_http, otlp_grpc, console
+  type: "jaeger"
+  
+  # Jaeger configuration (when type is jaeger)
+  jaeger:
+    agent_host: "localhost"  # Jaeger agent hostname
+    agent_port: 6831  # Jaeger agent UDP port
+    collector_endpoint: "http://localhost:14268/api/traces"  # HTTP collector endpoint
+    
+  # OTLP HTTP configuration (when type is otlp_http)
+  otlp_http:
+    endpoint: "http://localhost:4318/v1/traces"
+    timeout: 10  # seconds
+    compression: "gzip"  # none, gzip
+    headers: {}  # Custom headers for authentication
+  
+  # OTLP gRPC configuration (when type is otlp_grpc)
+  otlp_grpc:
+    endpoint: "localhost:4317"
+    timeout: 10  # seconds
+    compression: "gzip"  # none, gzip
+    headers: {}  # Custom headers for authentication
+  
+  # Console exporter for debugging (when type is console)
+  console:
+    enabled: false  # Set to true to print spans to console
+
+# Resource attributes (metadata attached to all spans)
+resource:
+  attributes:
+    deployment.environment: "production"
+    service.instance.id: "${HOSTNAME}"  # Will be replaced with actual hostname
+    
+# Instrumentation configuration
+instrumentation:
+  # FastAPI automatic instrumentation
+  fastapi:
+    enabled: true
+    capture_headers: false  # Don't capture request/response headers (privacy)
+    capture_query_params: false  # Don't capture query params (may contain PII)
+    
+  # SQLite instrumentation
+  sqlite:
+    enabled: false  # Disabled by default to avoid overhead
+    capture_statement_parameters: false  # Never capture SQL parameters (PII risk)
+  
+  # HTTP client instrumentation
+  http_client:
+    enabled: true
+    capture_headers: false  # Don't capture HTTP headers (privacy)
+
+# Context propagation
+propagation:
+  # Propagation format: w3c (W3C Trace Context), b3 (Zipkin B3), jaeger, xray
+  format: "w3c"  # Recommended for interoperability
+  
+  # Inject trace context into structlog
+  structlog_integration:
+    enabled: true
+    trace_id_field: "trace_id"
+    span_id_field: "span_id"
+
+# Batch span processor configuration
+batch_processor:
+  enabled: true
+  max_queue_size: 2048
+  schedule_delay_millis: 5000  # Export every 5 seconds
+  max_export_batch_size: 512
+  export_timeout_millis: 30000  # 30 seconds
+
+# Privacy and compliance
+privacy:
+  # Automatically mask PII in span attributes
+  mask_pii: true
+  
+  # Fields to exclude from spans (never capture)
+  excluded_fields:
+    - "password"
+    - "token"
+    - "api_key"
+    - "secret"
+    - "authorization"
+    - "credit_card"
+    - "ssn"
+    - "email"  # Hash instead of capturing directly
+  
+  # Hash user identifiers instead of capturing plaintext
+  hash_user_ids: true
+
+# Performance settings
+performance:
+  # Disable tracing for health check endpoints
+  excluded_urls:
+    - "/health"
+    - "/metrics"
+    - "/_internal"
+  
+  # Maximum number of active spans per trace
+  max_spans_per_trace: 1000

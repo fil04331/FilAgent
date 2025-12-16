@@ -1,0 +1,112 @@
+# Docker Compose Override for OpenTelemetry Observability
+# This file adds Jaeger for distributed tracing visualization
+#
+# Usage:
+#   docker compose up -d
+#   (This file is automatically loaded by docker compose)
+#
+# Access Jaeger UI at: http://localhost:16686
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Jaeger All-in-One
+  # Distributed tracing backend for OpenTelemetry
+  # ============================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: filagent-jaeger
+    restart: unless-stopped
+    
+    ports:
+      # Jaeger UI (Web interface for viewing traces)
+      - "16686:16686"
+      # Jaeger collector HTTP endpoint (OTLP)
+      - "14268:14268"
+      # Jaeger agent (UDP) - used by FilAgent
+      - "6831:6831/udp"
+      # OTLP gRPC receiver
+      - "4317:4317"
+      # OTLP HTTP receiver
+      - "4318:4318"
+    
+    environment:
+      # Collector configuration
+      - COLLECTOR_OTLP_ENABLED=true
+      
+      # Storage configuration (in-memory for development)
+      - SPAN_STORAGE_TYPE=memory
+      
+      # Memory storage limits
+      - MEMORY_MAX_TRACES=10000
+      
+      # Query service configuration
+      - QUERY_BASE_PATH=/
+      
+      # UI configuration
+      - JAEGER_DISABLED=false
+    
+    networks:
+      - default
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Update Gradio service to connect to Jaeger
+  # ============================================================================
+  gradio:
+    environment:
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_JAEGER_AGENT_HOST=jaeger
+      - OTEL_EXPORTER_JAEGER_AGENT_PORT=6831
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_SERVICE_NAME=filagent-gradio
+    
+    depends_on:
+      jaeger:
+        condition: service_healthy
+
+  # ============================================================================
+  # Update API service to connect to Jaeger
+  # ============================================================================
+  api:
+    environment:
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_JAEGER_AGENT_HOST=jaeger
+      - OTEL_EXPORTER_JAEGER_AGENT_PORT=6831
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_SERVICE_NAME=filagent-api
+    
+    depends_on:
+      jaeger:
+        condition: service_healthy
+
+# Networks are inherited from docker-compose.yml
+networks:
+  default:
+    name: filagent-network
+    external: true

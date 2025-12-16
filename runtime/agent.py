@@ -32,6 +32,22 @@ try:
 except ImportError:
     METRICS_AVAILABLE = False
 
+# Import OpenTelemetry for distributed tracing
+try:
+    from runtime.telemetry import get_tracer, get_trace_context
+    TELEMETRY_AVAILABLE = True
+except ImportError:
+    TELEMETRY_AVAILABLE = False
+    def get_tracer(name=None):
+        from contextlib import contextmanager
+        class NoOpTracer:
+            @contextmanager
+            def start_as_current_span(self, name, **kwargs):
+                yield None
+        return NoOpTracer()
+    def get_trace_context():
+        return {}
+
 # Import du planificateur HTN
 from planner import (
     HierarchicalPlanner,
@@ -171,6 +187,12 @@ class Agent:
             self.metrics = get_agent_metrics()
         else:
             self.metrics = None
+        
+        # Initialize OpenTelemetry tracer
+        if TELEMETRY_AVAILABLE:
+            self.tracer = get_tracer("filagent.agent")
+        else:
+            self.tracer = get_tracer()  # No-op tracer
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()

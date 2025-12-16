@@ -31,6 +31,15 @@ try:
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
+# Import OpenTelemetry for distributed tracing
+try:
+    from .telemetry import initialize_telemetry, get_telemetry_manager, get_trace_context
+    TELEMETRY_AVAILABLE = True
+except ImportError:
+    TELEMETRY_AVAILABLE = False
+    def get_trace_context():
+        return {}
+
 app = FastAPI(
     title="FilAgent API",
     version="0.1.0",
@@ -42,6 +51,19 @@ app = FastAPI(
 
 # Configuration
 config = get_config()
+
+# Initialize OpenTelemetry tracing
+if TELEMETRY_AVAILABLE:
+    telemetry_initialized = initialize_telemetry()
+    if telemetry_initialized:
+        # Instrument FastAPI application
+        telemetry_manager = get_telemetry_manager()
+        telemetry_manager.instrument_fastapi(app)
+        print("✅ FastAPI application instrumented with OpenTelemetry")
+    else:
+        print("⚠️ OpenTelemetry initialization failed, tracing disabled")
+else:
+    print("⚠️ OpenTelemetry not available, tracing disabled")
 
 
 class Message(BaseModel):
@@ -226,15 +248,24 @@ async def chat(request: ChatRequest):
             },
             "conversation_id": conversation_id,
         }
-        # Ajouter un header X-Trace-ID si disponible via logger
+        # Ajouter un header X-Trace-ID si disponible via logger ou OpenTelemetry
         headers = {}
-        try:
-            logger = get_logger()
-            trace_id = getattr(logger, "current_trace_id", None)
-            if trace_id:
-                headers["X-Trace-ID"] = trace_id
-        except Exception:
-            pass
+        
+        # Try OpenTelemetry trace context first
+        if TELEMETRY_AVAILABLE:
+            trace_ctx = get_trace_context()
+            if trace_ctx.get("trace_id"):
+                headers["X-Trace-ID"] = trace_ctx["trace_id"]
+        
+        # Fallback to logger trace_id
+        if not headers:
+            try:
+                logger = get_logger()
+                trace_id = getattr(logger, "current_trace_id", None)
+                if trace_id:
+                    headers["X-Trace-ID"] = trace_id
+            except Exception:
+                pass
 
         return JSONResponse(status_code=200, content=response, headers=headers)
     except Exception as e:

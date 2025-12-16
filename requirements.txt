@@ -10,6 +10,7 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.11.0
 arrow==1.4.0
+asgiref==3.11.0
 async-timeout==5.0.1; python_version < "3.11"
 attrs==25.4.0
 audioop-lts==0.2.2; python_version >= "3.13"
@@ -34,10 +35,12 @@ filelock==3.20.0
 fqdn==1.5.1
 frozenlist==1.8.0
 fsspec[http]==2025.10.0
+googleapis-common-protos==1.56.1
 gradio==5.49.1
 gradio-client==1.13.3
 graphql-core==3.2.7
 groovy==0.1.2
+grpcio==1.76.0
 h11==0.16.0
 harfile==0.4.0
 hf-xet==1.2.0; platform_machine == "x86_64" or platform_machine == "amd64" or platform_machine == "AMD64" or platform_machine == "arm64" or platform_machine == "aarch64"
@@ -48,6 +51,7 @@ hypothesis==6.148.1
 hypothesis-graphql==0.11.1
 hypothesis-jsonschema==0.23.1
 idna==3.11
+importlib-metadata==8.7.0
 iniconfig==2.3.0
 isoduration==20.11.0
 jinja2==3.1.6
@@ -70,6 +74,19 @@ openai==2.8.1
 openapi-schema-validator==0.6.3
 openapi-spec-validator==0.7.2
 openpyxl==3.1.5
+opentelemetry-api==1.39.1
+opentelemetry-exporter-jaeger==1.21.0
+opentelemetry-exporter-jaeger-proto-grpc==1.21.0
+opentelemetry-exporter-jaeger-thrift==1.21.0
+opentelemetry-exporter-otlp-proto-common==1.39.1
+opentelemetry-exporter-otlp-proto-http==1.39.1
+opentelemetry-instrumentation==0.60b1
+opentelemetry-instrumentation-asgi==0.60b1
+opentelemetry-instrumentation-fastapi==0.60b1
+opentelemetry-proto==1.39.1
+opentelemetry-sdk==1.39.1
+opentelemetry-semantic-conventions==0.60b1
+opentelemetry-util-http==0.60b1
 orjson==3.11.4
 packaging==25.0
 pandas==2.3.3
@@ -78,6 +95,7 @@ pillow==11.3.0
 pluggy==1.6.0
 prometheus-client==0.20.0
 propcache==0.4.1
+protobuf==6.33.2
 pyarrow==22.0.0
 pycparser==2.23; implementation_name != "PyPy" and platform_python_implementation != "PyPy"
 pydantic==2.11.10
@@ -114,6 +132,7 @@ sortedcontainers==2.4.0
 starlette==0.49.3
 starlette-testclient==0.4.1
 structlog==25.5.0
+thrift==0.22.0
 tomli==2.3.0
 tomli-w==1.2.0
 tomlkit==0.13.3
@@ -129,5 +148,7 @@ uvicorn==0.38.0
 webcolors==25.10.0
 websockets==15.0.1
 werkzeug==3.1.4
+wrapt==1.17.3
 xxhash==3.6.0
 yarl==1.22.0
+zipp==3.23.0
