@@ -1,0 +1,19 @@
+Décompose cette requête en tâches atomiques:
+
+Requête: {{ query }}
+
+Réponds UNIQUEMENT avec un JSON valide suivant ce format:
+{
+  "tasks": [
+    {
+      "name": "nom_descriptif",
+      "action": "nom_action",
+      "params": {"key": "value"},
+      "depends_on": [indices des tâches requises],
+      "priority": 3
+    }
+  ],
+  "reasoning": "Justification de la décomposition"
+}
+
+Actions disponibles: {{ available_actions }}
