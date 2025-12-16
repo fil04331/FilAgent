@@ -99,7 +99,7 @@ class DocumentChunker:
             current_tokens = self.estimate_tokens(current_chunk)
             
             # If adding this segment would exceed chunk_size, save current chunk
-            if current_tokens + segment_tokens > self.chunk_size and current_chunk:
+            if current_tokens > 0 and current_tokens + segment_tokens > self.chunk_size:
                 chunk_id = f"{source}:chunk:{chunk_counter}"
                 chunks.append(Chunk(
                     text=current_chunk.strip(),

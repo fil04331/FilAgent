@@ -264,14 +264,27 @@ class FAISSVectorStore(VectorStore):
         Returns:
             Document ID
         """
-        full_metadata = metadata or {}
-        if conversation_id:
-            full_metadata["conversation_id"] = conversation_id
-        if task_id:
-            full_metadata["task_id"] = task_id
+        # Generate embedding
+        embedding = self.embedder.encode(text, convert_to_numpy=True).reshape(1, -1)
         
-        ids = self.add_documents([text], [full_metadata])
-        return ids[0]
+        # Create unique ID
+        passage_id = f"passage:{hashlib.sha256(text.encode()).hexdigest()[:8]}"
+        
+        # Add to index
+        self.index.add(embedding.astype(np.float32))
+        
+        # Add to store (maintain old format for backward compatibility)
+        self.store.append({
+            "passage_id": passage_id,
+            "id": passage_id,  # Also add new format
+            "text": text,
+            "conversation_id": conversation_id,
+            "task_id": task_id,
+            "timestamp": datetime.now().isoformat(),
+            "metadata": metadata or {}
+        })
+        
+        return passage_id
     
     def similarity_search(
         self,
@@ -458,9 +471,11 @@ class FAISSVectorStore(VectorStore):
         Rebuild index from store
         Useful if store is manually updated
         """
+        if not self.store:
+            return
+        
         self._rebuild_index_from_store()
-        if self.store:
-            print(f"✓ Rebuilt semantic index with {len(self.store)} passages")
+        print(f"✓ Rebuilt semantic index with {len(self.store)} passages")
 
 
 class ChromaDBVectorStore(VectorStore):
