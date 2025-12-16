@@ -234,8 +234,10 @@ Based on `config/eval_targets.yaml`:
 
 - Main README: `README.md` (French)
 - Setup guide: `README_SETUP.md`
-- Agent documentation: `AGENT.md`
-- Project phases: `STATUS_PHASE*.md` files
+- Documentation index: `docs/INDEX.md`
+- Documentation structure: `docs/DOCUMENTATION_STRUCTURE.md`
+- Architecture Decision Records: `docs/ADRs/`
+- Historical documentation: `docs/archive/` (includes archived phase reports and implementation summaries)
 
 ## Backend MCP Development (High-Performance Concurrent Systems)
 
