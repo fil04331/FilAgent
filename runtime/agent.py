@@ -65,6 +65,14 @@ from runtime.tool_executor import ToolExecutor, ToolCall
 from runtime.tool_parser import ToolParser
 from runtime.context_builder import ContextBuilder
 
+# Import semantic cache manager
+try:
+    from memory.cache_manager import get_cache_manager
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+    print("⚠ Semantic cache not available (missing dependencies)")
+
 
 class Agent:
     """
@@ -340,6 +348,7 @@ class Agent:
         Analyser un message utilisateur et orchestrer la réponse de l'agent.
         
         REFACTORED: Now uses Router component for strategy decision.
+        NEW: Checks semantic cache before routing to reduce inference costs.
         """
 
         # Métriques: compter requête totale
@@ -347,16 +356,88 @@ class Agent:
 
         metrics = get_metrics()
 
+        # NEW: Check semantic cache BEFORE routing decision
+        cache_result = None
+        if CACHE_AVAILABLE:
+            try:
+                cache_manager = get_cache_manager()
+                cache_result = cache_manager.get(message)
+                
+                if cache_result:
+                    # Cache hit! Return cached response immediately
+                    print(f"✓ Cache hit (similarity: {cache_result['similarity_score']:.3f})")
+                    
+                    # Add cache metadata to response
+                    cached_response = {
+                        "response": cache_result['response']['response_text'],
+                        "conversation_id": conversation_id,
+                        "task_id": task_id,
+                        "tools_used": cache_result['response']['tools_used'],
+                        "usage": cache_result['response']['usage'],
+                        "iterations": cache_result['response']['iterations'],
+                        "cache_hit": True,
+                        "cache_metadata": {
+                            "similarity_score": cache_result['similarity_score'],
+                            "hit_count": cache_result['hit_count'],
+                            "age_hours": cache_result['age_hours'],
+                            "entry_id": cache_result['entry_id']
+                        }
+                    }
+                    
+                    # Store user message in episodic memory
+                    try:
+                        add_message(
+                            conversation_id=conversation_id,
+                            role="user",
+                            content=message,
+                            task_id=task_id,
+                        )
+                        add_message(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=cache_result['response']['response_text'],
+                            task_id=task_id,
+                        )
+                    except Exception as e:
+                        print(f"⚠ Failed to persist cached messages: {e}")
+                    
+                    return cached_response
+                else:
+                    print("⚠ Cache miss - executing query")
+            except Exception as e:
+                print(f"⚠ Cache lookup failed: {e}. Falling back to normal execution.")
+                cache_result = None
+
         # NOUVEAU: Use Router component for strategy decision
         routing_decision = self.router.route(message)
         
         if routing_decision.strategy == RouterExecutionStrategy.HTN:
             # Métriques: requête HTN
             metrics.htn_requests_total.labels(strategy="auto", status="requested").inc()
-            return self._run_with_htn(message, conversation_id, task_id)
+            result = self._run_with_htn(message, conversation_id, task_id)
         else:
             # Mode simple (pas de métriques HTN pour les requêtes simples)
-            return self._run_simple(message, conversation_id, task_id)
+            result = self._run_simple(message, conversation_id, task_id)
+        
+        # NEW: Store successful response in cache
+        if CACHE_AVAILABLE and result.get("response"):
+            try:
+                cache_manager = get_cache_manager()
+                cache_manager.store(
+                    query=message,
+                    response_text=result["response"],
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                    tools_used=result.get("tools_used", []),
+                    usage=result.get("usage", {}),
+                    iterations=result.get("iterations", 1),
+                    metadata={"strategy": routing_decision.strategy.value if hasattr(routing_decision.strategy, 'value') else str(routing_decision.strategy)}
+                )
+                print("✓ Response cached for future queries")
+            except Exception as e:
+                print(f"⚠ Failed to cache response: {e}")
+        
+        return result
 
     def _requires_planning(self, query: str) -> bool:
         """
