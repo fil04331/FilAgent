@@ -1,0 +1,14 @@
+# Action Auto-Gen - PyPDF2 security migration
+
+line: fix/pypdf3.9.0-security
+target: develop
+
+name: Upgrade PyPDF2 to pypdf==3.9.0
+
+steps:
+  - name: Create branch fix/pypdf3.9.0-security
+    run: repos/fil04331/FilAgent@main
+    command: git branch create fix/pypdf3.9.0-security from develop
+  - name: Create PR vers develop
+    run: repos/fil4331/FilAgent@main
+    command: git pull request create --title "SECURITY Upgrade PyPDF2 -> pypdf==3.9.0" --head fix/pypdf3.9.0-security --base develop
