@@ -31,11 +31,15 @@ class PythonSandboxTool(BaseTool):
     
     Principes de sécurité Zero Trust:
     - Conteneur éphémère détruit après exécution
-    - User non-root (sandbox:sandbox)
+    - User non-root (nobody:nogroup / 65534:65534)
     - Réseau désactivé (network_mode='none')
     - Limites strictes: 512MB RAM, 0.5 CPU
     - Timeout 5 secondes
-    - Pas d'accès au système hôte (volume temporaire uniquement)
+    - Pas d'accès au système hôte (volume temporaire read-only uniquement)
+    - Filesystem read-only avec petit tmpfs
+    - Toutes les Linux capabilities retirées
+    - Pas d'escalade de privilèges
+    - Double validation: AST parsing + Docker isolation
     """
 
     def __init__(self, dangerous_patterns: Optional[List[str]] = None, docker_image: str = "python:3.12-slim"):
@@ -131,6 +135,10 @@ class PythonSandboxTool(BaseTool):
             # Écrire le code dans le fichier
             code_file.write_text(code)
             
+            # Rendre le fichier lisible par tous (nécessaire pour l'user nobody)
+            os.chmod(code_file, 0o644)
+            os.chmod(temp_dir, 0o755)
+            
             # Mesurer le temps d'exécution
             start_time = time.time()
             
@@ -149,9 +157,8 @@ class PythonSandboxTool(BaseTool):
                 "mem_limit": f"{self.max_memory_mb}m",  # Limite RAM
                 "cpu_quota": self.cpu_quota,  # Limite CPU
                 "cpu_period": self.cpu_period,
-                "detach": False,
-                "remove": True,  # Auto-remove après exécution
-                "user": "sandbox",  # User non-root (créé dans l'image)
+                "detach": False,  # Will be overridden to True for manual control
+                "user": "65534:65534",  # User non-root (nobody:nogroup)
                 "environment": {
                     "PYTHONDONTWRITEBYTECODE": "1",
                     "PYTHONUNBUFFERED": "1"
@@ -164,28 +171,84 @@ class PythonSandboxTool(BaseTool):
             }
             
             try:
-                # Créer et exécuter le conteneur
-                container = self.docker_client.containers.run(**container_config, timeout=self.timeout)
+                # Créer le conteneur sans le démarrer automatiquement
+                # On utilise detach=True pour avoir le contrôle sur le wait
+                container_config_run = container_config.copy()
+                container_config_run['detach'] = True
                 
-                # Le conteneur retourne les logs (stdout/stderr combinés)
-                output = container.decode('utf-8') if isinstance(container, bytes) else str(container)
+                container = self.docker_client.containers.run(**container_config_run)
                 
-                elapsed_time = time.time() - start_time
-                
-                # Succès
-                if not output.strip():
-                    output = "[Code exécuté avec succès, pas de sortie]"
-                
-                return ToolResult(
-                    status=ToolStatus.SUCCESS,
-                    output=output,
-                    metadata={
-                        "elapsed_time": elapsed_time,
-                        "timeout": False,
-                        "isolation": "docker",
-                        "memory_limit_mb": self.max_memory_mb
-                    }
-                )
+                # Attendre que le conteneur se termine avec un timeout
+                try:
+                    exit_code = container.wait(timeout=self.timeout)
+                    
+                    # Récupérer les logs
+                    output = container.logs().decode('utf-8')
+                    
+                    elapsed_time = time.time() - start_time
+                    
+                    # Nettoyer le conteneur
+                    try:
+                        container.remove(force=True)
+                    except Exception:
+                        pass
+                    
+                    # Vérifier le code de sortie
+                    status_code = exit_code.get('StatusCode', 0) if isinstance(exit_code, dict) else exit_code
+                    
+                    if status_code == 0:
+                        # Succès
+                        if not output.strip():
+                            output = "[Code exécuté avec succès, pas de sortie]"
+                        
+                        return ToolResult(
+                            status=ToolStatus.SUCCESS,
+                            output=output,
+                            metadata={
+                                "elapsed_time": elapsed_time,
+                                "timeout": False,
+                                "isolation": "docker",
+                                "memory_limit_mb": self.max_memory_mb
+                            }
+                        )
+                    else:
+                        # Erreur d'exécution
+                        return ToolResult(
+                            status=ToolStatus.ERROR,
+                            output="",
+                            error=f"Container execution failed: {output}",
+                            metadata={
+                                "exit_code": status_code,
+                                "elapsed_time": elapsed_time
+                            }
+                        )
+                        
+                except Exception as wait_error:
+                    # Timeout ou erreur durant l'attente
+                    elapsed_time = time.time() - start_time
+                    
+                    # Arrêter et supprimer le conteneur
+                    try:
+                        container.stop(timeout=1)
+                        container.remove(force=True)
+                    except Exception:
+                        pass
+                    
+                    # Vérifier si c'est un timeout
+                    if "timeout" in str(wait_error).lower() or elapsed_time >= self.timeout:
+                        return ToolResult(
+                            status=ToolStatus.TIMEOUT,
+                            output="",
+                            error=f"Execution timeout after {self.timeout}s",
+                            metadata={"timeout": True, "elapsed_time": elapsed_time}
+                        )
+                    else:
+                        return ToolResult(
+                            status=ToolStatus.ERROR,
+                            output="",
+                            error=f"Container wait error: {str(wait_error)}",
+                            metadata={"elapsed_time": elapsed_time}
+                        )
                 
             except ContainerError as e:
                 # Erreur d'exécution dans le conteneur
@@ -203,24 +266,15 @@ class PythonSandboxTool(BaseTool):
                 )
             
             except Exception as e:
-                # Timeout ou autre erreur Docker
+                # Autre erreur Docker
                 elapsed_time = time.time() - start_time
                 
-                # Vérifier si c'est un timeout
-                if "timeout" in str(e).lower() or elapsed_time >= self.timeout:
-                    return ToolResult(
-                        status=ToolStatus.TIMEOUT,
-                        output="",
-                        error=f"Execution timeout after {self.timeout}s",
-                        metadata={"timeout": True, "elapsed_time": elapsed_time}
-                    )
-                else:
-                    return ToolResult(
-                        status=ToolStatus.ERROR,
-                        output="",
-                        error=f"Docker execution error: {str(e)}",
-                        metadata={"elapsed_time": elapsed_time}
-                    )
+                return ToolResult(
+                    status=ToolStatus.ERROR,
+                    output="",
+                    error=f"Docker execution error: {str(e)}",
+                    metadata={"elapsed_time": elapsed_time}
+                )
         
         except Exception as e:
             return ToolResult(
