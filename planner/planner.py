@@ -25,6 +25,8 @@ from .task_graph import Task, TaskGraph, TaskPriority, TaskDecompositionError
 from .metrics import get_metrics
 import time
 
+from runtime.template_loader import get_template_loader, TemplateLoader
+
 
 class PlanningStrategy(str, Enum):
     """Stratégies de planification disponibles"""
@@ -95,6 +97,8 @@ class HierarchicalPlanner:
         tools_registry: Optional[Any] = None,
         max_decomposition_depth: int = 3,
         enable_tracing: bool = True,
+        template_loader: Optional[TemplateLoader] = None,
+        template_version: str = "v1",
     ):
         """
         Initialise le planificateur
@@ -104,11 +108,19 @@ class HierarchicalPlanner:
             tools_registry: Registre des outils disponibles
             max_decomposition_depth: Profondeur max de décomposition récursive
             enable_tracing: Active la traçabilité complète (conformité)
+            template_loader: Custom template loader (uses global if None)
+            template_version: Template version to use (default: 'v1')
         """
         self.model = model_interface
         self.tools = tools_registry
         self.max_depth = max_decomposition_depth
         self.enable_tracing = enable_tracing
+
+        # Template loader for prompt generation
+        if template_loader is None:
+            self.template_loader = get_template_loader(version=template_version)
+        else:
+            self.template_loader = template_loader
 
         # Patterns courants pour règles prédéfinies
         self._init_rule_patterns()
@@ -282,28 +294,9 @@ class HierarchicalPlanner:
         if self.model is None:
             raise TaskDecompositionError("LLM-based planning requires a model_interface")
 
-        # Construire le prompt de décomposition
+        # Construire le prompt de décomposition avec templates
         system_prompt = self._build_decomposition_prompt()
-        user_prompt = f"""Décompose cette requête en tâches atomiques:
-
-Requête: {query}
-
-Réponds UNIQUEMENT avec un JSON valide suivant ce format:
-{{
-  "tasks": [
-    {{
-      "name": "nom_descriptif",
-      "action": "nom_action",
-      "params": {{"key": "value"}},
-      "depends_on": [indices des tâches requises],
-      "priority": 3
-    }}
-  ],
-  "reasoning": "Justification de la décomposition"
-}}
-
-Actions disponibles: {self._get_available_actions()}
-"""
+        user_prompt = self._build_user_decomposition_prompt(query)
 
         # Appeler le LLM
         try:
@@ -368,8 +361,17 @@ Actions disponibles: {self._get_available_actions()}
             return rule_result
 
     def _build_decomposition_prompt(self) -> str:
-        """Construit le prompt système pour décomposition LLM"""
-        return """Tu es un expert en décomposition de tâches complexes.
+        """
+        Construit le prompt système pour décomposition LLM
+        
+        Uses Jinja2 template from prompts/templates/v1/planner_decomposition.j2
+        """
+        try:
+            return self.template_loader.render('planner_decomposition')
+        except Exception as e:
+            # Fallback to inline prompt if template fails
+            print(f"Warning: Failed to load planner template, using fallback: {e}")
+            return """Tu es un expert en décomposition de tâches complexes.
 
 Ton rôle:
 - Analyser les requêtes utilisateur
@@ -384,6 +386,50 @@ Principes:
 - Priorités cohérentes (CRITICAL=5, HIGH=4, NORMAL=3, LOW=2, OPTIONAL=1)
 
 Réponds TOUJOURS en JSON valide sans markdown."""
+    
+    def _build_user_decomposition_prompt(self, query: str) -> str:
+        """
+        Construit le prompt utilisateur pour décomposition
+        
+        Uses Jinja2 template from prompts/templates/v1/planner_user_prompt.j2
+        
+        Args:
+            query: User query to decompose
+            
+        Returns:
+            Formatted user prompt
+        """
+        available_actions = ", ".join(self._get_available_actions())
+        
+        try:
+            return self.template_loader.render(
+                'planner_user_prompt',
+                query=query,
+                available_actions=available_actions,
+            )
+        except Exception as e:
+            # Fallback to inline prompt if template fails
+            print(f"Warning: Failed to load planner user template, using fallback: {e}")
+            return f"""Décompose cette requête en tâches atomiques:
+
+Requête: {query}
+
+Réponds UNIQUEMENT avec un JSON valide suivant ce format:
+{{
+  "tasks": [
+    {{
+      "name": "nom_descriptif",
+      "action": "nom_action",
+      "params": {{"key": "value"}},
+      "depends_on": [indices des tâches requises],
+      "priority": 3
+    }}
+  ],
+  "reasoning": "Justification de la décomposition"
+}}
+
+Actions disponibles: {available_actions}
+"""
 
     def _get_available_actions(self) -> List[str]:
         """Retourne la liste des actions disponibles"""

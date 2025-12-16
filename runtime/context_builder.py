@@ -10,6 +10,7 @@ Key Principles:
 2. Stateless: No instance state, pure functions
 3. Configurable: Templates can be injected
 4. Type Safety: Clear input/output contracts
+5. Template-based: Uses Jinja2 templates for maintainability
 """
 
 import json
@@ -17,6 +18,8 @@ import hashlib
 from typing import List, Dict, Optional, Any
 
 from pydantic import BaseModel
+
+from runtime.template_loader import get_template_loader, TemplateLoader
 
 
 class Message(BaseModel):
@@ -39,6 +42,8 @@ class ContextBuilder:
         self,
         max_history_messages: int = 10,
         role_labels: Optional[Dict[str, str]] = None,
+        template_loader: Optional[TemplateLoader] = None,
+        template_version: str = "v1",
     ):
         """
         Initialize context builder with configuration.
@@ -46,6 +51,8 @@ class ContextBuilder:
         Args:
             max_history_messages: Maximum number of messages to include in context
             role_labels: Custom role labels for formatting
+            template_loader: Custom template loader (uses global if None)
+            template_version: Template version to use (default: 'v1')
         """
         self.max_history_messages = max_history_messages
         self.role_labels = role_labels or {
@@ -54,6 +61,12 @@ class ContextBuilder:
             "system": "Système",
             "tool": "Outil",
         }
+        
+        # Template loader for prompt generation
+        if template_loader is None:
+            self.template_loader = get_template_loader(version=template_version)
+        else:
+            self.template_loader = template_loader
     
     def build_context(
         self,
@@ -193,9 +206,11 @@ class ContextBuilder:
         """
         Build system prompt with tool descriptions and optional semantic context.
         
+        Uses Jinja2 template from prompts/templates/v1/system_prompt.j2
+        
         Args:
             tool_registry: Registry of available tools
-            domain_context: Optional domain-specific context
+            domain_context: Optional domain-specific context (currently unused, reserved for future)
             semantic_context: Optional semantic search results
             
         Returns:
@@ -210,6 +225,33 @@ class ContextBuilder:
                 f"- {tool_name}: {schema['description']}\n  Paramètres: {json.dumps(schema['parameters'])}"
             )
         
+        tools_section = "\n".join(tool_descriptions)
+        
+        # Render template with variables
+        try:
+            prompt = self.template_loader.render(
+                'system_prompt',
+                tools=tools_section,
+                semantic_context=semantic_context or "",
+            )
+        except Exception as e:
+            # Fallback to inline prompt if template fails
+            # This ensures backward compatibility during migration
+            print(f"Warning: Failed to load template, using fallback: {e}")
+            prompt = self._build_system_prompt_fallback(tools_section, semantic_context)
+        
+        return prompt.strip()
+    
+    def _build_system_prompt_fallback(
+        self, 
+        tools_section: str, 
+        semantic_context: Optional[str] = None
+    ) -> str:
+        """
+        Fallback system prompt if template loading fails.
+        
+        This preserves the original hardcoded prompt for backward compatibility.
+        """
         base_prompt = """Tu es FilAgent, un assistant IA spécialisé pour les propriétaires de PME québécoises.
 
 CONTEXTE:
@@ -250,10 +292,8 @@ IMPORTANT: Utilise les outils SEULEMENT quand nécessaire. Pour des questions g�
 
 Réponds toujours de manière professionnelle, concrète et utile pour un propriétaire de PME québécoise."""
         
-        tools_section = "\n".join(tool_descriptions)
-        prompt = base_prompt.format(tools=tools_section).strip()
+        prompt = base_prompt.format(tools=tools_section)
         
-        # Add semantic context if provided
         if semantic_context:
             prompt = f"{prompt}\n\n{semantic_context}"
         

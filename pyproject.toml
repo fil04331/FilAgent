@@ -51,6 +51,9 @@ dependencies = [
     "structlog>=23.2.0,<26",
     "prometheus-client>=0.19.0,<0.21",
     
+    # Template Engine
+    "jinja2>=3.1.0,<4",
+    
     # OpenTelemetry for distributed tracing
     "opentelemetry-api>=1.20.0,<2",
     "opentelemetry-sdk>=1.20.0,<2",
