@@ -1,0 +1,11 @@
+[
+  {
+    "targets": ["filagent-api:8000"],
+    "labels": {
+      "env": "docker",
+      "service": "filagent-api",
+      "job": "filagent",
+      "deployment": "docker-compose"
+    }
+  }
+]

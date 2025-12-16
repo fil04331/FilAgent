@@ -9,6 +9,7 @@ import json
 import re
 import hashlib
 import textwrap
+import time
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
@@ -23,6 +24,13 @@ from .middleware.logging import get_logger
 from .middleware.audittrail import get_dr_manager
 from .middleware.provenance import get_tracker
 from planner.compliance_guardian import ComplianceGuardian
+
+# Import metrics for observability
+try:
+    from runtime.metrics import get_agent_metrics
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
 
 # Import du planificateur HTN
 from planner import (
@@ -157,6 +165,12 @@ class Agent:
             self.context_builder = ContextBuilder()
         else:
             self.context_builder = context_builder
+        
+        # Initialize metrics collector
+        if METRICS_AVAILABLE:
+            self.metrics = get_agent_metrics()
+        else:
+            self.metrics = None
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
@@ -435,6 +449,9 @@ class Agent:
 
     def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
+        
+        # Track conversation start time
+        conversation_start_time = time.time()
 
         # Rafraîchir les middlewares patchables (important pour les tests)
         self._refresh_middlewares()
@@ -454,6 +471,15 @@ class Agent:
                 # En mode strict, propager l'erreur
                 cg_config = getattr(self.config, 'compliance_guardian', None)
                 if cg_config and cg_config.strict_mode:
+                    # Record failed conversation metric
+                    if self.metrics:
+                        conversation_duration = time.time() - conversation_start_time
+                        self.metrics.record_conversation(
+                            status="error",
+                            duration_seconds=conversation_duration,
+                            outcome="compliance_error",
+                            iterations=0
+                        )
                     raise
                 else:
                     print(f"⚠ Compliance validation warning: {e}")
@@ -528,12 +554,20 @@ class Agent:
             # REFACTORED: Use ContextBuilder for system prompt
             system_prompt = self.context_builder.build_system_prompt(self.tool_registry)
 
+            # Track generation start time for metrics
+            generation_start_time = time.time()
+            
             generation_result = self.model.generate(
                 prompt=full_prompt,
                 config=generation_config,
                 system_prompt=system_prompt,
             )
             end_time = datetime.now().isoformat()
+            
+            # Record generation duration metric
+            if self.metrics:
+                generation_duration = time.time() - generation_start_time
+                self.metrics.record_generation_duration(generation_duration)
 
             usage["prompt_tokens"] += generation_result.prompt_tokens
             usage["completion_tokens"] += generation_result.tokens_generated
@@ -661,6 +695,23 @@ class Agent:
             except Exception as e:
                 print(f"⚠ Failed to create decision record: {e}")
 
+        # Record conversation metrics
+        conversation_duration = time.time() - conversation_start_time
+        if self.metrics:
+            outcome = "max_iterations" if final_response and "trop longue" in final_response else "success"
+            status = "completed" if outcome == "success" else "timeout"
+            self.metrics.record_conversation(
+                status=status,
+                duration_seconds=conversation_duration,
+                outcome=outcome,
+                iterations=iterations
+            )
+            # Record token usage
+            self.metrics.record_tokens(
+                prompt_tokens=usage["prompt_tokens"],
+                completion_tokens=usage["completion_tokens"]
+            )
+        
         # COMPLIANCE: Auditer l'exécution et générer Decision Record
         if self.compliance_guardian:
             try:

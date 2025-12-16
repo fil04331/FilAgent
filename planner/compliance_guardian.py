@@ -12,11 +12,19 @@ Il valide les requêtes, les plans d'exécution et génère des enregistrements 
 
 import re
 import hashlib
+import time
 from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
 import yaml
+
+# Import metrics for observability
+try:
+    from runtime.metrics import get_agent_metrics
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
 
 
 __all__ = [
@@ -75,6 +83,12 @@ class ComplianceGuardian:
         self.config_path = config_path or "config/compliance_rules.yaml"
         self.rules = self._load_rules()
         self.audit_log: List[Dict[str, Any]] = []
+        
+        # Initialize metrics collector
+        if METRICS_AVAILABLE:
+            self.metrics = get_agent_metrics()
+        else:
+            self.metrics = None
         
     def _load_rules(self) -> Dict[str, Any]:
         """Charger les règles de conformité depuis le fichier YAML"""
@@ -135,6 +149,7 @@ class ComplianceGuardian:
         Raises:
             ComplianceError: Si la requête viole les règles de conformité
         """
+        start_time = time.time()
         context = context or {}
         validation_result = {
             'valid': True,
@@ -153,6 +168,14 @@ class ComplianceGuardian:
             validation_result['errors'].append(
                 f"Query exceeds maximum length of {max_length} characters"
             )
+            # Record rejection metric
+            if self.metrics:
+                user_id = context.get('user_id', 'anonymous')
+                self.metrics.record_compliance_rejection(
+                    reason="max_length_exceeded",
+                    risk_level="MEDIUM",
+                    user_id=user_id
+                )
         
         # Vérifier les patterns interdits
         forbidden_patterns = self.rules['validation']['forbidden_patterns']
@@ -167,14 +190,38 @@ class ComplianceGuardian:
                 validation_result['errors'].append(
                     f"Query contains forbidden pattern: {pattern}"
                 )
+                # Record rejection metric
+                if self.metrics:
+                    user_id = context.get('user_id', 'anonymous')
+                    self.metrics.record_compliance_rejection(
+                        reason="forbidden_pattern",
+                        risk_level="HIGH",
+                        user_id=user_id
+                    )
+                    # Record as suspicious pattern for security monitoring
+                    self.metrics.record_suspicious_pattern(
+                        pattern_type="forbidden_keyword",
+                        action_taken="blocked"
+                    )
         
         # Détecter les PII
         pii_patterns = self.rules['validation']['pii_patterns']
+        # Map patterns to their types for reliable categorization
+        pii_pattern_types = {
+            r'\b\d{3}-\d{2}-\d{4}\b': 'ssn',
+            r'\b[A-Z]{2}\d{6}\b': 'health_insurance',
+            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 'email',
+        }
+        
         pii_found = []
+        pii_types_detected = []
         for pattern in pii_patterns:
             matches = re.findall(pattern, query)
             if matches:
                 pii_found.extend(matches)
+                # Determine PII type using mapping
+                pii_type = pii_pattern_types.get(pattern, 'unknown')
+                pii_types_detected.append(pii_type)
         
         if pii_found:
             validation_result['warnings'].append(
@@ -182,6 +229,14 @@ class ComplianceGuardian:
             )
             validation_result['metadata']['pii_detected'] = True
             validation_result['metadata']['pii_count'] = len(pii_found)
+            
+            # Record PII detection metrics
+            if self.metrics:
+                for pii_type in set(pii_types_detected):
+                    self.metrics.record_pii_detection(
+                        pii_type=pii_type,
+                        action_taken="logged"
+                    )
         
         # Vérifier les champs requis dans le contexte
         required_fields = self.rules['validation'].get('required_fields', [])
@@ -200,6 +255,21 @@ class ComplianceGuardian:
                 'errors_count': len(validation_result['errors']),
                 'context': context,
             })
+        
+        # Record validation metrics
+        duration = time.time() - start_time
+        if self.metrics:
+            status = "rejected" if not validation_result['valid'] else (
+                "warning" if validation_result['warnings'] else "passed"
+            )
+            risk_level = "HIGH" if not validation_result['valid'] else (
+                "MEDIUM" if validation_result['warnings'] else "LOW"
+            )
+            self.metrics.record_compliance_validation(
+                status=status,
+                risk_level=risk_level,
+                duration_seconds=duration
+            )
         
         if not validation_result['valid']:
             raise ComplianceError(

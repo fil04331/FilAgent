@@ -1,0 +1,286 @@
+{
+  "dashboard": {
+    "title": "FilAgent Security & Observability",
+    "tags": ["filagent", "security", "compliance", "observability"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "rows": [
+      {
+        "collapse": false,
+        "height": 250,
+        "panels": [
+          {
+            "id": 1,
+            "title": "Compliance Rejections (Total)",
+            "type": "graph",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "sum(rate(filagent_compliance_rejection_total[5m])) by (reason, risk_level)",
+                "legendFormat": "{{reason}} ({{risk_level}})",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "reqps",
+                "label": "Rejections/sec"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Compliance Validation Status",
+            "type": "graph",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "sum(rate(filagent_compliance_validation_total[5m])) by (status, risk_level)",
+                "legendFormat": "{{status}} ({{risk_level}})",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": true,
+        "title": "Compliance Monitoring",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 250,
+        "panels": [
+          {
+            "id": 3,
+            "title": "Tool Execution Duration (p95)",
+            "type": "graph",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(filagent_tool_execution_seconds_bucket[5m])) by (tool_name, le))",
+                "legendFormat": "{{tool_name}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "s",
+                "label": "Duration"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Tool Execution Success Rate",
+            "type": "graph",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "sum(rate(filagent_tool_execution_total{status=\"success\"}[5m])) by (tool_name) / sum(rate(filagent_tool_execution_total[5m])) by (tool_name)",
+                "legendFormat": "{{tool_name}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "percentunit",
+                "label": "Success Rate",
+                "max": 1,
+                "min": 0
+              }
+            ]
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": true,
+        "title": "Tool Execution Metrics",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 250,
+        "panels": [
+          {
+            "id": 5,
+            "title": "Security - Suspicious Patterns Detected",
+            "type": "graph",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "sum(rate(filagent_security_suspicious_pattern_total[5m])) by (pattern_type, action_taken)",
+                "legendFormat": "{{pattern_type}} ({{action_taken}})",
+                "refId": "A"
+              }
+            ],
+            "alert": {
+              "conditions": [
+                {
+                  "evaluator": {
+                    "params": [0.1],
+                    "type": "gt"
+                  },
+                  "operator": {
+                    "type": "and"
+                  },
+                  "query": {
+                    "params": ["A", "5m", "now"]
+                  },
+                  "reducer": {
+                    "params": [],
+                    "type": "avg"
+                  },
+                  "type": "query"
+                }
+              ],
+              "frequency": "60s",
+              "handler": 1,
+              "name": "Suspicious Patterns Alert",
+              "noDataState": "no_data",
+              "notifications": []
+            }
+          },
+          {
+            "id": 6,
+            "title": "Security - PII Detection Events",
+            "type": "graph",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "sum(rate(filagent_security_pii_detected_total[5m])) by (pii_type, action_taken)",
+                "legendFormat": "{{pii_type}} ({{action_taken}})",
+                "refId": "A"
+              }
+            ]
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": true,
+        "title": "Security Monitoring",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 250,
+        "panels": [
+          {
+            "id": 7,
+            "title": "Conversation Duration (p95)",
+            "type": "graph",
+            "span": 4,
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(filagent_conversation_duration_seconds_bucket[5m])) by (outcome, le))",
+                "legendFormat": "{{outcome}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "s",
+                "label": "Duration"
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "title": "Active Conversations",
+            "type": "graph",
+            "span": 4,
+            "targets": [
+              {
+                "expr": "filagent_active_conversations",
+                "legendFormat": "Active",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 9,
+            "title": "Token Usage Rate",
+            "type": "graph",
+            "span": 4,
+            "targets": [
+              {
+                "expr": "sum(rate(filagent_tokens_total[5m])) by (token_type)",
+                "legendFormat": "{{token_type}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [
+              {
+                "format": "reqps",
+                "label": "Tokens/sec"
+              }
+            ]
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": true,
+        "title": "Agent Performance",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 150,
+        "panels": [
+          {
+            "id": 10,
+            "title": "Top Compliance Rejection Reasons",
+            "type": "table",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "topk(10, sum(increase(filagent_compliance_rejection_total[1h])) by (reason, risk_level))",
+                "format": "table",
+                "instant": true,
+                "refId": "A"
+              }
+            ],
+            "transform": "table"
+          },
+          {
+            "id": 11,
+            "title": "Tool Validation Failures",
+            "type": "table",
+            "span": 6,
+            "targets": [
+              {
+                "expr": "topk(10, sum(increase(filagent_tool_validation_failure_total[1h])) by (tool_name, error_type))",
+                "format": "table",
+                "instant": true,
+                "refId": "A"
+              }
+            ],
+            "transform": "table"
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": true,
+        "title": "Top Issues",
+        "titleSize": "h6"
+      }
+    ],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    }
+  },
+  "overwrite": true
+}
