@@ -452,4 +452,22 @@ def get_agent_metrics(enabled: bool = True) -> AgentMetrics:
 def reset_agent_metrics():
     """Reset agent metrics instance (useful for testing)."""
     global _agent_metrics_instance
+    
+    # Unregister all metrics from Prometheus registry if available
+    if PROMETHEUS_AVAILABLE and _agent_metrics_instance is not None:
+        try:
+            from prometheus_client import REGISTRY
+            # Get all collectors to unregister
+            collectors = list(REGISTRY._collector_to_names.keys())
+            for collector in collectors:
+                try:
+                    # Only unregister our metrics (those starting with filagent_)
+                    names = REGISTRY._collector_to_names.get(collector, set())
+                    if any(name.startswith('filagent_') for name in names):
+                        REGISTRY.unregister(collector)
+                except Exception:
+                    pass  # Ignore errors during cleanup
+        except Exception:
+            pass  # Ignore if registry cleanup fails
+    
     _agent_metrics_instance = None
