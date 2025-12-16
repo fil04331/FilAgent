@@ -94,6 +94,7 @@ ml = [
     "llama-cpp-python>=0.2.0,<0.3",
     "faiss-cpu>=1.8.0,<1.9",
     "sentence-transformers>=2.2.2,<3",
+    "chromadb>=0.4.0,<0.6",  # Alternative vector store backend
     "openai>=2.8.0",  # For Perplexity API (OpenAI-compatible) - aligned with main deps
 ]
 

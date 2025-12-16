@@ -30,9 +30,17 @@ memory:
     path: "memory/episodic/conversations.db"
     retention_days: 90
   semantic:
-    type: "faiss"
+    backend: "faiss"  # Options: "faiss" or "chromadb"
     path: "memory/semantic/index"
-    embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    embedding_model: "all-MiniLM-L6-v2"  # Default: 384 dimensions
+    # Alternative models:
+    # - "paraphrase-multilingual-mpnet-base-v2" (768 dimensions, multilingual)
+    # - "all-mpnet-base-v2" (768 dimensions, best quality)
+    # - "all-MiniLM-L12-v2" (384 dimensions, fast)
+    embedding_dim: 384  # Auto-detected if not specified
+    chunk_size: 500  # Tokens per chunk for document ingestion
+    chunk_overlap: 50  # Overlap between chunks
+    top_k_retrieval: 3  # Number of chunks to retrieve for context
     
 compliance:
   loi25:
