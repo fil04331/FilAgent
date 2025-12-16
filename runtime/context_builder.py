@@ -136,17 +136,67 @@ class ContextBuilder:
         serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     
+    def inject_semantic_context(
+        self,
+        query: str,
+        top_k: int = 3,
+        semantic_memory: Optional[Any] = None,
+    ) -> str:
+        """
+        Retrieve relevant context from semantic memory
+        
+        Args:
+            query: User query to search for relevant context
+            top_k: Number of relevant chunks to retrieve
+            semantic_memory: Optional SemanticMemory instance (uses global if None)
+            
+        Returns:
+            Formatted context string from semantic search
+        """
+        if semantic_memory is None:
+            try:
+                from memory.semantic import get_semantic_memory
+                semantic_memory = get_semantic_memory()
+            except Exception:
+                return ""  # Semantic memory not available
+        
+        try:
+            # Search for relevant documents
+            results = semantic_memory.similarity_search(query, k=top_k)
+            
+            if not results:
+                return ""
+            
+            # Format retrieved context
+            context_parts = ["[Contexte sémantique pertinent]"]
+            for i, result in enumerate(results, 1):
+                text = result.get("text", "")
+                score = result.get("score", 0.0)
+                source = result.get("metadata", {}).get("source", "unknown")
+                
+                context_parts.append(
+                    f"\n{i}. (Score: {score:.2f}, Source: {source})\n{text}"
+                )
+            
+            return "\n".join(context_parts)
+            
+        except Exception as e:
+            print(f"Warning: Could not retrieve semantic context: {e}")
+            return ""
+    
     def build_system_prompt(
         self,
         tool_registry: Any,
         domain_context: Optional[str] = None,
+        semantic_context: Optional[str] = None,
     ) -> str:
         """
-        Build system prompt with tool descriptions.
+        Build system prompt with tool descriptions and optional semantic context.
         
         Args:
             tool_registry: Registry of available tools
             domain_context: Optional domain-specific context
+            semantic_context: Optional semantic search results
             
         Returns:
             Complete system prompt
@@ -201,7 +251,13 @@ IMPORTANT: Utilise les outils SEULEMENT quand nécessaire. Pour des questions g�
 Réponds toujours de manière professionnelle, concrète et utile pour un propriétaire de PME québécoise."""
         
         tools_section = "\n".join(tool_descriptions)
-        return base_prompt.format(tools=tools_section).strip()
+        prompt = base_prompt.format(tools=tools_section).strip()
+        
+        # Add semantic context if provided
+        if semantic_context:
+            prompt = f"{prompt}\n\n{semantic_context}"
+        
+        return prompt
     
     def format_tool_results_for_context(
         self,
