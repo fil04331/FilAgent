@@ -84,7 +84,7 @@ OUTILS DISPONIBLES :
 {chr(10).join(tool_descriptions)}
 
 Format d'appel d'outil (JSON strict) :
-{"tool": "nom_outil", "arguments": {"param": "valeur"}}
+'{"tool": "nom_outil", "arguments": {"param": "valeur"}}'
 
 Si tu manques d'information sur un fichier, utilise `file_reader` pour le lire AVANT de répondre.
 Ne réponds jamais avec des suppositions. Vérifie le code source.
