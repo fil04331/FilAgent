@@ -7,7 +7,7 @@ Compatible avec le format OpenAI pour faciliter l'intégration
 from dotenv import load_dotenv
 load_dotenv()  # Load .env file at startup
 
-from fastapi import FastAPI, HTTPException, Path as FastAPIPath
+from fastapi import FastAPI, HTTPException, Path as FastAPIPath, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
@@ -20,6 +20,7 @@ import uuid
 from .config import get_config
 from .agent import get_agent
 from memory.episodic import get_messages, get_connection
+from memory.analytics import add_interaction_log, create_tables as create_analytics_tables, compute_hash
 from .middleware.logging import get_logger
 from .middleware.worm import get_worm_logger
 
@@ -51,6 +52,13 @@ app = FastAPI(
 
 # Configuration
 config = get_config()
+
+# Initialize analytics database tables
+try:
+    create_analytics_tables()
+    print("✅ Analytics database initialized")
+except Exception as e:
+    print(f"⚠️ Failed to initialize analytics database: {e}")
 
 # Initialize OpenTelemetry tracing
 if TELEMETRY_AVAILABLE:
@@ -116,6 +124,15 @@ class ChatResponse(BaseModel):
     model: str
     choices: List[dict]
     usage: dict
+
+
+class FeedbackRequest(BaseModel):
+    """Requête de feedback utilisateur"""
+    
+    score: int = Field(..., ge=1, le=5, description="Score de satisfaction (1-5)")
+    text: Optional[str] = Field(None, max_length=2000, description="Commentaire optionnel")
+    latency_ms: Optional[float] = Field(None, ge=0, description="Latence observée en ms")
+    tokens_used: Optional[int] = Field(None, ge=0, description="Tokens utilisés")
 
 
 def _load_manual_openapi_schema() -> dict:
@@ -321,6 +338,90 @@ async def get_conversation(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     return {"conversation_id": conversation_id, "messages": messages}
+
+
+@app.post("/api/v1/feedback/{conversation_id}")
+async def submit_feedback(
+    background_tasks: BackgroundTasks,
+    feedback: FeedbackRequest,
+    conversation_id: str = FastAPIPath(
+        ...,
+        max_length=128,
+        pattern=r'^[a-zA-Z0-9\-_]+$',
+        description="Identifiant unique de la conversation"
+    )
+):
+    """
+    Soumettre un feedback utilisateur pour une conversation.
+    
+    Le feedback est stocké de manière asynchrone pour ne pas ralentir la réponse.
+    Capture le score de satisfaction (1-5), commentaires optionnels,
+    et métriques de performance (latence, tokens).
+    """
+    # Validation supplémentaire du conversation_id
+    if not re.match(r'^[a-zA-Z0-9\-_]+$', conversation_id):
+        raise HTTPException(status_code=400, detail="Invalid conversation_id format")
+    
+    if len(conversation_id) > 128:
+        raise HTTPException(status_code=400, detail="conversation_id too long")
+    
+    # Vérifier que la conversation existe
+    messages = get_messages(conversation_id)
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Fonction pour stocker le feedback de manière asynchrone
+    def store_feedback():
+        try:
+            # Compute hashes from the last user message and assistant response
+            input_hash = None
+            output_hash = None
+            
+            # Find last user message and last assistant message
+            user_messages = [msg for msg in messages if msg['role'] == 'user']
+            assistant_messages = [msg for msg in messages if msg['role'] == 'assistant']
+            
+            if user_messages:
+                input_hash = compute_hash(user_messages[-1]['content'])
+            
+            if assistant_messages:
+                output_hash = compute_hash(assistant_messages[-1]['content'])
+            
+            # Store the feedback
+            add_interaction_log(
+                conversation_id=conversation_id,
+                user_feedback_score=feedback.score,
+                user_feedback_text=feedback.text,
+                input_hash=input_hash,
+                output_hash=output_hash,
+                latency_ms=feedback.latency_ms,
+                tokens_used=feedback.tokens_used,
+                metadata={
+                    "submitted_at": datetime.now().isoformat(),
+                    "message_count": len(messages)
+                }
+            )
+        except Exception as e:
+            # Log error but don't fail the request
+            logger = None
+            try:
+                logger = get_logger()
+            except Exception:
+                pass
+            if logger:
+                logger.error(f"Failed to store feedback: {e}", exc_info=True)
+            else:
+                print(f"Failed to store feedback: {e}")
+    
+    # Add the storage task to background tasks
+    background_tasks.add_task(store_feedback)
+    
+    return {
+        "status": "success",
+        "message": "Feedback received and will be processed",
+        "conversation_id": conversation_id,
+        "feedback_score": feedback.score
+    }
 
 
 @app.get("/metrics")

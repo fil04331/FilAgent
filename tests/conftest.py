@@ -339,6 +339,43 @@ def temp_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope="function")
+def temp_analytics_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
+    """
+    Fixture pour une base de données analytics SQLite temporaire isolée
+    
+    Automatically patches memory.analytics.DB_PATH for complete isolation.
+    
+    Scope: function (new database per test)
+    
+    Args:
+        tmp_path: pytest's temporary directory fixture
+        monkeypatch: pytest's monkeypatch fixture for patching
+    
+    Returns:
+        Path: Chemin vers la base de données analytics temporaire
+        
+    Example:
+        def test_analytics(temp_analytics_db):
+            # Database is isolated and cleaned up automatically
+            conn = sqlite3.connect(str(temp_analytics_db))
+            # ... test code ...
+    """
+    db_path = tmp_path / "test_analytics.db"
+
+    # Patch the DB_PATH in memory.analytics module for complete isolation
+    import memory.analytics
+    monkeypatch.setattr(memory.analytics, 'DB_PATH', db_path)
+
+    # Create tables using the analytics module's function
+    from memory.analytics import create_tables
+    create_tables()
+
+    yield db_path
+
+    # Cleanup (automatique avec tmp_path + monkeypatch reverts DB_PATH)
+
+
+@pytest.fixture(scope="function")
 def temp_faiss(tmp_path) -> Generator[Path, None, None]:
     """
     Fixture pour un index FAISS temporaire isolé
