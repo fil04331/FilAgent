@@ -109,7 +109,7 @@ def interactive_session():
         print("\n✅ Agent prêt. Posez vos questions sur le dépôt (ex: 'Analyse runtime/agent.py', 'Génère un test pour...').")
         print("Tapez 'exit' ou 'quit' pour quitter.\n")
 
-        conversation_id = "repo_session_cli"
+        conversation_id = f"repo_session_cli_{uuid.uuid4()}"
 
         while True:
             try:
