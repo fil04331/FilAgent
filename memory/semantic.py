@@ -213,9 +213,10 @@ class FAISSVectorStore(VectorStore):
             return []
         
         # Generate IDs if not provided
+        # Use 16 chars (64 bits) to minimize collision risk for large collections
         if ids is None:
             ids = [
-                f"doc:{hashlib.sha256(text.encode()).hexdigest()[:12]}"
+                f"doc:{hashlib.sha256(text.encode()).hexdigest()[:16]}"
                 for text in texts
             ]
         
@@ -536,9 +537,10 @@ class ChromaDBVectorStore(VectorStore):
             return []
         
         # Generate IDs if not provided
+        # Use 16 chars (64 bits) to minimize collision risk for large collections
         if ids is None:
             ids = [
-                f"doc:{hashlib.sha256(text.encode()).hexdigest()[:12]}"
+                f"doc:{hashlib.sha256(text.encode()).hexdigest()[:16]}"
                 for text in texts
             ]
         

@@ -58,6 +58,13 @@ class DocumentChunker:
             
         Returns:
             Estimated token count (~1 token per 4 characters)
+            
+        Note:
+            This is a fast approximation that works reasonably well for
+            English and French text (~1 token per 4 chars). For production
+            use with other languages or precise token counting, consider
+            using the actual tokenizer (e.g., tiktoken for OpenAI models).
+            Trade-off: Speed vs. accuracy.
         """
         # Simple heuristic: ~1 token per 4 characters for English/French
         # More accurate would use actual tokenizer, but this is fast
@@ -191,7 +198,11 @@ class DocumentChunker:
         
         metadata = metadata or {}
         
-        # Split into sentences (simple regex, can be improved with spaCy/NLTK)
+        # Split into sentences using simple regex
+        # Note: This may not handle all edge cases (abbreviations like "Dr.",
+        # "Inc.", decimal numbers, etc.). For production use with complex text,
+        # consider using spaCy (spacy.load('en_core_web_sm').pipe()) or
+        # NLTK (nltk.sent_tokenize()) for more robust sentence detection.
         sentences = re.split(r'(?<=[.!?])\s+', text)
         
         chunks = []
