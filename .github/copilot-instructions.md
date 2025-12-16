@@ -54,7 +54,10 @@ python runtime/server.py
 # Install test dependencies if not already installed
 pip install -r requirements.txt
 
-# Run all tests
+# Run all tests (using PDM - recommended)
+pdm run pytest
+
+# Fallback: Run tests directly with pytest
 python -m pytest
 
 # Run specific test categories
