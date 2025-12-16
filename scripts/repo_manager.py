@@ -12,7 +12,7 @@ import logging
 # Configuration des chemins pour garantir l'import des modules runtime
 # Assumes script is in scripts/ or root
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir) if current_dir.endswith("scripts") else current_dir
+project_root = os.path.dirname(current_dir) if os.path.basename(current_dir) == "scripts" else current_dir
 
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
