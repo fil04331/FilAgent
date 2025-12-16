@@ -1,0 +1,19 @@
+# Minimal Python 3.12 sandbox environment for isolated code execution
+# Security hardening: non-root user, minimal attack surface
+
+FROM python:3.12-slim
+
+# Create non-root user for code execution
+RUN groupadd -r sandbox && useradd -r -g sandbox sandbox
+
+# Create workspace directory
+RUN mkdir -p /workspace && chown sandbox:sandbox /workspace
+
+# Set working directory
+WORKDIR /workspace
+
+# Switch to non-root user
+USER sandbox
+
+# Default command: execute Python file passed as argument
+CMD ["python3"]

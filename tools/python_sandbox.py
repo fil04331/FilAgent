@@ -1,44 +1,77 @@
 """
-Sandbox Python pour exécution sûre de code Python
-Limites CPU, mémoire, et filesystem
+Sandbox Python pour exécution sûre de code Python dans un conteneur Docker isolé
+Limites CPU, mémoire, réseau et filesystem
+Zero Trust: tout code est considéré comme potentiellement malveillant
 """
 
-import subprocess
 import tempfile
 import os
 import time
 import ast
-import sys
+from pathlib import Path
 from typing import Dict, Any, Optional, List
+import logging
 
 from .base import BaseTool, ToolResult, ToolStatus
 
-# Import resource module for Unix systems
+# Import Docker SDK
 try:
-    import resource
-    RESOURCE_AVAILABLE = True
+    import docker
+    from docker.errors import DockerException, ContainerError, ImageNotFound, APIError
+    DOCKER_AVAILABLE = True
 except ImportError:
-    RESOURCE_AVAILABLE = False
+    DOCKER_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class PythonSandboxTool(BaseTool):
     """
-    Outil pour exécuter du code Python en sandbox
-    Limites : CPU, mémoire, timeout
+    Outil pour exécuter du code Python en sandbox Docker isolé
+    
+    Principes de sécurité Zero Trust:
+    - Conteneur éphémère détruit après exécution
+    - User non-root (nobody:nogroup / 65534:65534)
+    - Réseau désactivé (network_mode='none')
+    - Limites strictes: 512MB RAM, 0.5 CPU
+    - Timeout 5 secondes
+    - Pas d'accès au système hôte (volume temporaire read-only uniquement)
+    - Filesystem read-only avec petit tmpfs
+    - Toutes les Linux capabilities retirées
+    - Pas d'escalade de privilèges
+    - Double validation: AST parsing + Docker isolation
     """
 
-    def __init__(self, dangerous_patterns: Optional[List[str]] = None):
+    def __init__(self, dangerous_patterns: Optional[List[str]] = None, docker_image: str = "python:3.12-slim"):
         super().__init__(
-            name="python_sandbox", description="Exécuter du code Python de manière sécurisée dans un sandbox"
+            name="python_sandbox", 
+            description="Exécuter du code Python de manière sécurisée dans un conteneur Docker isolé"
         )
-        # Limites de ressources
+        
+        # Configuration Docker
+        self.docker_image = docker_image
         self.max_memory_mb = 512
-        self.max_cpu_time = 30  # secondes
-        self.timeout = 30  # secondes total
-
-        # Patterns dangereux configurables
+        self.cpu_quota = 50000  # 0.5 CPU (50% d'un core)
+        self.cpu_period = 100000  # Période standard
+        self.timeout = 5  # secondes (réduit à 5s pour sécurité)
+        
+        # Vérifier disponibilité Docker
+        if not DOCKER_AVAILABLE:
+            logger.error("Docker SDK not available. Install with: pip install docker")
+            raise RuntimeError("Docker SDK is required for PythonSandboxTool")
+        
+        # Initialiser le client Docker
+        try:
+            self.docker_client = docker.from_env()
+            # Vérifier que Docker daemon est accessible
+            self.docker_client.ping()
+        except DockerException as e:
+            logger.error(f"Failed to connect to Docker daemon: {e}")
+            raise RuntimeError(f"Docker daemon not accessible: {e}")
+        
+        # Patterns dangereux configurables (pour double validation)
         if dangerous_patterns is None:
-            self.dangerous_patterns = [
+            patterns = [
                 "__import__",
                 "eval(",
                 "exec(",
@@ -49,121 +82,219 @@ class PythonSandboxTool(BaseTool):
                 "subprocess",
                 "pickle",
             ]
+            # Pre-compute lowercased patterns for performance
+            self.dangerous_patterns = patterns
+            self.dangerous_patterns_lower = [p.lower() for p in patterns]
         else:
             self.dangerous_patterns = dangerous_patterns
+            self.dangerous_patterns_lower = [p.lower() for p in dangerous_patterns]
+        
+        # Essayer de pull l'image si nécessaire
+        self._ensure_docker_image()
 
-    def _set_resource_limits(self):
+    def _ensure_docker_image(self):
         """
-        Définir les limites de ressources pour le processus sandbox
-        Appelé via preexec_fn dans subprocess (Unix uniquement)
+        S'assurer que l'image Docker est disponible localement
+        Pull l'image si nécessaire
         """
-        if not RESOURCE_AVAILABLE:
-            return
-
         try:
-            # Limite CPU time (secondes)
-            resource.setrlimit(resource.RLIMIT_CPU, (self.max_cpu_time, self.max_cpu_time))
-
-            # Limite mémoire (bytes)
-            max_memory_bytes = self.max_memory_mb * 1024 * 1024
-            resource.setrlimit(resource.RLIMIT_AS, (max_memory_bytes, max_memory_bytes))
-
-            # Limite nombre de processus/threads (empêcher fork bombs)
-            resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
-
-            # Limite taille de fichier (empêcher création de gros fichiers)
-            resource.setrlimit(resource.RLIMIT_FSIZE, (10 * 1024 * 1024, 10 * 1024 * 1024))  # 10 MB
-
-            # Limite nombre de fichiers ouverts
-            resource.setrlimit(resource.RLIMIT_NOFILE, (10, 10))
-        except Exception as e:
-            # Si les limites échouent, on continue mais on log
-            print(f"Warning: Failed to set resource limits: {e}")
+            self.docker_client.images.get(self.docker_image)
+            logger.info(f"Docker image {self.docker_image} already available")
+        except ImageNotFound:
+            logger.info(f"Pulling Docker image {self.docker_image}...")
+            try:
+                self.docker_client.images.pull(self.docker_image)
+                logger.info(f"Successfully pulled {self.docker_image}")
+            except DockerException as e:
+                logger.error(f"Failed to pull Docker image: {e}")
+                raise RuntimeError(f"Cannot pull Docker image {self.docker_image}: {e}")
 
     def execute(self, arguments: Dict[str, Any]) -> ToolResult:
-        """Exécuter le code Python"""
+        """
+        Exécuter le code Python dans un conteneur Docker isolé
+        
+        Sécurité Zero Trust:
+        - Conteneur éphémère créé et détruit pour chaque exécution
+        - User non-root
+        - Pas de réseau
+        - Limites strictes CPU/RAM
+        - Timeout 5s
+        """
         # Valider les arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}")
 
         code = arguments["code"]
-
+        
+        # Créer un répertoire temporaire pour l'exécution
+        temp_dir = None
+        container = None
+        
         try:
-            # Créer un fichier temporaire
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-                f.write(code)
-                temp_file = f.name
-
+            temp_dir = tempfile.mkdtemp(prefix="sandbox_")
+            code_file = Path(temp_dir) / "code.py"
+            
+            # Écrire le code dans le fichier
+            code_file.write_text(code)
+            
+            # Rendre le fichier lisible par tous (nécessaire pour l'user nobody)
+            os.chmod(code_file, 0o644)
+            os.chmod(temp_dir, 0o755)
+            
+            # Mesurer le temps d'exécution
+            start_time = time.time()
+            
+            # Configuration du conteneur Docker
+            container_config = {
+                "image": self.docker_image,
+                "command": ["python3", "/workspace/code.py"],
+                "volumes": {
+                    temp_dir: {
+                        "bind": "/workspace",
+                        "mode": "ro"  # Read-only pour éviter modifications
+                    }
+                },
+                "working_dir": "/workspace",
+                "network_mode": "none",  # Pas de réseau
+                "mem_limit": f"{self.max_memory_mb}m",  # Limite RAM
+                "cpu_quota": self.cpu_quota,  # Limite CPU
+                "cpu_period": self.cpu_period,
+                "detach": True,  # Detached mode for manual wait control
+                "user": "65534:65534",  # User non-root (nobody:nogroup)
+                "environment": {
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTHONUNBUFFERED": "1"
+                },
+                # Restrictions supplémentaires
+                "cap_drop": ["ALL"],  # Retirer toutes les capabilities
+                "security_opt": ["no-new-privileges"],  # Empêcher escalade de privilèges
+                "read_only": True,  # Filesystem read-only
+                "tmpfs": {"/tmp": "size=10m,mode=1777"}  # Petit tmpfs pour /tmp si besoin
+            }
+            
             try:
-                # Exécuter avec timeout et limites de ressources
-                start_time = time.time()
-
-                # Préparer l'environnement sécurisé
-                env = os.environ.copy()
-                env['PYTHONDONTWRITEBYTECODE'] = '1'  # Pas de fichiers .pyc
-
-                # Exécuter avec limites de ressources (Unix) ou simple timeout (Windows)
-                if RESOURCE_AVAILABLE and sys.platform != 'win32':
-                    result = subprocess.run(
-                        ["python3", temp_file],
-                        capture_output=True,
-                        text=True,
-                        timeout=self.timeout,
-                        cwd=os.path.dirname(temp_file),
-                        env=env,
-                        preexec_fn=self._set_resource_limits,  # Appliquer limites CPU/mémoire
-                    )
-                else:
-                    # Windows ou resource non disponible - seulement timeout
-                    result = subprocess.run(
-                        ["python3", temp_file],
-                        capture_output=True,
-                        text=True,
-                        timeout=self.timeout,
-                        cwd=os.path.dirname(temp_file),
-                        env=env,
-                    )
-
-                elapsed_time = time.time() - start_time
-
-                # Vérifier le résultat
-                if result.returncode == 0:
-                    output = result.stdout
-                    if not output:
-                        output = "[Code exécuté avec succès, pas de sortie]"
-
-                    return ToolResult(
-                        status=ToolStatus.SUCCESS,
-                        output=output,
-                        metadata={"returncode": result.returncode, "elapsed_time": elapsed_time, "timeout": False},
-                    )
-                else:
-                    return ToolResult(
-                        status=ToolStatus.ERROR,
-                        output="",
-                        error=f"Execution failed: {result.stderr}",
-                        metadata={"returncode": result.returncode, "stderr": result.stderr},
-                    )
-
-            except subprocess.TimeoutExpired:
-                return ToolResult(
-                    status=ToolStatus.TIMEOUT,
-                    output="",
-                    error=f"Execution timeout after {self.timeout}s",
-                    metadata={"timeout": True},
-                )
-            except Exception as e:
-                return ToolResult(status=ToolStatus.ERROR, output="", error=f"Execution error: {str(e)}")
-            finally:
-                # Nettoyer le fichier temporaire
+                # Créer et démarrer le conteneur en mode détaché pour contrôle manuel
+                container = self.docker_client.containers.run(**container_config)
+                
+                # Attendre que le conteneur se termine avec un timeout
                 try:
-                    os.unlink(temp_file)
-                except Exception:
-                    pass
-
+                    exit_code = container.wait(timeout=self.timeout)
+                    
+                    # Récupérer les logs
+                    output = container.logs().decode('utf-8')
+                    
+                    elapsed_time = time.time() - start_time
+                    
+                    # Nettoyer le conteneur
+                    try:
+                        container.remove(force=True)
+                    except Exception:
+                        pass
+                    
+                    # Extraire le code de sortie (Docker SDK retourne un dict avec 'StatusCode')
+                    if isinstance(exit_code, dict):
+                        status_code = exit_code.get('StatusCode', 0)
+                    elif isinstance(exit_code, int):
+                        status_code = exit_code
+                    else:
+                        status_code = 0
+                    
+                    if status_code == 0:
+                        # Succès
+                        if not output.strip():
+                            output = "[Code exécuté avec succès, pas de sortie]"
+                        
+                        return ToolResult(
+                            status=ToolStatus.SUCCESS,
+                            output=output,
+                            metadata={
+                                "elapsed_time": elapsed_time,
+                                "timeout": False,
+                                "isolation": "docker",
+                                "memory_limit_mb": self.max_memory_mb
+                            }
+                        )
+                    else:
+                        # Erreur d'exécution
+                        return ToolResult(
+                            status=ToolStatus.ERROR,
+                            output="",
+                            error=f"Container execution failed: {output}",
+                            metadata={
+                                "exit_code": status_code,
+                                "elapsed_time": elapsed_time
+                            }
+                        )
+                        
+                except Exception as wait_error:
+                    # Timeout ou erreur durant l'attente
+                    elapsed_time = time.time() - start_time
+                    
+                    # Arrêter et supprimer le conteneur
+                    try:
+                        container.stop(timeout=1)
+                        container.remove(force=True)
+                    except Exception:
+                        pass
+                    
+                    # Vérifier si c'est un timeout
+                    if "timeout" in str(wait_error).lower() or elapsed_time >= self.timeout:
+                        return ToolResult(
+                            status=ToolStatus.TIMEOUT,
+                            output="",
+                            error=f"Execution timeout after {self.timeout}s",
+                            metadata={"timeout": True, "elapsed_time": elapsed_time}
+                        )
+                    else:
+                        return ToolResult(
+                            status=ToolStatus.ERROR,
+                            output="",
+                            error=f"Container wait error: {str(wait_error)}",
+                            metadata={"elapsed_time": elapsed_time}
+                        )
+                
+            except ContainerError as e:
+                # Erreur d'exécution dans le conteneur
+                elapsed_time = time.time() - start_time
+                stderr = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
+                
+                return ToolResult(
+                    status=ToolStatus.ERROR,
+                    output="",
+                    error=f"Container execution failed: {stderr}",
+                    metadata={
+                        "exit_code": e.exit_status,
+                        "elapsed_time": elapsed_time
+                    }
+                )
+            
+            except Exception as e:
+                # Autre erreur Docker
+                elapsed_time = time.time() - start_time
+                
+                return ToolResult(
+                    status=ToolStatus.ERROR,
+                    output="",
+                    error=f"Docker execution error: {str(e)}",
+                    metadata={"elapsed_time": elapsed_time}
+                )
+        
         except Exception as e:
-            return ToolResult(status=ToolStatus.ERROR, output="", error=f"Failed to execute Python code: {str(e)}")
+            return ToolResult(
+                status=ToolStatus.ERROR,
+                output="",
+                error=f"Failed to execute Python code: {str(e)}"
+            )
+        
+        finally:
+            # Nettoyer le répertoire temporaire
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temp directory {temp_dir}: {e}")
 
     def _validate_ast(self, code: str) -> tuple[bool, Optional[str]]:
         """
@@ -246,8 +377,8 @@ class PythonSandboxTool(BaseTool):
 
         # Bloquer certaines opérations dangereuses (double vérification)
         code_lower = arguments["code"].lower()
-        for pattern in self.dangerous_patterns:
-            if pattern.lower() in code_lower:
+        for pattern, pattern_lower in zip(self.dangerous_patterns, self.dangerous_patterns_lower):
+            if pattern_lower in code_lower:
                 return False, f"Blocked dangerous operation: {pattern}"
 
         return True, None

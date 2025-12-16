@@ -63,6 +63,9 @@ dependencies = [
     # HTTP clients & integration
     "requests>=2.32.4,<3",  # Security: CVE-2024-47081 (.netrc credentials leak)
 
+    # Container isolation for sandbox execution
+    "docker>=7.0.0,<8",  # Docker SDK for Python - isolated code execution
+
     # Data handling - Updated for Python 3.14 compatibility
     "pandas>=2.3.3,<3",
     "pyarrow>=17.0.0",  # Version 17+ has Python 3.14 support
