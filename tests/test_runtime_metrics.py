@@ -53,10 +53,10 @@ class TestAgentMetricsInitialization:
     
     def test_singleton_pattern(self):
         """Test get_agent_metrics returns singleton."""
-        from runtime.metrics import get_agent_metrics, reset_agent_metrics, _agent_metrics_instance
+        from runtime.metrics import get_agent_metrics, reset_agent_metrics
         
-        # Get current instance (if any)
-        current = _agent_metrics_instance
+        # Reset to ensure clean state
+        reset_agent_metrics()
         
         # Get two instances
         metrics1 = get_agent_metrics()

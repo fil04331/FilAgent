@@ -206,21 +206,22 @@ class ComplianceGuardian:
         
         # Détecter les PII
         pii_patterns = self.rules['validation']['pii_patterns']
+        # Map patterns to their types for reliable categorization
+        pii_pattern_types = {
+            r'\b\d{3}-\d{2}-\d{4}\b': 'ssn',
+            r'\b[A-Z]{2}\d{6}\b': 'health_insurance',
+            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 'email',
+        }
+        
         pii_found = []
         pii_types_detected = []
         for pattern in pii_patterns:
             matches = re.findall(pattern, query)
             if matches:
                 pii_found.extend(matches)
-                # Determine PII type from pattern
-                if r'\d{3}-\d{2}-\d{4}' in pattern:
-                    pii_types_detected.append('ssn')
-                elif r'[A-Z]{2}\d{6}' in pattern:
-                    pii_types_detected.append('health_insurance')
-                elif r'@' in pattern:
-                    pii_types_detected.append('email')
-                else:
-                    pii_types_detected.append('unknown')
+                # Determine PII type using mapping
+                pii_type = pii_pattern_types.get(pattern, 'unknown')
+                pii_types_detected.append(pii_type)
         
         if pii_found:
             validation_result['warnings'].append(

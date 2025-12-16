@@ -399,7 +399,8 @@ Security benefits far outweigh minimal performance cost.
 - [Prometheus Security Best Practices](https://prometheus.io/docs/operating/security/)
 - [Loi 25 Requirements](https://www.quebec.ca/en/government/policy/digital/data-protection)
 - [GDPR Article 32 - Security](https://gdpr-info.eu/art-32-gdpr/)
-- [EU AI Act Security Requirements](https://artificialintelligenceact.eu/)
+- [EU AI Act (Unofficial Resource)](https://artificialintelligenceact.eu/)
+- [Official EU AI Act Text](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52021PC0206)
 
 ## Change Log
 

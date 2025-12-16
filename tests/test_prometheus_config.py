@@ -172,12 +172,15 @@ class TestTargetGenerationScript:
         assert script_file.exists()
     
     def test_script_is_executable(self, scripts_dir):
-        """Test script has proper permissions."""
+        """Test script has proper shebang for execution."""
         script_file = scripts_dir / "generate_prometheus_targets.py"
         
-        # On Unix, check if file is executable
+        # On Unix, check if file is executable OR has shebang (both are acceptable)
         if os.name != 'nt':  # Not Windows
-            assert os.access(script_file, os.X_OK) or script_file.read_text().startswith('#!/usr/bin/env')
+            is_executable = os.access(script_file, os.X_OK)
+            has_shebang = script_file.read_text().startswith('#!/usr/bin/env')
+            # File should have shebang for proper execution (permission is optional)
+            assert has_shebang, "Script should have shebang for execution"
     
     def test_script_runs_without_errors(self, scripts_dir, tmp_path):
         """Test script executes successfully."""

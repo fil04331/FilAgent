@@ -165,6 +165,12 @@ class Agent:
             self.context_builder = ContextBuilder()
         else:
             self.context_builder = context_builder
+        
+        # Initialize metrics collector
+        if METRICS_AVAILABLE:
+            self.metrics = get_agent_metrics()
+        else:
+            self.metrics = None
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()

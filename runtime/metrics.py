@@ -450,14 +450,24 @@ def get_agent_metrics(enabled: bool = True) -> AgentMetrics:
 
 
 def reset_agent_metrics():
-    """Reset agent metrics instance (useful for testing)."""
+    """
+    Reset agent metrics instance (useful for testing).
+    
+    WARNING: This function accesses private attributes of prometheus_client.
+    It should only be used in test environments. The implementation may need
+    updates if prometheus_client changes its internal structure.
+    
+    Tested with prometheus_client >= 0.19.0, < 0.21
+    """
     global _agent_metrics_instance
     
     # Unregister all metrics from Prometheus registry if available
     if PROMETHEUS_AVAILABLE and _agent_metrics_instance is not None:
         try:
             from prometheus_client import REGISTRY
-            # Get all collectors to unregister
+            # NOTE: Accessing private attribute _collector_to_names
+            # This is fragile but necessary for test cleanup
+            # Alternative: Use separate CollectorRegistry per test
             collectors = list(REGISTRY._collector_to_names.keys())
             for collector in collectors:
                 try:
