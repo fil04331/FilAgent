@@ -24,6 +24,13 @@ from pydantic import BaseModel, Field, ValidationError
 from tools.base import BaseTool, ToolResult, ToolStatus
 from tools.registry import ToolRegistry
 
+# Import metrics for observability
+try:
+    from runtime.metrics import get_agent_metrics
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
+
 
 class ToolCall(BaseModel):
     """
@@ -81,6 +88,12 @@ class ToolExecutor:
         self.tool_registry = tool_registry
         self.logger = logger
         self.tracker = tracker
+        
+        # Initialize metrics collector
+        if METRICS_AVAILABLE:
+            self.metrics = get_agent_metrics()
+        else:
+            self.metrics = None
     
     def validate_tool_call(self, tool_call: ToolCall) -> tuple[bool, Optional[str]]:
         """
@@ -100,6 +113,22 @@ class ToolExecutor:
         # Validate arguments using tool's validation method
         is_valid, error_msg = tool.validate_arguments(tool_call.arguments)
         if not is_valid:
+            # Record validation failure metric
+            if self.metrics:
+                # Categorize error type from message
+                error_type = "invalid_type"
+                if "missing" in error_msg.lower():
+                    error_type = "missing_argument"
+                elif "type" in error_msg.lower():
+                    error_type = "invalid_type"
+                elif "value" in error_msg.lower():
+                    error_type = "invalid_value"
+                
+                self.metrics.record_tool_validation_failure(
+                    tool_name=tool_call.tool,
+                    error_type=error_type
+                )
+            
             return False, f"Invalid arguments for '{tool_call.tool}': {error_msg}"
         
         return True, None
@@ -128,6 +157,15 @@ class ToolExecutor:
         is_valid, error_msg = self.validate_tool_call(tool_call)
         if not is_valid:
             end_time_iso = datetime.now().isoformat()
+            
+            # Record validation failure metric
+            if self.metrics:
+                self.metrics.record_tool_execution(
+                    tool_name=tool_call.tool,
+                    duration_seconds=0.0,
+                    status="validation_error"
+                )
+            
             return ToolExecutionResult(
                 tool_name=tool_call.tool,
                 status=ToolStatus.ERROR,
@@ -185,6 +223,15 @@ class ToolExecutor:
                 )
             except Exception as e:
                 print(f"⚠ Failed to track tool execution for '{tool_call.tool}': {e}")
+        
+        # Record execution metrics
+        if self.metrics:
+            status = "success" if result.is_success() else "error"
+            self.metrics.record_tool_execution(
+                tool_name=tool_call.tool,
+                duration_seconds=duration_ms / 1000.0,  # Convert to seconds
+                status=status
+            )
         
         return ToolExecutionResult(
             tool_name=tool_call.tool,

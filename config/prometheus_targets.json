@@ -1,0 +1,10 @@
+[
+  {
+    "targets": ["localhost:8000"],
+    "labels": {
+      "env": "development",
+      "service": "filagent-api",
+      "job": "filagent"
+    }
+  }
+]

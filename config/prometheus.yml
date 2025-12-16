@@ -3,7 +3,54 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
+  # FilAgent API monitoring
+  # For local development: Uses localhost:8000
+  # For Docker: Override with file_sd_configs or use Docker DNS (filagent-api:8000)
+  # For K8s: Use kubernetes_sd_configs below
   - job_name: 'filagent'
+    # File-based service discovery (recommended for Docker/K8s)
+    # This allows dynamic target configuration without restarting Prometheus
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/targets/filagent.json'
+        refresh_interval: 30s
+    
+    # Fallback to static config for local development
     static_configs:
       - targets: ['localhost:8000']
+        labels:
+          env: 'development'
+          service: 'filagent-api'
+    
     metrics_path: '/metrics'
+    
+    # Relabeling for additional metadata
+    relabel_configs:
+      # Keep only targets with valid endpoints
+      - source_labels: [__address__]
+        regex: '(.+)'
+        target_label: instance
+        replacement: '$1'
+      
+      # Add environment label from job
+      - source_labels: [env]
+        target_label: environment
+        regex: '(.*)'
+        replacement: '$1'
+
+  # Alternative configuration for Kubernetes environments
+  # Uncomment and configure based on your K8s setup
+  # - job_name: 'filagent-k8s'
+  #   kubernetes_sd_configs:
+  #     - role: pod
+  #       namespaces:
+  #         names:
+  #           - filagent
+  #   relabel_configs:
+  #     - source_labels: [__meta_kubernetes_pod_label_app]
+  #       action: keep
+  #       regex: filagent
+  #     - source_labels: [__meta_kubernetes_pod_name]
+  #       target_label: pod
+  #     - source_labels: [__meta_kubernetes_namespace]
+  #       target_label: namespace
