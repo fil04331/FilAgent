@@ -20,7 +20,7 @@ import uuid
 from .config import get_config
 from .agent import get_agent
 from memory.episodic import get_messages, get_connection
-from memory.analytics import add_interaction_log, create_tables as create_analytics_tables
+from memory.analytics import add_interaction_log, create_tables as create_analytics_tables, compute_hash
 from .middleware.logging import get_logger
 from .middleware.worm import get_worm_logger
 
@@ -382,11 +382,9 @@ async def submit_feedback(
             assistant_messages = [msg for msg in messages if msg['role'] == 'assistant']
             
             if user_messages:
-                from memory.analytics import compute_hash
                 input_hash = compute_hash(user_messages[-1]['content'])
             
             if assistant_messages:
-                from memory.analytics import compute_hash
                 output_hash = compute_hash(assistant_messages[-1]['content'])
             
             # Store the feedback
