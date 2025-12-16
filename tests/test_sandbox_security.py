@@ -113,7 +113,7 @@ class TestSandboxSecurity:
     
     def test_timeout_enforcement(self, sandbox_tool):
         """Test que le timeout (5s) est appliqué"""
-        # Code qui prend plus de 5 secondes
+        # Code qui prend plus de 5 secondes (time module n'est pas bloqué)
         slow_code = """
 import time
 time.sleep(10)
@@ -122,14 +122,9 @@ print("Should not reach here")
         
         result = sandbox_tool.execute({"code": slow_code})
         
-        # Devrait timeout ou être bloqué
-        # Note: time.sleep n'est pas dans la liste de blocage AST,
-        # donc il devrait timeout au niveau Docker
-        # Cependant, "import time" n'est pas dans dangerous_modules
-        # donc le code devrait s'exécuter jusqu'au timeout
-        assert result.status in [ToolStatus.TIMEOUT, ToolStatus.ERROR]
-        if result.status == ToolStatus.TIMEOUT:
-            assert result.metadata.get("timeout") is True
+        # Le timeout Docker devrait tuer le conteneur
+        assert result.status == ToolStatus.TIMEOUT
+        assert result.metadata.get("timeout") is True
     
     def test_network_isolation(self, sandbox_tool):
         """Test que le réseau est isolé (network_mode='none')"""

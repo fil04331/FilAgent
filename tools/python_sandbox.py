@@ -71,7 +71,7 @@ class PythonSandboxTool(BaseTool):
         
         # Patterns dangereux configurables (pour double validation)
         if dangerous_patterns is None:
-            self.dangerous_patterns = [
+            patterns = [
                 "__import__",
                 "eval(",
                 "exec(",
@@ -82,8 +82,12 @@ class PythonSandboxTool(BaseTool):
                 "subprocess",
                 "pickle",
             ]
+            # Pre-compute lowercased patterns for performance
+            self.dangerous_patterns = patterns
+            self.dangerous_patterns_lower = [p.lower() for p in patterns]
         else:
             self.dangerous_patterns = dangerous_patterns
+            self.dangerous_patterns_lower = [p.lower() for p in dangerous_patterns]
         
         # Essayer de pull l'image si nécessaire
         self._ensure_docker_image()
@@ -128,7 +132,6 @@ class PythonSandboxTool(BaseTool):
         container = None
         
         try:
-            # Créer un répertoire temporaire
             temp_dir = tempfile.mkdtemp(prefix="sandbox_")
             code_file = Path(temp_dir) / "code.py"
             
@@ -157,7 +160,7 @@ class PythonSandboxTool(BaseTool):
                 "mem_limit": f"{self.max_memory_mb}m",  # Limite RAM
                 "cpu_quota": self.cpu_quota,  # Limite CPU
                 "cpu_period": self.cpu_period,
-                "detach": False,  # Will be overridden to True for manual control
+                "detach": True,  # Detached mode for manual wait control
                 "user": "65534:65534",  # User non-root (nobody:nogroup)
                 "environment": {
                     "PYTHONDONTWRITEBYTECODE": "1",
@@ -171,12 +174,8 @@ class PythonSandboxTool(BaseTool):
             }
             
             try:
-                # Créer le conteneur sans le démarrer automatiquement
-                # On utilise detach=True pour avoir le contrôle sur le wait
-                container_config_run = container_config.copy()
-                container_config_run['detach'] = True
-                
-                container = self.docker_client.containers.run(**container_config_run)
+                # Créer et démarrer le conteneur en mode détaché pour contrôle manuel
+                container = self.docker_client.containers.run(**container_config)
                 
                 # Attendre que le conteneur se termine avec un timeout
                 try:
@@ -193,8 +192,13 @@ class PythonSandboxTool(BaseTool):
                     except Exception:
                         pass
                     
-                    # Vérifier le code de sortie
-                    status_code = exit_code.get('StatusCode', 0) if isinstance(exit_code, dict) else exit_code
+                    # Extraire le code de sortie (Docker SDK retourne un dict avec 'StatusCode')
+                    if isinstance(exit_code, dict):
+                        status_code = exit_code.get('StatusCode', 0)
+                    elif isinstance(exit_code, int):
+                        status_code = exit_code
+                    else:
+                        status_code = 0
                     
                     if status_code == 0:
                         # Succès
@@ -373,8 +377,8 @@ class PythonSandboxTool(BaseTool):
 
         # Bloquer certaines opérations dangereuses (double vérification)
         code_lower = arguments["code"].lower()
-        for pattern in self.dangerous_patterns:
-            if pattern.lower() in code_lower:
+        for pattern, pattern_lower in zip(self.dangerous_patterns, self.dangerous_patterns_lower):
+            if pattern_lower in code_lower:
                 return False, f"Blocked dangerous operation: {pattern}"
 
         return True, None
