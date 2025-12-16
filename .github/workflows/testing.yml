@@ -1,38 +1,38 @@
-# Nom du workflow (de l'agent de test)
-name: Python Tests
+# Workflow de test et validation qualité pour conformité Loi 25
+# Philosophie : "Si ce n'est pas testé, c'est cassé"
+name: Tests & Quality (Loi 25)
 
-# Déclencheurs : l'agent se lancera sur pull requests et pushes vers main
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
 permissions:
   contents: read
+  security-events: write  # Pour les rapports de sécurité
 
 jobs:
-  test:
-    # Le type de machine sur lequel l'agent va tourner
+  # Job 1: Linting - DOIT passer avant les tests
+  lint:
+    name: Code Linting & Type Checking
     runs-on: ubuntu-latest
-
+    
     steps:
-      # Étape 1: Récupère le code de votre dépôt
-      - uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-      # Étape 2: Configure l'environnement Python
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      # Étape 3: Installe et configure PDM
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
           python-version: '3.12'
           cache: true
 
-      # Étape 4: Cache des dépendances PDM
       - name: Cache PDM packages
         uses: actions/cache@v4
         with:
@@ -43,12 +43,204 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pdm-
 
-      # Étape 5: Installe les dépendances avec PDM
       - name: Install dependencies
         run: |
           pdm install --no-lock
 
-      # Étape 6: Exécute les tests avec pytest via PDM
-      - name: Test with pytest
+      - name: Check code formatting with Black
         run: |
-          pdm run pytest
+          pdm run black --check --diff .
+        continue-on-error: false
+
+      - name: Lint with flake8
+        run: |
+          # Erreurs critiques (syntaxe, noms non définis)
+          pdm run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Autres problèmes de style
+          pdm run flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: false
+
+      - name: Type checking with mypy
+        run: |
+          pdm run mypy runtime/ planner/ tools/ memory/ policy/ --ignore-missing-imports
+        continue-on-error: false
+
+  # Job 2: Audit de sécurité
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          pdm install --no-lock
+
+      - name: Security scan with Bandit
+        run: |
+          pdm run bandit -r runtime/ planner/ tools/ memory/ policy/ \
+            -f json -o bandit-report.json || true
+          pdm run bandit -r runtime/ planner/ tools/ memory/ policy/ \
+            -f screen
+        continue-on-error: false
+
+      - name: Dependency audit with pip-audit
+        run: |
+          pdm run pip-audit --disable-pip --format json > pip-audit-report.json || true
+          pdm run pip-audit --desc
+        continue-on-error: false
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            pip-audit-report.json
+          retention-days: 30
+
+  # Job 3: Tests avec couverture 80%
+  test:
+    name: Tests with 80% Coverage
+    runs-on: ubuntu-latest
+    needs: [lint, security]  # Ne s'exécute que si lint et security passent
+    
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: true
+
+      - name: Cache PDM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            __pypackages__
+            .pdm-build
+          key: ${{ runner.os }}-pdm-${{ matrix.python-version }}-${{ hashFiles('pdm.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pdm-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          pdm install --no-lock
+
+      - name: Run tests with coverage
+        run: |
+          pdm run pytest \
+            --cov=runtime \
+            --cov=planner \
+            --cov=tools \
+            --cov=memory \
+            --cov=policy \
+            --cov-branch \
+            --cov-report=html \
+            --cov-report=term \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80
+        continue-on-error: false
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        with:
+          name: coverage-reports
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 30
+
+      - name: Coverage summary
+        if: matrix.python-version == '3.12'
+        run: |
+          echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          pdm run pytest --cov=runtime --cov=planner --cov=tools --cov=memory --cov=policy --cov-report=term | tail -20 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Tests de conformité spécifiques
+  compliance:
+    name: Compliance Tests (Loi 25)
+    runs-on: ubuntu-latest
+    needs: [lint, security]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          pdm install --no-lock
+
+      - name: Run compliance tests
+        run: |
+          pdm run pytest -m compliance -v
+        continue-on-error: false
+
+  # Job 5: Résumé final
+  quality-gate:
+    name: Quality Gate Summary
+    runs-on: ubuntu-latest
+    needs: [lint, security, test, compliance]
+    if: always()
+    
+    steps:
+      - name: Check job results
+        run: |
+          echo "## Quality Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Linting: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security: ${{ needs.security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Compliance: ${{ needs.compliance.result }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.security.result }}" != "success" ]] || \
+             [[ "${{ needs.test.result }}" != "success" ]] || \
+             [[ "${{ needs.compliance.result }}" != "success" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Quality gate FAILED" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Quality gate PASSED" >> $GITHUB_STEP_SUMMARY
+          fi

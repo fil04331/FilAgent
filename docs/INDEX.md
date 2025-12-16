@@ -96,11 +96,14 @@ This index provides a comprehensive overview of all documentation available for 
 
 - [DOCUMENTATION_UPDATE_2025-11-16.md](/docs/DOCUMENTATION_UPDATE_2025-11-16.md) - **NEW** Documentation update report (2025-11-16)
 
-### Testing
+### Testing & Quality Assurance
 
+- [MUTATION_TESTING.md](/docs/MUTATION_TESTING.md) - **NEW** Mutation testing guide with mutmut
+- [CI_CD_UPGRADE_SUMMARY.md](/docs/CI_CD_UPGRADE_SUMMARY.md) - **NEW** CI/CD pipeline upgrade for Loi 25 compliance
 - [tests/](/tests/) - Test suite
 - [pytest.ini](/pytest.ini) - Pytest configuration
 - [.flake8](/.flake8) - Linting configuration
+- [pyproject.toml](/pyproject.toml) - Coverage settings (80% minimum)
 
 ---
 
@@ -149,8 +152,10 @@ Located in [docs/SOPs/](/docs/SOPs/):
 
 1. [CLAUDE.md](/CLAUDE.md) - Complete development guide
 2. [DEPENDENCY_MANAGEMENT.md](/docs/DEPENDENCY_MANAGEMENT.md) - Dependency setup
-3. [BENCHMARKS.md](/docs/BENCHMARKS.md) - Performance testing
-4. [runtime/model_interface.py](/runtime/model_interface.py) - Model interface
+3. [CI_CD_UPGRADE_SUMMARY.md](/docs/CI_CD_UPGRADE_SUMMARY.md) - CI/CD pipeline and quality standards
+4. [MUTATION_TESTING.md](/docs/MUTATION_TESTING.md) - Mutation testing guide
+5. [BENCHMARKS.md](/docs/BENCHMARKS.md) - Performance testing
+6. [runtime/model_interface.py](/runtime/model_interface.py) - Model interface
 
 ### For Operations
 
@@ -220,5 +225,5 @@ Historical documentation has been moved to [docs/archive/](/docs/archive/) to ke
 
 ---
 
-**Last Updated**: 2025-12-08
+**Last Updated**: 2025-12-16
 **Maintainer**: FilAgent Technical Writing Team
