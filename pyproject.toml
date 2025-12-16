@@ -118,6 +118,7 @@ dev = [
     "bandit>=1.9.1",
     "safety>=3.0.0,<4",
     "pylint>=4.0.3",
+    "mutmut>=3.0.0,<4",  # Mutation testing pour valider la robustesse des tests
 ]
 
 # Benchmarking dependencies
@@ -178,6 +179,12 @@ mcp = "python mcp_server.py"
 # Security scanning
 security = "pip-audit"
 bandit = "bandit -r runtime/ planner/ tools/ -f json"
+
+# Mutation testing
+mutate = "mutmut run"
+mutate-results = "mutmut results"
+mutate-html = "mutmut html"
+mutate-show = "mutmut show"
 
 # Documentation
 docs = "mkdocs serve"
@@ -284,7 +291,7 @@ omit = [
 precision = 2
 show_missing = true
 skip_covered = false
-fail_under = 30.0
+fail_under = 80.0  # Exigence Loi 25 : couverture minimale de 80%
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -306,3 +313,33 @@ directory = "htmlcov"
 exclude_dirs = ["tests", "venv", ".venv", "__pypackages__"]
 severity = "medium"
 confidence = "medium"
+
+[tool.mutmut]
+# Configuration pour mutation testing
+# Vérifie la robustesse des tests en introduisant des mutations dans le code
+paths_to_mutate = [
+    "runtime/",
+    "planner/",
+    "tools/",
+    "memory/",
+    "policy/",
+]
+
+# Chemins à exclure des mutations
+paths_to_exclude = [
+    "tests/",
+    "gradio_app*.py",
+    "mcp_server.py",
+    "examples/",
+    "scripts/",
+]
+
+# Commande de test à utiliser
+runner = "pytest"
+
+# Options pour le runner
+# Les tests doivent passer rapidement pour le mutation testing
+test_command = "pytest -x --tb=short -q"
+
+# Ne pas muter les docstrings et commentaires
+dict_synonyms = []
