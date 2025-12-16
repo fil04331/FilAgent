@@ -1,7 +1,7 @@
 # Structure de la Documentation FilAgent
 
-**Version** : 2.0.0  
-**Dernière mise à jour** : 2025-12-08  
+**Version** : 2.1.0  
+**Dernière mise à jour** : 2025-12-16  
 **Auteur** : Équipe Documentation FilAgent
 
 ---
@@ -512,6 +512,26 @@ La CI vérifie automatiquement :
 
 ## Historique des changements
 
+### Version 2.1.0 - 2025-12-16
+
+**Changements majeurs** :
+- Archivage de 11 documents temporaires et rapports historiques depuis la racine
+- Documents archivés:
+  - Rapports de tests: ANALYSE_TESTS_RESUME, COVERAGE_REPORT, TEST_DIAGNOSTIC_REPORT
+  - Implémentations: OPENTELEMETRY_IMPLEMENTATION_SUMMARY, SEMANTIC_CACHE_IMPLEMENTATION, TEMPLATE_MIGRATION_SUMMARY
+  - Rapports de développement: IMPLEMENTATION_REPORT_DEC8, REFACTORING_SUMMARY
+  - Documents de planification: PLAN-ACTION-DEC8, CI_CD_VERIFICATION_CHECKLIST, ARCHITECTURE_OVERVIEW
+- Réduction finale de la racine: 17 → 6 fichiers MD essentiels
+- Mise à jour de `docs/archive/README.md` avec détails des nouveaux archivages
+- Mise à jour de `docs/INDEX.md` version 2.1.0
+- Ajout d'entrée dans CHANGELOG.md
+
+**Motivations** :
+- Compléter le nettoyage documentaire initié en 2025-12-08
+- Archiver les rapports temporaires et documents de développement accomplis
+- Maintenir uniquement les documents essentiels et activement maintenus à la racine
+- Faciliter l'onboarding des nouveaux contributeurs
+
 ### Version 2.0.0 - 2025-12-08
 
 **Changements majeurs** :
@@ -535,5 +555,23 @@ La CI vérifie automatiquement :
 
 ---
 
+## État actuel (2025-12-16)
+
+**Fichiers MD à la racine** : 6
+- README.md
+- CHANGELOG.md
+- SECURITY.md
+- README_SETUP.md
+- CLAUDE.md
+- AGENTS.md
+
+**Documentation active dans docs/** : ~40 fichiers techniques
+
+**Documents archivés dans docs/archive/** : ~60+ documents historiques
+
+**Objectif atteint** : Structure claire, minimaliste et maintenable avec séparation nette entre documentation active et archives historiques.
+
+---
+
 **Maintenu par** : Équipe Documentation Technique FilAgent  
-**Dernière revue** : 2025-12-08
+**Dernière revue** : 2025-12-16

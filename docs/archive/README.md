@@ -4,7 +4,8 @@
 
 Ce répertoire contient la documentation archivée du projet FilAgent. Ces documents ont une valeur historique et contextuelle mais ne sont plus activement maintenus ou ne représentent plus l'état actuel du projet.
 
-**Date d'archivage** : 2025-12-08
+**Date création** : 2025-12-08  
+**Dernière mise à jour** : 2025-12-16
 
 ## Structure
 
@@ -45,6 +46,17 @@ Documents décrivant l'état d'avancement du projet à différentes phases de d�
 
 Rapports d'analyse, d'audit et de synthèse générés durant le développement :
 
+**Documents archivés (2025-12-16)** :
+- `ANALYSE_TESTS_RESUME.md` - Résumé analyse tests (2025-12-10)
+- `COVERAGE_REPORT.md` - Rapport couverture de tests (2025-12-08)
+- `TEST_DIAGNOSTIC_REPORT.md` - Diagnostic suite de tests (2025-12-10)
+- `IMPLEMENTATION_REPORT_DEC8.md` - Rapport d'implémentation (2025-12-08)
+- `REFACTORING_SUMMARY.md` - Résumé refactoring Clean Architecture
+- `OPENTELEMETRY_IMPLEMENTATION_SUMMARY.md` - Implémentation OpenTelemetry (voir docs/OPENTELEMETRY_USAGE.md)
+- `SEMANTIC_CACHE_IMPLEMENTATION.md` - Implémentation cache sémantique (voir docs/SEMANTIC_CACHE.md)
+- `TEMPLATE_MIGRATION_SUMMARY.md` - Migration système de templates (voir docs/PROMPT_TEMPLATES.md)
+
+**Rapports historiques antérieurs** :
 - Audits de sécurité et conformité
 - Analyses de code et couverture
 - Rapports de benchmarks et performances
@@ -66,6 +78,12 @@ Guides utilisateur ou développeur qui ont été consolidés ou remplacés :
 
 Documents créés durant le développement pour des besoins temporaires :
 
+**Documents archivés (2025-12-16)** :
+- `PLAN-ACTION-DEC8.md` - Plan d'action détaillé du 8 décembre (objectifs atteints)
+- `CI_CD_VERIFICATION_CHECKLIST.md` - Checklist de vérification CI/CD pour conformité Loi 25 (implémentée)
+- `ARCHITECTURE_OVERVIEW.md` - Vue d'ensemble architecture Clean (consolidé dans ADRs)
+
+**Documents historiques antérieurs** :
 - Checklists de vérification
 - Notes de développement temporaires
 - Réponses à des questions spécifiques
