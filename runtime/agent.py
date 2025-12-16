@@ -382,233 +382,178 @@ class Agent:
 
     def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécution avec planification HTN"""
-        
-        with self.tracer.start_as_current_span(
-            "agent.run_with_htn",
-            attributes={
-                "conversation_id": conversation_id,
-                "task_id": task_id or "",
-                "execution_mode": "htn"
-            }
-        ):
-            # Rafraîchir les middlewares patchables
-            self._refresh_middlewares()
 
-            # Métriques: enregistrer requête HTN
-            from planner.metrics import get_metrics
+        # Rafraîchir les middlewares patchables
+        self._refresh_middlewares()
 
-            get_metrics()  # Initialiser les métriques
+        # Métriques: enregistrer requête HTN
+        from planner.metrics import get_metrics
 
-            # Logger le début de la conversation HTN avec trace context
-            if self.logger:
-                try:
-                    trace_ctx = get_trace_context()
-                    self.logger.log_event(
-                        actor="agent.core",
-                        event="conversation.start.htn",
-                        level="INFO",
-                        conversation_id=conversation_id,
-                        task_id=task_id,
-                        **trace_ctx  # Add trace_id and span_id to logs
-                    )
-                except Exception as e:
-                    print(f"⚠ Failed to log conversation.start.htn event: {e}")
+        get_metrics()  # Initialiser les métriques
 
-            # 1. Planifier
-            with self.tracer.start_as_current_span(
-                "agent.htn.planning",
-                attributes={
-                    "conversation_id": conversation_id,
-                    "task_id": task_id or "",
-                }
-            ) as planning_span:
-                htn_config = getattr(self.config, "htn_planning", None)
-                strategy_str = htn_config.default_strategy if htn_config else "hybrid"
-                strategy = PlanningStrategy.HYBRID
-                if strategy_str == "rule_based":
-                    strategy = PlanningStrategy.RULE_BASED
-                elif strategy_str == "llm_based":
-                    strategy = PlanningStrategy.LLM_BASED
-
-                plan_result = self.planner.plan(
-                    query=user_query,
-                    strategy=strategy,
-                    context={"conversation_id": conversation_id, "task_id": task_id},
+        # Logger le début de la conversation HTN
+        if self.logger:
+            try:
+                self.logger.log_event(
+                    actor="agent.core",
+                    event="conversation.start.htn",
+                    level="INFO",
+                    conversation_id=conversation_id,
+                    task_id=task_id,
                 )
-                
-                if planning_span:
-                    planning_span.set_attribute("planning.strategy", strategy.value)
-                    planning_span.set_attribute("planning.confidence", plan_result.confidence)
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.start.htn event: {e}")
 
-            # Log decision record (conformité Loi 25)
-            if self.dr_manager:
-                try:
-                    prompt_hash = hashlib.sha256(user_query.encode("utf-8")).hexdigest()
-                    trace_ctx = get_trace_context()
-                    self.dr_manager.create_dr(
-                        actor="agent.core",
-                        task_id=task_id or conversation_id,
-                        decision="planning",
-                        prompt_hash=prompt_hash,
-                        tools_used=[],
-                        alternatives_considered=["simple_execution"],
-                        constraints={
-                            "strategy": strategy.value,
-                            "max_depth": self.planner.max_depth,
-                            **trace_ctx  # Add trace context to decision record
-                        },
-                        expected_risk=["planning_error:low", "execution_error:medium"],
-                        reasoning_markers=[f"plan_confidence:{plan_result.confidence}"],
-                    )
-                except Exception as e:
-                    print(f"⚠ Failed to create decision record for planning: {e}")
+        # 1. Planifier
+        htn_config = getattr(self.config, "htn_planning", None)
+        strategy_str = htn_config.default_strategy if htn_config else "hybrid"
+        strategy = PlanningStrategy.HYBRID
+        if strategy_str == "rule_based":
+            strategy = PlanningStrategy.RULE_BASED
+        elif strategy_str == "llm_based":
+            strategy = PlanningStrategy.LLM_BASED
 
-            # 2. Exécuter
-            with self.tracer.start_as_current_span(
-                "agent.htn.execution",
-                attributes={
-                    "conversation_id": conversation_id,
-                    "task_id": task_id or "",
-                }
-            ) as exec_span:
-                exec_result = self.executor.execute(
-                    graph=plan_result.graph,
-                    context={"conversation_id": conversation_id, "task_id": task_id},
+        plan_result = self.planner.plan(
+            query=user_query,
+            strategy=strategy,
+            context={"conversation_id": conversation_id, "task_id": task_id},
+        )
+
+        # Log decision record (conformité Loi 25)
+        if self.dr_manager:
+            try:
+                prompt_hash = hashlib.sha256(user_query.encode("utf-8")).hexdigest()
+                self.dr_manager.create_dr(
+                    actor="agent.core",
+                    task_id=task_id or conversation_id,
+                    decision="planning",
+                    prompt_hash=prompt_hash,
+                    tools_used=[],
+                    alternatives_considered=["simple_execution"],
+                    constraints={
+                        "strategy": strategy.value,
+                        "max_depth": self.planner.max_depth,
+                    },
+                    expected_risk=["planning_error:low", "execution_error:medium"],
+                    reasoning_markers=[f"plan_confidence:{plan_result.confidence}"],
                 )
-                
-                if exec_span:
-                    exec_span.set_attribute("execution.success", exec_result.success)
-                    exec_span.set_attribute("execution.completed_tasks", len(exec_result.completed_tasks))
+            except Exception as e:
+                print(f"⚠ Failed to create decision record for planning: {e}")
 
-            # 3. Vérifier
-            with self.tracer.start_as_current_span(
-                "agent.htn.verification",
-                attributes={
-                    "conversation_id": conversation_id,
-                    "task_id": task_id or "",
-                }
-            ) as verif_span:
-                verif_config = getattr(self.config, "htn_verification", None)
-                verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
-                verifications = self.verifier.verify_graph_results(
-                    graph=plan_result.graph,
-                    level=verif_level,
-                )
-                
-                if verif_span:
-                    verif_span.set_attribute("verification.level", verif_level.value)
-                    verif_span.set_attribute("verification.count", len(verifications))
+        # 2. Exécuter
+        exec_result = self.executor.execute(
+            graph=plan_result.graph,
+            context={"conversation_id": conversation_id, "task_id": task_id},
+        )
 
-            # 4. Construire la réponse
-            if exec_result.success:
-                # Toutes les tâches critiques réussies
-                response = self._format_htn_response(plan_result, exec_result, verifications, conversation_id, task_id)
-            else:
-                # Échec critique: fallback sur mode simple
-                print("⚠ HTN execution failed, falling back to simple mode")
-                response = self._run_simple(user_query, conversation_id, task_id)
+        # 3. Vérifier
+        verif_config = getattr(self.config, "htn_verification", None)
+        verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
+        verifications = self.verifier.verify_graph_results(
+            graph=plan_result.graph,
+            level=verif_level,
+        )
 
-            # Métriques: calculer et mettre à jour métriques agrégées
-            # (calculées périodiquement, pas à chaque requête pour performance)
-            # Ces métriques peuvent être calculées via PromQL ou dans un job séparé
+        # 4. Construire la réponse
+        if exec_result.success:
+            # Toutes les tâches critiques réussies
+            response = self._format_htn_response(plan_result, exec_result, verifications, conversation_id, task_id)
+        else:
+            # Échec critique: fallback sur mode simple
+            print("⚠ HTN execution failed, falling back to simple mode")
+            response = self._run_simple(user_query, conversation_id, task_id)
 
-            return response
+        # Métriques: calculer et mettre à jour métriques agrégées
+        # (calculées périodiquement, pas à chaque requête pour performance)
+        # Ces métriques peuvent être calculées via PromQL ou dans un job séparé
+
+        return response
 
     def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
         
-        with self.tracer.start_as_current_span(
-            "agent.run_simple",
-            attributes={
-                "conversation_id": conversation_id,
-                "task_id": task_id or "",
-                "execution_mode": "simple"
-            }
-        ):
-            # Track conversation start time
-            conversation_start_time = time.time()
+        # Track conversation start time
+        conversation_start_time = time.time()
 
-            # Rafraîchir les middlewares patchables (important pour les tests)
-            self._refresh_middlewares()
+        # Rafraîchir les middlewares patchables (important pour les tests)
+        self._refresh_middlewares()
 
-            # COMPLIANCE: Valider la requête avant exécution
-            if self.compliance_guardian:
-                try:
-                    cg_config = getattr(self.config, 'compliance_guardian', None)
-                    if cg_config and cg_config.validate_queries:
-                        context = {
-                            'conversation_id': conversation_id,
-                            'task_id': task_id,
-                            'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
-                        }
-                        self.compliance_guardian.validate_query(message, context)
-                except Exception as e:
-                    # En mode strict, propager l'erreur
-                    cg_config = getattr(self.config, 'compliance_guardian', None)
-                    if cg_config and cg_config.strict_mode:
-                        # Record failed conversation metric
-                        if self.metrics:
-                            conversation_duration = time.time() - conversation_start_time
-                            self.metrics.record_conversation(
-                                status="error",
-                                duration_seconds=conversation_duration,
-                                outcome="compliance_error",
-                                iterations=0
-                            )
-                        raise
-                    else:
-                        print(f"⚠ Compliance validation warning: {e}")
-
-            # Logger le début de la conversation (avec fallback) and add trace context
-            if self.logger:
-                try:
-                    trace_ctx = get_trace_context()
-                    self.logger.log_event(
-                        actor="agent.core",
-                        event="conversation.start",
-                        level="INFO",
-                        conversation_id=conversation_id,
-                        task_id=task_id,
-                        **trace_ctx  # Add trace_id and span_id to logs
-                    )
-                except Exception as e:
-                    print(f"⚠ Failed to log conversation.start event: {e}")
-
-            # Enregistrer le message utilisateur en mémoire persistante
+        # COMPLIANCE: Valider la requête avant exécution
+        if self.compliance_guardian:
             try:
-                add_message(
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.validate_queries:
+                    context = {
+                        'conversation_id': conversation_id,
+                        'task_id': task_id,
+                        'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
+                    }
+                    self.compliance_guardian.validate_query(message, context)
+            except Exception as e:
+                # En mode strict, propager l'erreur
+                cg_config = getattr(self.config, 'compliance_guardian', None)
+                if cg_config and cg_config.strict_mode:
+                    # Record failed conversation metric
+                    if self.metrics:
+                        conversation_duration = time.time() - conversation_start_time
+                        self.metrics.record_conversation(
+                            status="error",
+                            duration_seconds=conversation_duration,
+                            outcome="compliance_error",
+                            iterations=0
+                        )
+                    raise
+                else:
+                    print(f"⚠ Compliance validation warning: {e}")
+
+        # Logger le début de la conversation (avec fallback)
+        if self.logger:
+            try:
+                self.logger.log_event(
+                    actor="agent.core",
+                    event="conversation.start",
+                    level="INFO",
                     conversation_id=conversation_id,
-                    role="user",
-                    content=message,
                     task_id=task_id,
                 )
             except Exception as e:
-                print(f"⚠ Failed to persist user message: {e}")
+                print(f"⚠ Failed to log conversation.start event: {e}")
 
-            try:
-                history = get_messages(conversation_id)
-            except Exception as e:
-                print(f"⚠ Failed to load conversation history: {e}")
-                history = []
-            trimmed_history = history[:-1] if history else history
-            # REFACTORED: Use ContextBuilder
-            context = self.context_builder.build_context(trimmed_history, conversation_id, task_id)
+        # Enregistrer le message utilisateur en mémoire persistante
+        try:
+            add_message(
+                conversation_id=conversation_id,
+                role="user",
+                content=message,
+                task_id=task_id,
+            )
+        except Exception as e:
+            print(f"⚠ Failed to persist user message: {e}")
 
-            max_iterations = 10
-            iterations = 0
-            final_response: Optional[str] = None
-            final_prompt_hash: Optional[str] = None
-            start_time = datetime.now().isoformat()
-            end_time = start_time
-            tools_used: List[str] = []
-            usage = {
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0,
-            }
+        try:
+            history = get_messages(conversation_id)
+        except Exception as e:
+            print(f"⚠ Failed to load conversation history: {e}")
+            history = []
+        trimmed_history = history[:-1] if history else history
+        # REFACTORED: Use ContextBuilder
+        context = self.context_builder.build_context(trimmed_history, conversation_id, task_id)
 
-            current_message = message
-            while iterations < max_iterations:
+        max_iterations = 10
+        iterations = 0
+        final_response: Optional[str] = None
+        final_prompt_hash: Optional[str] = None
+        start_time = datetime.now().isoformat()
+        end_time = start_time
+        tools_used: List[str] = []
+        usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+
+        current_message = message
+        while iterations < max_iterations:
             iterations += 1
             generation_config = GenerationConfig(
                 temperature=self.config.generation.temperature,
@@ -831,29 +776,27 @@ class Agent:
             except Exception as e:
                 print(f"⚠ Compliance audit/DR generation warning: {e}")
 
-            if self.logger:
-                try:
-                    trace_ctx = get_trace_context()
-                    self.logger.log_event(
-                        actor="agent.core",
-                        event="conversation.end",
-                        level="INFO",
-                        conversation_id=conversation_id,
-                        task_id=task_id,
-                        metadata={"iterations": iterations},
-                        **trace_ctx  # Add trace context to logs
-                    )
-                except Exception as e:
-                    print(f"⚠ Failed to log conversation.end event: {e}")
+        if self.logger:
+            try:
+                self.logger.log_event(
+                    actor="agent.core",
+                    event="conversation.end",
+                    level="INFO",
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                    metadata={"iterations": iterations},
+                )
+            except Exception as e:
+                print(f"⚠ Failed to log conversation.end event: {e}")
 
-            return {
-                "response": final_response,
-                "iterations": iterations,
-                "conversation_id": conversation_id,
-                "task_id": task_id,
-                "tools_used": unique_tools,
-                "usage": usage,
-            }
+        return {
+            "response": final_response,
+            "iterations": iterations,
+            "conversation_id": conversation_id,
+            "task_id": task_id,
+            "tools_used": unique_tools,
+            "usage": usage,
+        }
 
     # =============================================================================
     # DEPRECATED METHODS - Kept for backward compatibility, delegate to components
