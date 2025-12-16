@@ -1,6 +1,8 @@
 """
 Agent core : Intègre le modèle et les outils
 Gère les boucles de raisonnement et les appels d'outils
+
+REFACTORED: Now uses Clean Architecture with dependency injection
 """
 
 import json
@@ -13,7 +15,7 @@ from datetime import datetime
 from .config import get_config
 from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
-from tools.registry import get_registry
+from tools.registry import get_registry, ToolRegistry
 from tools.base import ToolResult, ToolStatus
 
 # Import des middlewares de conformité
@@ -33,47 +35,128 @@ from planner import (
 )
 from planner.task_graph import TaskStatus
 
+# Import NEW architecture components
+from architecture.router import StrategyRouter, ExecutionStrategy as RouterExecutionStrategy
+from runtime.tool_executor import ToolExecutor, ToolCall
+from runtime.tool_parser import ToolParser
+from runtime.context_builder import ContextBuilder
+
 
 class Agent:
     """
     Agent LLM avec capacités d'appel d'outils
+    
+    REFACTORED: Now uses dependency injection for all components.
+    Components can be injected for testing or will be created with defaults.
     """
 
-    def __init__(self, config=None):
+    def __init__(
+        self,
+        config=None,
+        tool_registry: Optional[ToolRegistry] = None,
+        logger=None,
+        dr_manager=None,
+        tracker=None,
+        router: Optional[StrategyRouter] = None,
+        tool_executor: Optional[ToolExecutor] = None,
+        tool_parser: Optional[ToolParser] = None,
+        context_builder: Optional[ContextBuilder] = None,
+        compliance_guardian=None,
+    ):
+        """
+        Initialize Agent with dependency injection.
+        
+        Args:
+            config: Agent configuration (created if None)
+            tool_registry: Tool registry (created if None)
+            logger: Logger instance (retrieved if None)
+            dr_manager: Decision record manager (retrieved if None)
+            tracker: Provenance tracker (retrieved if None)
+            router: Strategy router (created if None)
+            tool_executor: Tool executor (created if None)
+            tool_parser: Tool parser (created if None)
+            context_builder: Context builder (created if None)
+            compliance_guardian: Compliance guardian (created based on config)
+        """
+        # Core configuration
         self.config = config or get_config()
         self.model = None  # Sera initialisé plus tard
-        self.tool_registry = get_registry()
+        
+        # Tool registry (injected or default)
+        self.tool_registry = tool_registry or get_registry()
+        
+        # Legacy conversation history (kept for backward compatibility)
         self.conversation_history: List[Dict[str, str]] = []
 
-        # Initialiser les middlewares de conformité avec fallbacks
-        try:
-            self.logger = get_logger()
-        except Exception as e:
-            print(f"⚠ Failed to initialize logger: {e}")
-            self.logger = None
+        # Middlewares (injected or retrieved)
+        if logger is None:
+            try:
+                self.logger = get_logger()
+            except Exception as e:
+                print(f"⚠ Failed to initialize logger: {e}")
+                self.logger = None
+        else:
+            self.logger = logger
 
-        try:
-            self.dr_manager = get_dr_manager()
-        except Exception as e:
-            print(f"⚠ Failed to initialize DR manager: {e}")
-            self.dr_manager = None
+        if dr_manager is None:
+            try:
+                self.dr_manager = get_dr_manager()
+            except Exception as e:
+                print(f"⚠ Failed to initialize DR manager: {e}")
+                self.dr_manager = None
+        else:
+            self.dr_manager = dr_manager
 
-        try:
-            self.tracker = get_tracker()
-        except Exception as e:
-            print(f"⚠ Failed to initialize tracker: {e}")
-            self.tracker = None
+        if tracker is None:
+            try:
+                self.tracker = get_tracker()
+            except Exception as e:
+                print(f"⚠ Failed to initialize tracker: {e}")
+                self.tracker = None
+        else:
+            self.tracker = tracker
 
-        # Initialiser le ComplianceGuardian si activé
-        self.compliance_guardian = None
-        try:
-            cg_config = getattr(self.config, "compliance_guardian", None)
-            if cg_config and getattr(cg_config, "enabled", False):
-                rules_path = getattr(cg_config, "rules_path", "config/compliance_rules.yaml")
-                self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
-        except Exception as e:
-            print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+        # ComplianceGuardian (injected or created based on config)
+        if compliance_guardian is None:
             self.compliance_guardian = None
+            try:
+                cg_config = getattr(self.config, "compliance_guardian", None)
+                if cg_config and getattr(cg_config, "enabled", False):
+                    rules_path = getattr(cg_config, "rules_path", "config/compliance_rules.yaml")
+                    self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
+            except Exception as e:
+                print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+                self.compliance_guardian = None
+        else:
+            self.compliance_guardian = compliance_guardian
+
+        # NEW: Architecture components (injected or created)
+        if router is None:
+            # Create router based on config
+            htn_config = getattr(self.config, "htn_planning", None)
+            htn_enabled = htn_config and getattr(htn_config, "enabled", True)
+            self.router = StrategyRouter(htn_enabled=htn_enabled)
+        else:
+            self.router = router
+        
+        if tool_executor is None:
+            self.tool_executor = ToolExecutor(
+                tool_registry=self.tool_registry,
+                logger=self.logger,
+                tracker=self.tracker,
+            )
+        else:
+            self.tool_executor = tool_executor
+        
+        if tool_parser is None:
+            self.tool_parser = ToolParser()
+        else:
+            self.tool_parser = tool_parser
+        
+        if context_builder is None:
+            self.context_builder = ContextBuilder()
+        else:
+            self.context_builder = context_builder
 
         # S'assurer que les middlewares reflètent les éventuels patches actifs
         self._refresh_middlewares()
@@ -217,68 +300,47 @@ class Agent:
         return VerificationLevel.STRICT
 
     def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
-        """Analyser un message utilisateur et orchestrer la réponse de l'agent."""
+        """
+        Analyser un message utilisateur et orchestrer la réponse de l'agent.
+        
+        REFACTORED: Now uses Router component for strategy decision.
+        """
 
         # Métriques: compter requête totale
         from planner.metrics import get_metrics
 
         metrics = get_metrics()
 
-        # NOUVEAU: Détecter si la requête nécessite HTN
-        requires_htn = self._requires_planning(message)
-
-        if requires_htn:
+        # NOUVEAU: Use Router component for strategy decision
+        routing_decision = self.router.route(message)
+        
+        if routing_decision.strategy == RouterExecutionStrategy.HTN:
             # Métriques: requête HTN
             metrics.htn_requests_total.labels(strategy="auto", status="requested").inc()
             return self._run_with_htn(message, conversation_id, task_id)
         else:
             # Mode simple (pas de métriques HTN pour les requêtes simples)
-            return self._run_simple(message, conversation_id, task_id)  # Ancien comportement
+            return self._run_simple(message, conversation_id, task_id)
 
     def _requires_planning(self, query: str) -> bool:
         """
         Détermine si HTN est nécessaire
-
-        Critères:
-        - Mots-clés multi-étapes: "puis", "ensuite", "après"
-        - Requêtes complexes: "analyse... génère... crée..."
-        - Nombre de verbes d'action > 2
+        
+        REFACTORED: Now delegates to Router component.
+        This method is kept for backward compatibility with tests.
         """
         # DEBUG: ACTIVÉ TEMPORAIREMENT pour investiguer bug troncature 283 chars
         print(f"\n[HTN-DEBUG] _requires_planning called for query: {query[:100]}...")
-
-        # Vérifier si HTN est activé dans la configuration
-        htn_config = getattr(self.config, "htn_planning", None)
-        if htn_config and not getattr(htn_config, "enabled", True):
-            print(f"[HTN-DEBUG] HTN disabled in config, returning False")
-            return False
 
         # Si le planificateur n'est pas initialisé, ne pas utiliser HTN
         if self.planner is None:
             print(f"[HTN-DEBUG] Planner not initialized, returning False")
             return False
 
-        keywords = ["puis", "ensuite", "après", "finalement", "et"]
-        action_verbs = [
-            "lis",
-            "analyse",
-            "génère",
-            "crée",
-            "calcule",
-            "read",
-            "analyze",
-            "generate",
-            "create",
-            "calculate",
-        ]
-
-        has_multi_step = any(kw in query.lower() for kw in keywords)
-        num_actions = sum(1 for verb in action_verbs if verb in query.lower())
-
-        result = has_multi_step or num_actions >= 2
-        print(f"[HTN-DEBUG] Planning decision: {result}")
-        print(f"  - has_multi_step: {has_multi_step}")
-        print(f"  - num_actions: {num_actions}")
+        # Delegate to router component
+        result = self.router.should_use_planning(query)
+        
+        print(f"[HTN-DEBUG] Planning decision (via Router): {result}")
 
         return result
 
@@ -426,7 +488,8 @@ class Agent:
             print(f"⚠ Failed to load conversation history: {e}")
             history = []
         trimmed_history = history[:-1] if history else history
-        context = self._build_context(trimmed_history, conversation_id, task_id)
+        # REFACTORED: Use ContextBuilder
+        context = self.context_builder.build_context(trimmed_history, conversation_id, task_id)
 
         max_iterations = 10
         iterations = 0
@@ -453,18 +516,22 @@ class Agent:
                 repetition_penalty=self.config.generation.repetition_penalty,
             )
 
-            full_prompt = self._compose_prompt(context, current_message)
-            current_prompt_hash = self._compute_prompt_hash(
+            # REFACTORED: Use ContextBuilder
+            full_prompt = self.context_builder.compose_prompt(context, current_message)
+            current_prompt_hash = self.context_builder.compute_prompt_hash(
                 context,
                 current_message,
                 conversation_id,
                 task_id,
             )
 
+            # REFACTORED: Use ContextBuilder for system prompt
+            system_prompt = self.context_builder.build_system_prompt(self.tool_registry)
+
             generation_result = self.model.generate(
                 prompt=full_prompt,
                 config=generation_config,
-                system_prompt=self._get_system_prompt(),
+                system_prompt=system_prompt,
             )
             end_time = datetime.now().isoformat()
 
@@ -474,66 +541,30 @@ class Agent:
 
             response_text = generation_result.text.strip()
 
-            tool_calls_attr = getattr(generation_result, "tool_calls", None)
-            tool_calls: List[Dict[str, Any]] = []
-            if isinstance(tool_calls_attr, list) and tool_calls_attr:
-                tool_calls = tool_calls_attr
-            elif "<tool_call>" in response_text:
-                tool_calls = self._parse_tool_calls(response_text)
+            # REFACTORED: Use ToolParser
+            parsing_result = self.tool_parser.parse(generation_result, response_text)
+            tool_calls: List[ToolCall] = parsing_result.tool_calls
             if tool_calls:
-                tool_results = []
-                for tool_call in tool_calls:
-                    tool_name = tool_call.get("tool")
-                    arguments = tool_call.get("arguments", {})
+                # REFACTORED: Use ToolExecutor for batch execution
+                execution_results = self.tool_executor.execute_batch(
+                    tool_calls,
+                    conversation_id,
+                    task_id,
+                )
+                
+                # Track tool names for decision records
+                for result in execution_results:
+                    tools_used.append(result.tool_name)
 
-                    if not tool_name:
-                        continue
-
-                    tool_start_time = datetime.now().isoformat()
-                    execution_result = self._execute_tool(tool_call)
-                    tool_end_time = datetime.now().isoformat()
-                    tool_results.append(execution_result)
-                    tools_used.append(tool_name)
-
-                    if self.logger:
-                        try:
-                            self.logger.log_tool_call(
-                                tool_name=tool_name,
-                                arguments=arguments,
-                                conversation_id=conversation_id,
-                                task_id=task_id,
-                                success=execution_result.is_success(),
-                                output=execution_result.output if execution_result.output else execution_result.error,
-                            )
-                        except Exception as e:
-                            print(f"⚠ Failed to log tool call for '{tool_name}': {e}")
-
-                    if self.tracker:
-                        try:
-                            input_hash = hashlib.sha256(str(arguments).encode()).hexdigest()
-                            output_payload = (
-                                execution_result.output
-                                if execution_result.is_success()
-                                else execution_result.error or ""
-                            )
-                            output_hash = hashlib.sha256(str(output_payload).encode()).hexdigest()
-                            self.tracker.track_tool_execution(
-                                tool_name=tool_name,
-                                tool_input_hash=input_hash,
-                                tool_output_hash=output_hash,
-                                task_id=task_id or conversation_id,
-                                start_time=tool_start_time,
-                                end_time=tool_end_time,
-                            )
-                        except Exception as e:
-                            print(f"⚠ Failed to track tool execution for '{tool_name}': {e}")
-
-                # Injecter les résultats des outils dans le contexte et relancer le modèle
-                formatted_results = self._format_tool_results(tool_results)
-                context = f"{context}\n\n[Résultats des outils]\n{formatted_results}".strip()
-                current_message = (
-                    "Voici les résultats des outils exécutés :\n"
-                    f"{formatted_results}\n\nContinuez votre réponse en utilisant ces résultats."
+                # REFACTORED: Use ToolExecutor to format results
+                formatted_results = self.tool_executor.format_results(execution_results)
+                
+                # REFACTORED: Use ContextBuilder to inject results
+                context = self.context_builder.format_tool_results_for_context(
+                    context, formatted_results
+                )
+                current_message = self.context_builder.create_followup_message(
+                    formatted_results
                 )
                 continue
 
@@ -543,7 +574,8 @@ class Agent:
 
         if final_response is None:
             final_response = "Erreur: boucle de raisonnement trop longue"
-            final_prompt_hash = final_prompt_hash or self._compute_prompt_hash(
+            # REFACTORED: Use ContextBuilder
+            final_prompt_hash = final_prompt_hash or self.context_builder.compute_prompt_hash(
                 context,
                 current_message,
                 conversation_id,
@@ -693,34 +725,23 @@ class Agent:
             "usage": usage,
         }
 
+    # =============================================================================
+    # DEPRECATED METHODS - Kept for backward compatibility, delegate to components
+    # =============================================================================
+    
     def _compose_prompt(self, context: str, message: str) -> str:
-        """Assembler le contexte et le dernier message utilisateur pour le modèle."""
-        context = context.strip()
-        message = message.strip()
-        assistant_header = "Assistant:"
-        if not context:
-            return f"Utilisateur: {message}\n{assistant_header}\n"
-        return f"{context}\n\nUtilisateur: {message}\n{assistant_header}\n"
+        """
+        DEPRECATED: Use context_builder.compose_prompt() instead.
+        Kept for backward compatibility with tests.
+        """
+        return self.context_builder.compose_prompt(context, message)
 
     def _build_context(self, history: List[Dict], conversation_id: str, task_id: Optional[str]) -> str:
-        """Construire le contexte conversationnel pour le modèle."""
-        role_labels = {
-            "user": "Utilisateur",
-            "assistant": "Assistant",
-            "system": "Système",
-            "tool": "Outil",
-        }
-
-        context_messages = []
-        for msg in history[-10:]:  # 10 derniers messages
-            role_key = msg.get("role", "assistant")
-            role = role_labels.get(role_key, role_key.capitalize())
-            content = msg.get("content", "").strip()
-            if not content:
-                continue
-            context_messages.append(f"{role}: {content}")
-
-        return "\n".join(context_messages)
+        """
+        DEPRECATED: Use context_builder.build_context() instead.
+        Kept for backward compatibility with tests.
+        """
+        return self.context_builder.build_context(history, conversation_id, task_id)
 
     def _compute_prompt_hash(
         self,
@@ -729,115 +750,78 @@ class Agent:
         conversation_id: str,
         task_id: Optional[str] = None,
     ) -> str:
-        """Générer un hash stable incluant les identifiants de conversation."""
-
-        payload = {
-            "conversation_id": conversation_id,
-            "task_id": task_id,
-            "context": context,
-            "message": message,
-        }
-        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        """
+        DEPRECATED: Use context_builder.compute_prompt_hash() instead.
+        Kept for backward compatibility with tests.
+        """
+        return self.context_builder.compute_prompt_hash(context, message, conversation_id, task_id)
 
     def _get_system_prompt(self) -> str:
-        """Retourner le prompt système adapté au contexte FilAgent"""
-        tools = self.tool_registry.list_all()
-        tool_descriptions = []
-
-        for tool_name, tool in tools.items():
-            schema = tool.get_schema()
-            tool_descriptions.append(
-                f"- {tool_name}: {schema['description']}\n  Paramètres: {json.dumps(schema['parameters'])}"
-            )
-
-        raw_prompt = f"""Tu es FilAgent, un assistant IA spécialisé pour les propriétaires de PME québécoises.
-
-CONTEXTE:
-Tu aides les propriétaires de petites et moyennes entreprises (PME) au Québec avec leurs défis d'affaires quotidiens.
-Tes réponses doivent TOUJOURS considérer le contexte québécois, incluant:
-- Le bilinguisme français-anglais
-- Les lois et règlements québécois (Loi 25, Loi 101, etc.)
-- Le marché local et les spécificités du Québec
-- Les programmes de subventions gouvernementales disponibles
-
-DOMAINES D'EXPERTISE:
-- Marketing et communications (stratégie, réseaux sociaux, contenu)
-- Juridique et conformité (contrats, propriété intellectuelle, Loi 25)
-- Opérations et chaîne d'approvisionnement (gestion stocks, fournisseurs)
-- Ressources humaines (recrutement, rétention, grilles salariales)
-- Environnement et transition énergétique (certifications, subventions)
-- Technologies et transformation numérique
-
-QUALITÉ DES RÉPONSES:
-1. Reste STRICTEMENT pertinent au sujet exact de la question posée
-2. Fournis des informations SPÉCIFIQUES au Québec (lois, programmes, contexte local)
-3. Inclus des CHIFFRES, exemples concrets et données factuelles quand disponibles
-4. Structure tes réponses de façon CLAIRE et ACTIONNABLE
-5. Si tu manques d'information, DIS-LE clairement plutôt que de dévier du sujet
-
-OUTILS DISPONIBLES:
-{chr(10).join(tool_descriptions)}
-
-Format pour appeler un outil:
-<tool_call>
-{{
-    "tool": "nom_outil",
-    "arguments": {{"param": "valeur"}}
-}}
-</tool_call>
-
-IMPORTANT: Utilise les outils SEULEMENT quand nécessaire. Pour des questions générales d'affaires, réponds directement avec tes connaissances et des recherches web pertinentes.
-
-Réponds toujours de manière professionnelle, concrète et utile pour un propriétaire de PME québécoise."""
-
-        return textwrap.dedent(raw_prompt).strip()
+        """
+        DEPRECATED: Use context_builder.build_system_prompt() instead.
+        Kept for backward compatibility with tests.
+        """
+        return self.context_builder.build_system_prompt(self.tool_registry)
 
     def _parse_tool_calls(self, text: str) -> List[Dict[str, Any]]:
         """
-        Parser le texte pour détecter les appels d'outils
-        Format attendu:
-        <tool_call>
-        {{"tool": "nom", "arguments": {{}}}}
-        </tool_call>
+        DEPRECATED: Use tool_parser.parse() instead.
+        Kept for backward compatibility with tests.
+        
+        Note: Returns list of dicts for compatibility, not ToolCall objects.
         """
-        pattern = r"<tool_call>(.*?)</tool_call>"
-        matches = re.findall(pattern, text, re.DOTALL)
-
-        tool_calls = []
-        for match in matches:
-            try:
-                tool_json = json.loads(match.strip())
-                if "tool" in tool_json and "arguments" in tool_json:
-                    tool_calls.append(tool_json)
-            except json.JSONDecodeError:
-                continue
-
-        return tool_calls
+        # Create a mock generation result
+        mock_result = type('obj', (object,), {'tool_calls': None})()
+        parsing_result = self.tool_parser.parse(mock_result, text)
+        
+        # Convert ToolCall objects back to dicts for compatibility
+        return [
+            {"tool": tc.tool, "arguments": tc.arguments}
+            for tc in parsing_result.tool_calls
+        ]
 
     def _execute_tool(self, tool_call: Dict[str, Any]) -> ToolResult:
-        """Exécuter un outil"""
-        tool_name = tool_call.get("tool")
-        arguments = tool_call.get("arguments", {})
-
-        tool = self.tool_registry.get_tool(tool_name)
-
-        if not tool:
-            return ToolResult(status=ToolStatus.ERROR, output="", error=f"Tool not found: {tool_name}")
-
-        # Exécuter l'outil
-        result = tool.execute(arguments)
-        return result
+        """
+        DEPRECATED: Use tool_executor.execute_tool() instead.
+        Kept for backward compatibility with tests.
+        """
+        # Convert dict to ToolCall
+        tc = ToolCall(
+            tool=tool_call.get("tool", ""),
+            arguments=tool_call.get("arguments", {}),
+        )
+        
+        # Execute and convert result back to ToolResult
+        exec_result = self.tool_executor.execute_tool(tc, "legacy", None)
+        
+        return ToolResult(
+            status=exec_result.status,
+            output=exec_result.output,
+            error=exec_result.error,
+        )
 
     def _format_tool_results(self, results: List[ToolResult]) -> str:
-        """Formatter les résultats des outils pour le contexte"""
-        formatted = []
-        for i, result in enumerate(results, 1):
-            if result.is_success():
-                formatted.append(f"Outil {i}: SUCCESS\n{result.output}")
-            else:
-                formatted.append(f"Outil {i}: ERROR\n{result.error}")
-        return "\n---\n".join(formatted)
+        """
+        DEPRECATED: Use tool_executor.format_results() instead.
+        Kept for backward compatibility with tests.
+        """
+        # Convert ToolResult list to ToolExecutionResult list
+        from runtime.tool_executor import ToolExecutionResult
+        exec_results = [
+            ToolExecutionResult(
+                tool_name=f"tool_{i}",
+                status=r.status,
+                output=r.output,
+                error=r.error,
+                start_time="",
+                end_time="",
+                duration_ms=0,
+                input_hash="",
+                output_hash="",
+            )
+            for i, r in enumerate(results)
+        ]
+        return self.tool_executor.format_results(exec_results)
 
     def _build_action_registry(self) -> Dict[str, Any]:
         """
