@@ -3,9 +3,9 @@ permissions:
   contents: read
 
 on:
-  # Run weekly on Sundays at 2 AM UTC
+  # Run monthly instead of weekly to reduce costs
   schedule:
-    - cron: '0 2 * * 0'
+    - cron: '0 2 1 * *'  # First day of month at 2 AM UTC
 
   # Allow manual trigger
   workflow_dispatch:
@@ -19,15 +19,15 @@ on:
         required: false
         default: ''
 
-  # Run on push to main (optional, can be removed)
+  # Only run on significant code changes
   push:
     branches:
       - main
     paths:
       - 'eval/**'
-      - 'runtime/**'
+      - 'runtime/agent.py'
+      - 'runtime/model_interface.py'
       - 'planner/**'
-      - 'tools/**'
 
 jobs:
   run-benchmarks:
