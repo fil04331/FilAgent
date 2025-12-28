@@ -140,31 +140,37 @@ def test_runtime_modules() -> Tuple[bool, List[str]]:
     errors = []
     
     try:
-        from runtime.config import AgentConfig, GenerationConfig
+        from runtime.config import AgentConfig, GenerationConfig as ConfigGenerationConfig
         print("✓ runtime.config imports successfully")
     except Exception as e:
         errors.append(f"Failed to import runtime.config: {e}")
         return False, errors
     
     try:
-        from runtime.model_interface import LlamaCppInterface, GenerationConfig
+        from runtime.model_interface import LlamaCppInterface, GenerationConfig as ModelGenerationConfig
         print("✓ runtime.model_interface imports successfully")
     except Exception as e:
         errors.append(f"Failed to import runtime.model_interface: {e}")
         return False, errors
     
     try:
-        # Test that GenerationConfig is a proper dataclass or Pydantic model
+        # Test that runtime.config.GenerationConfig is a proper Pydantic v2 model
         from dataclasses import is_dataclass
-        config = GenerationConfig()
+        config = ConfigGenerationConfig()
         
-        # Can be either dataclass or Pydantic model
-        if is_dataclass(config):
-            print("✓ GenerationConfig uses dataclass (valid alternative to Pydantic)")
-        elif hasattr(config, "model_dump"):
-            print("✓ GenerationConfig uses Pydantic v2")
+        # Should be a Pydantic model
+        if hasattr(config, "model_dump"):
+            print("✓ runtime.config.GenerationConfig uses Pydantic v2")
         else:
-            errors.append("GenerationConfig is neither dataclass nor Pydantic model")
+            errors.append("runtime.config.GenerationConfig should be a Pydantic v2 model")
+            return False, errors
+            
+        # Test that model_interface.GenerationConfig is a dataclass
+        model_config = ModelGenerationConfig()
+        if is_dataclass(model_config):
+            print("✓ runtime.model_interface.GenerationConfig uses dataclass (valid)")
+        else:
+            errors.append("runtime.model_interface.GenerationConfig should be a dataclass")
             return False, errors
     except Exception as e:
         errors.append(f"GenerationConfig test failed: {e}")
@@ -179,8 +185,12 @@ def test_no_deprecated_patterns() -> Tuple[bool, List[str]]:
     import subprocess
     import os
     
-    # Change to repo root
-    os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # Get repo root (script is in repo root)
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(repo_root)
+    
+    # Directories to search for code (not tests, not examples, not docs)
+    search_dirs = ["runtime/", "tools/", "memory/", "planner/", "policy/"]
     
     deprecated_patterns = [
         ("pydantic.v1", "Use pydantic v2 instead"),
@@ -190,8 +200,10 @@ def test_no_deprecated_patterns() -> Tuple[bool, List[str]]:
     
     for pattern, message in deprecated_patterns:
         try:
+            # Build grep command with search directories
+            cmd = ["grep", "-r", pattern, "--include=*.py"] + search_dirs
             result = subprocess.run(
-                ["grep", "-r", pattern, "--include=*.py", "runtime/", "tools/", "memory/", "planner/"],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=10
