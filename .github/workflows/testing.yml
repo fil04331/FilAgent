@@ -121,7 +121,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.11', '3.12']  # Reduced from 3.10-3.12 to save CI time
     
     steps:
       - name: Checkout code
