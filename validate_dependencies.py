@@ -187,7 +187,6 @@ def test_no_deprecated_patterns() -> Tuple[bool, List[str]]:
     
     # Get repo root (script is in repo root)
     repo_root = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(repo_root)
     
     # Directories to search for code (not tests, not examples, not docs)
     search_dirs = ["runtime/", "tools/", "memory/", "planner/", "policy/"]
@@ -200,13 +199,15 @@ def test_no_deprecated_patterns() -> Tuple[bool, List[str]]:
     
     for pattern, message in deprecated_patterns:
         try:
-            # Build grep command with search directories
-            cmd = ["grep", "-r", pattern, "--include=*.py"] + search_dirs
+            # Build grep command with absolute paths
+            abs_search_dirs = [os.path.join(repo_root, d) for d in search_dirs]
+            cmd = ["grep", "-r", pattern, "--include=*.py"] + abs_search_dirs
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=30,  # 30 seconds should be sufficient for most codebases
+                cwd=repo_root
             )
             
             if result.returncode == 0 and result.stdout.strip():
@@ -231,20 +232,20 @@ def main():
     try:
         import pydantic
         print(f"Pydantic version: {pydantic.__version__}")
-    except:
-        pass
+    except ImportError:
+        print("⚠ Pydantic not installed")
     
     try:
         import fastapi
         print(f"FastAPI version: {fastapi.__version__}")
-    except:
-        pass
+    except ImportError:
+        print("⚠ FastAPI not installed")
     
     try:
         import llama_cpp
         print(f"llama-cpp-python version: {llama_cpp.__version__}")
-    except:
-        pass
+    except ImportError:
+        print("⚠ llama-cpp-python not installed")
     
     print()
     print("-" * 60)
