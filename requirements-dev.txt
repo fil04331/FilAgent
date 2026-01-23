@@ -95,7 +95,7 @@ pillow==11.3.0
 pluggy==1.6.0
 prometheus-client==0.23.1
 propcache==0.4.1
-protobuf==6.33.2
+protobuf==7.34.0rc1
 pyarrow==22.0.0
 pycparser==2.23; implementation_name != "PyPy" and platform_python_implementation != "PyPy"
 pydantic==2.12.5
