@@ -11,9 +11,13 @@
       "Bash(gh pr reopen:*)",
       "Bash(cut:*)",
       "Bash(xargs -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\" && grep -E \"\"\"\"^name:|^on:\"\"\"\" {}')",
-      "Bash(pdm export:*)"
+      "Bash(pdm export:*)",
+      "Bash(pdm run mypy:*)",
+      "Bash(git fetch:*)",
+      "Bash(pdm run pytest:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "Explanatory"
 }
