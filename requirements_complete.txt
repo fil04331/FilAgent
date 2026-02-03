@@ -87,7 +87,7 @@ opentelemetry-proto==1.39.1
 opentelemetry-sdk==1.39.1
 opentelemetry-semantic-conventions==0.60b1
 opentelemetry-util-http==0.60b1
-orjson==3.11.5
+orjson==3.11.7
 packaging==25.0
 pandas==2.3.3
 pathable==0.4.4
