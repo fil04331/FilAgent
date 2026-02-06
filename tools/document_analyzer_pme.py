@@ -309,29 +309,34 @@ class DocumentAnalyzerPME(BaseTool):
         if len(file_path) > 4096:
             return False, "file_path too long (max 4096 characters)"
 
+        # Security: Validate path is in allowlist (path traversal protection)
+        # Check this BEFORE extension validation for better security
+        try:
+            path = Path(file_path)
+            
+            # Check if file exists before path validation
+            # This prevents information leakage about file existence outside allowed paths
+            if path.exists():
+                if not self._is_path_allowed(path):
+                    # Log blocked attempt for audit trail
+                    if self.logger:
+                        self.logger.log_event(
+                            actor="document_analyzer_pme",
+                            event="path.blocked",
+                            level="WARNING",
+                            metadata={
+                                "attempted_path": self._redact_file_path(file_path),
+                                "reason": "Path not in allowlist"
+                            }
+                        )
+                    return False, f"Access denied: Path not in allowed directories"
+        except Exception as e:
+            return False, f"Path validation error: {str(e)}"
+
         # Check file extension
         valid_extensions = [".pdf", ".xlsx", ".xls", ".docx", ".doc"]
         if not any(file_path.lower().endswith(ext) for ext in valid_extensions):
             return False, f"Unsupported file type. Supported: {', '.join(valid_extensions)}"
-
-        # Security: Validate path is in allowlist (path traversal protection)
-        try:
-            path = Path(file_path)
-            if not self._is_path_allowed(path):
-                # Log blocked attempt for audit trail
-                if self.logger:
-                    self.logger.log_event(
-                        actor="document_analyzer_pme",
-                        event="path.blocked",
-                        level="WARNING",
-                        metadata={
-                            "attempted_path": self._redact_file_path(file_path),
-                            "reason": "Path not in allowlist"
-                        }
-                    )
-                return False, f"Access denied: Path not in allowed directories"
-        except Exception as e:
-            return False, f"Path validation error: {str(e)}"
 
         return True, None
 
