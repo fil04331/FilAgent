@@ -1275,3 +1275,57 @@ def reset_singletons() -> Generator[None, None, None]:
     # Après le test: les patches sont déjà nettoyés par leurs propres fixtures
     # Ce fixture sert de point d'extension pour futurs nettoyages de singletons
     pass
+
+
+@pytest.fixture(scope="function", autouse=True)
+def configure_document_analyzer_for_tests():
+    """
+    Configure DocumentAnalyzerPME to allow test fixtures directory
+    
+    This fixture automatically adds the tests/fixtures directory to
+    DocumentAnalyzerPME.allowed_paths for all tests, enabling tests
+    to use fixture files without security errors.
+    
+    Scope: function (applied to each test)
+    Autouse: True (automatically applied)
+    
+    Yields:
+        None
+        
+    Note:
+        This is necessary because the path validation security fix
+        requires all file paths to be in allowed_paths. Test files
+        in tests/fixtures/ need to be accessible.
+    """
+    from pathlib import Path
+    
+    # Import DocumentAnalyzerPME
+    try:
+        from tools.document_analyzer_pme import DocumentAnalyzerPME
+        
+        # Get test fixtures directory
+        fixtures_dir = Path(__file__).parent / "fixtures"
+        fixtures_path_str = str(fixtures_dir) + "/"
+        
+        # Store original allowed_paths class attribute if it exists
+        # Note: We need to patch at class level to affect all instances
+        original_init = DocumentAnalyzerPME.__init__
+        
+        def patched_init(self, *args, **kwargs):
+            # Call original init
+            original_init(self, *args, **kwargs)
+            # Add fixtures directory to allowed_paths if not already there
+            if fixtures_path_str not in self.allowed_paths:
+                self.allowed_paths.append(fixtures_path_str)
+        
+        # Patch the __init__ method
+        DocumentAnalyzerPME.__init__ = patched_init
+        
+        yield
+        
+        # Restore original __init__
+        DocumentAnalyzerPME.__init__ = original_init
+        
+    except ImportError:
+        # DocumentAnalyzerPME not available, skip patching
+        yield
