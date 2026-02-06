@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Audit MLOps** (2026-02-06): Audit complet post-merge avec plan d'action 4 sprints
+  - `AUDIT_POST_MERGE_MLOPS.md`: Rapport d'audit détaillé (15 pages)
+  - `PLAN_ACTION_AMELIORATION.md`: Plan d'action sur 4 sprints (20 pages)
+  - `EXECUTIVE_SUMMARY_AUDIT.md`: Résumé exécutif pour la direction
+  - `QUICKSTART_SPRINT1.md`: Guide quick start pour développeurs
+  - Identification de 10 défectuosités avec priorisation
+  - Métriques actuelles: 95.5% tests passants, 84.46% couverture
+  - Verdict: 🟢 BON (8.1/10) - Production-ready après corrections Sprint 1
+
 ### Changed
 - **Documentation** (2025-12-16): Nettoyage et archivage de la documentation
   - Archivé 11 documents temporaires et rapports historiques vers `docs/archive/`
