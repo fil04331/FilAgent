@@ -12,6 +12,7 @@ import re
 import hashlib
 import textwrap
 import time
+import logging
 from typing import TYPE_CHECKING, List, Dict, Optional, Union, Callable, cast
 from datetime import datetime
 
@@ -55,6 +56,7 @@ from planner.compliance_guardian import (
 # Import metrics for observability
 try:
     from runtime.metrics import get_agent_metrics
+
     METRICS_AVAILABLE = True
 except ImportError:
     METRICS_AVAILABLE = False
@@ -62,18 +64,24 @@ except ImportError:
 # Import OpenTelemetry for distributed tracing
 try:
     from runtime.telemetry import get_tracer, get_trace_context
+
     TELEMETRY_AVAILABLE = True
 except ImportError:
     TELEMETRY_AVAILABLE = False
+
     def get_tracer(name=None):
         from contextlib import contextmanager
+
         class NoOpTracer:
             @contextmanager
             def start_as_current_span(self, name, **kwargs):
                 yield None
+
         return NoOpTracer()
+
     def get_trace_context():
         return {}
+
 
 # Import du planificateur HTN
 from planner import (
@@ -98,16 +106,21 @@ from runtime.context_builder import ContextBuilder
 # Import semantic cache manager
 try:
     from memory.cache_manager import get_cache_manager
+
     CACHE_AVAILABLE = True
 except ImportError:
     CACHE_AVAILABLE = False
-    print("⚠ Semantic cache not available (missing dependencies)")
+    logging.warning("Semantic cache not available (missing dependencies)")
+
+
+# Module-level logger for initialization warnings
+_init_logger = logging.getLogger(__name__)
 
 
 class Agent:
     """
     Agent LLM avec capacités d'appel d'outils
-    
+
     REFACTORED: Now uses dependency injection for all components.
     Components can be injected for testing or will be created with defaults.
     """
@@ -168,7 +181,7 @@ class Agent:
             try:
                 self.logger = get_logger()
             except Exception as e:
-                print(f"⚠ Failed to initialize logger: {e}")
+                _init_logger.warning("Failed to initialize logger: %s", e)
                 self.logger = None
         else:
             self.logger = logger
@@ -177,7 +190,7 @@ class Agent:
             try:
                 self.dr_manager = get_dr_manager()
             except Exception as e:
-                print(f"⚠ Failed to initialize DR manager: {e}")
+                _init_logger.warning("Failed to initialize DR manager: %s", e)
                 self.dr_manager = None
         else:
             self.dr_manager = dr_manager
@@ -186,7 +199,7 @@ class Agent:
             try:
                 self.tracker = get_tracker()
             except Exception as e:
-                print(f"⚠ Failed to initialize tracker: {e}")
+                _init_logger.warning("Failed to initialize tracker: %s", e)
                 self.tracker = None
         else:
             self.tracker = tracker
@@ -200,7 +213,7 @@ class Agent:
                     rules_path = getattr(cg_config, "rules_path", "config/compliance_rules.yaml")
                     self.compliance_guardian = ComplianceGuardian(config_path=rules_path)
             except Exception as e:
-                print(f"⚠ Failed to initialize ComplianceGuardian: {e}")
+                _init_logger.warning("Failed to initialize ComplianceGuardian: %s", e)
                 self.compliance_guardian = None
         else:
             self.compliance_guardian = compliance_guardian
@@ -213,7 +226,7 @@ class Agent:
             self.router = StrategyRouter(htn_enabled=htn_enabled)
         else:
             self.router = router
-        
+
         if tool_executor is None:
             self.tool_executor = ToolExecutor(
                 tool_registry=self.tool_registry,
@@ -222,23 +235,23 @@ class Agent:
             )
         else:
             self.tool_executor = tool_executor
-        
+
         if tool_parser is None:
             self.tool_parser = ToolParser()
         else:
             self.tool_parser = tool_parser
-        
+
         if context_builder is None:
             self.context_builder = ContextBuilder()
         else:
             self.context_builder = context_builder
-        
+
         # Initialize metrics collector
         if METRICS_AVAILABLE:
             self.metrics = get_agent_metrics()
         else:
             self.metrics = None
-        
+
         # Initialize OpenTelemetry tracer
         if TELEMETRY_AVAILABLE:
             self.tracer = get_tracer("filagent.agent")
@@ -269,21 +282,21 @@ class Agent:
             if not self._is_mock(self.logger) and self.logger is not current_logger:
                 self.logger = current_logger
         except Exception as e:
-            print(f"⚠ Failed to refresh logger: {e}")
+            _init_logger.warning("Failed to refresh logger: %s", e)
 
         try:
             current_dr_manager = audittrail_mw.get_dr_manager()
             if not self._is_mock(self.dr_manager) and self.dr_manager is not current_dr_manager:
                 self.dr_manager = current_dr_manager
         except Exception as e:
-            print(f"⚠ Failed to refresh DR manager: {e}")
+            _init_logger.warning("Failed to refresh DR manager: %s", e)
 
         try:
             current_tracker = provenance_mw.get_tracker()
             if not self._is_mock(self.tracker) and self.tracker is not current_tracker:
                 self.tracker = current_tracker
         except Exception as e:
-            print(f"⚠ Failed to refresh tracker: {e}")
+            _init_logger.warning("Failed to refresh tracker: %s", e)
 
         # Rafraîchir le ComplianceGuardian si la configuration change
         try:
@@ -295,7 +308,7 @@ class Agent:
             else:
                 self.compliance_guardian = None
         except Exception as e:
-            print(f"⚠ Failed to refresh ComplianceGuardian: {e}")
+            _init_logger.warning("Failed to refresh ComplianceGuardian: %s", e)
 
     def initialize_model(self) -> None:
         """Initialiser le modèle"""
@@ -306,7 +319,7 @@ class Agent:
         self.model = init_model(
             backend=self.config.model.backend, model_path=self.config.model.path, config=model_config
         )
-        print("✓ Model initialized")
+        _init_logger.info("Model initialized successfully")
 
         # Initialiser le planificateur HTN après l'initialisation du modèle
         self._initialize_htn()
@@ -361,7 +374,7 @@ class Agent:
             default_level=verif_level,
             enable_tracing=True,
         )
-        print("✓ HTN system initialized")
+        _init_logger.info("HTN system initialized successfully")
 
     def _resolve_verification_level(self, verif_config: object) -> VerificationLevel:
         """Normalise le niveau de vérification issu de la configuration."""
@@ -408,28 +421,28 @@ class Agent:
             try:
                 cache_manager = get_cache_manager()
                 cache_result = cache_manager.get(message)
-                
+
                 if cache_result:
                     # Cache hit! Return cached response immediately
-                    print(f"✓ Cache hit (similarity: {cache_result['similarity_score']:.3f})")
-                    
+                    _init_logger.debug("Cache hit (similarity: %.3f)", cache_result["similarity_score"])
+
                     # Add cache metadata to response
                     cached_response = {
-                        "response": cache_result['response']['response_text'],
+                        "response": cache_result["response"]["response_text"],
                         "conversation_id": conversation_id,
                         "task_id": task_id,
-                        "tools_used": cache_result['response']['tools_used'],
-                        "usage": cache_result['response']['usage'],
-                        "iterations": cache_result['response']['iterations'],
+                        "tools_used": cache_result["response"]["tools_used"],
+                        "usage": cache_result["response"]["usage"],
+                        "iterations": cache_result["response"]["iterations"],
                         "cache_hit": True,
                         "cache_metadata": {
-                            "similarity_score": cache_result['similarity_score'],
-                            "hit_count": cache_result['hit_count'],
-                            "age_hours": cache_result['age_hours'],
-                            "entry_id": cache_result['entry_id']
-                        }
+                            "similarity_score": cache_result["similarity_score"],
+                            "hit_count": cache_result["hit_count"],
+                            "age_hours": cache_result["age_hours"],
+                            "entry_id": cache_result["entry_id"],
+                        },
                     }
-                    
+
                     # Store user message in episodic memory
                     try:
                         add_message(
@@ -441,22 +454,22 @@ class Agent:
                         add_message(
                             conversation_id=conversation_id,
                             role="assistant",
-                            content=cache_result['response']['response_text'],
+                            content=cache_result["response"]["response_text"],
                             task_id=task_id,
                         )
                     except Exception as e:
-                        print(f"⚠ Failed to persist cached messages: {e}")
-                    
+                        _init_logger.warning("Failed to persist cached messages: %s", e)
+
                     return cached_response
                 else:
-                    print("⚠ Cache miss - executing query")
+                    _init_logger.debug("Cache miss - executing query")
             except Exception as e:
-                print(f"⚠ Cache lookup failed: {e}. Falling back to normal execution.")
+                _init_logger.warning("Cache lookup failed: %s. Falling back to normal execution.", e)
                 cache_result = None
 
         # NOUVEAU: Use Router component for strategy decision
         routing_decision = self.router.route(message)
-        
+
         if routing_decision.strategy == RouterExecutionStrategy.HTN:
             # Métriques: requête HTN
             metrics.htn_requests_total.labels(strategy="auto", status="requested").inc()
@@ -464,7 +477,7 @@ class Agent:
         else:
             # Mode simple (pas de métriques HTN pour les requêtes simples)
             result = self._run_simple(message, conversation_id, task_id)
-        
+
         # NEW: Store successful response in cache
         if CACHE_AVAILABLE and result.get("response"):
             try:
@@ -477,37 +490,44 @@ class Agent:
                     tools_used=result.get("tools_used", []),
                     usage=result.get("usage", {}),
                     iterations=result.get("iterations", 1),
-                    metadata={"strategy": routing_decision.strategy.value if hasattr(routing_decision.strategy, 'value') else str(routing_decision.strategy)}
+                    metadata={
+                        "strategy": (
+                            routing_decision.strategy.value
+                            if hasattr(routing_decision.strategy, "value")
+                            else str(routing_decision.strategy)
+                        )
+                    },
                 )
-                print("✓ Response cached for future queries")
+                _init_logger.debug("Response cached for future queries")
             except Exception as e:
-                print(f"⚠ Failed to cache response: {e}")
-        
+                _init_logger.warning("Failed to cache response: %s", e)
+
         return result
 
     def _requires_planning(self, query: str) -> bool:
         """
         Détermine si HTN est nécessaire
-        
+
         REFACTORED: Now delegates to Router component.
         This method is kept for backward compatibility with tests.
         """
-        # DEBUG: ACTIVÉ TEMPORAIREMENT pour investiguer bug troncature 283 chars
-        print(f"\n[HTN-DEBUG] _requires_planning called for query: {query[:100]}...")
+        _init_logger.debug("_requires_planning called for query: %s...", query[:100])
 
         # Si le planificateur n'est pas initialisé, ne pas utiliser HTN
         if self.planner is None:
-            print(f"[HTN-DEBUG] Planner not initialized, returning False")
+            _init_logger.debug("Planner not initialized, returning False")
             return False
 
         # Delegate to router component
         result = self.router.should_use_planning(query)
-        
-        print(f"[HTN-DEBUG] Planning decision (via Router): {result}")
+
+        _init_logger.debug("Planning decision (via Router): %s", result)
 
         return result
 
-    def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
+    def _run_with_htn(
+        self, user_query: str, conversation_id: str, task_id: Optional[str] = None
+    ) -> Dict[str, ChatResponseValue]:
         """Exécution avec planification HTN"""
 
         # Vérifier que HTN est initialisé
@@ -534,7 +554,7 @@ class Agent:
                     task_id=task_id,
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.start.htn event: {e}")
+                _init_logger.warning("Failed to log conversation.start.htn event: %s", e)
 
         # 1. Planifier
         htn_config = getattr(self.config, "htn_planning", None)
@@ -575,7 +595,7 @@ class Agent:
                     reasoning_markers=[f"plan_confidence:{plan_result.confidence}"],
                 )
             except Exception as e:
-                print(f"⚠ Failed to create decision record for planning: {e}")
+                _init_logger.warning("Failed to create decision record for planning: %s", e)
 
         # 2. Exécuter
         exec_result = self.executor.execute(
@@ -597,7 +617,7 @@ class Agent:
             response = self._format_htn_response(plan_result, exec_result, verifications, conversation_id, task_id)
         else:
             # Échec critique: fallback sur mode simple
-            print("⚠ HTN execution failed, falling back to simple mode")
+            _init_logger.warning("HTN execution failed, falling back to simple mode")
             response = self._run_simple(user_query, conversation_id, task_id)
 
         # Métriques: calculer et mettre à jour métriques agrégées
@@ -606,9 +626,11 @@ class Agent:
 
         return response
 
-    def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
+    def _run_simple(
+        self, message: str, conversation_id: str, task_id: Optional[str] = None
+    ) -> Dict[str, ChatResponseValue]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
-        
+
         # Track conversation start time
         conversation_start_time = time.time()
 
@@ -622,17 +644,17 @@ class Agent:
         # COMPLIANCE: Valider la requête avant exécution
         if self.compliance_guardian:
             try:
-                cg_config = getattr(self.config, 'compliance_guardian', None)
+                cg_config = getattr(self.config, "compliance_guardian", None)
                 if cg_config and cg_config.validate_queries:
                     validation_context: ContextDict = {
-                        'conversation_id': conversation_id,
-                        'task_id': task_id or '',
-                        'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
+                        "conversation_id": conversation_id,
+                        "task_id": task_id or "",
+                        "user_id": conversation_id,  # Utiliser conversation_id comme proxy pour user_id
                     }
                     self.compliance_guardian.validate_query(message, validation_context)
             except Exception as e:
                 # En mode strict, propager l'erreur
-                cg_config = getattr(self.config, 'compliance_guardian', None)
+                cg_config = getattr(self.config, "compliance_guardian", None)
                 if cg_config and cg_config.strict_mode:
                     # Record failed conversation metric
                     if self.metrics:
@@ -641,11 +663,11 @@ class Agent:
                             status="error",
                             duration_seconds=conversation_duration,
                             outcome="compliance_error",
-                            iterations=0
+                            iterations=0,
                         )
                     raise
                 else:
-                    print(f"⚠ Compliance validation warning: {e}")
+                    _init_logger.warning("Compliance validation warning: %s", e)
 
         # Logger le début de la conversation (avec fallback)
         if self.logger:
@@ -658,7 +680,7 @@ class Agent:
                     task_id=task_id,
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.start event: {e}")
+                _init_logger.warning("Failed to log conversation.start event: %s", e)
 
         # Enregistrer le message utilisateur en mémoire persistante
         try:
@@ -669,12 +691,12 @@ class Agent:
                 task_id=task_id,
             )
         except Exception as e:
-            print(f"⚠ Failed to persist user message: {e}")
+            _init_logger.warning("Failed to persist user message: %s", e)
 
         try:
             history = get_messages(conversation_id)
         except Exception as e:
-            print(f"⚠ Failed to load conversation history: {e}")
+            _init_logger.warning("Failed to load conversation history: %s", e)
             history = []
         trimmed_history = history[:-1] if history else history
         # REFACTORED: Use ContextBuilder
@@ -719,14 +741,14 @@ class Agent:
 
             # Track generation start time for metrics
             generation_start_time = time.time()
-            
+
             generation_result = self.model.generate(
                 prompt=full_prompt,
                 config=generation_config,
                 system_prompt=system_prompt,
             )
             end_time = datetime.now().isoformat()
-            
+
             # Record generation duration metric
             if self.metrics:
                 generation_duration = time.time() - generation_start_time
@@ -748,21 +770,17 @@ class Agent:
                     conversation_id,
                     task_id,
                 )
-                
+
                 # Track tool names for decision records
                 for result in execution_results:
                     tools_used.append(result.tool_name)
 
                 # REFACTORED: Use ToolExecutor to format results
                 formatted_results = self.tool_executor.format_results(execution_results)
-                
+
                 # REFACTORED: Use ContextBuilder to inject results
-                context = self.context_builder.format_tool_results_for_context(
-                    context, formatted_results
-                )
-                current_message = self.context_builder.create_followup_message(
-                    formatted_results
-                )
+                context = self.context_builder.format_tool_results_for_context(context, formatted_results)
+                current_message = self.context_builder.create_followup_message(formatted_results)
                 continue
 
             final_response = response_text
@@ -787,7 +805,7 @@ class Agent:
                 task_id=task_id,
             )
         except Exception as e:
-            print(f"⚠ Failed to persist assistant message: {e}")
+            _init_logger.warning("Failed to persist assistant message: %s", e)
 
         response_hash = hashlib.sha256(final_response.encode("utf-8")).hexdigest()
         unique_tools = list(dict.fromkeys(tools_used))
@@ -804,7 +822,7 @@ class Agent:
                     tokens_used=usage["total_tokens"],
                 )
             except Exception as e:
-                print(f"⚠ Failed to log generation: {e}")
+                _init_logger.warning("Failed to log generation: %s", e)
 
         if self.tracker:
             try:
@@ -823,7 +841,7 @@ class Agent:
                     },
                 )
             except Exception as e:
-                print(f"⚠ Failed to track generation: {e}")
+                _init_logger.warning("Failed to track generation: %s", e)
 
         if self.dr_manager and (
             unique_tools
@@ -856,9 +874,9 @@ class Agent:
                             metadata={"dr_id": dr.dr_id},
                         )
                     except Exception as e:
-                        print(f"⚠ Failed to log dr.created event: {e}")
+                        _init_logger.warning("Failed to log dr.created event: %s", e)
             except Exception as e:
-                print(f"⚠ Failed to create decision record: {e}")
+                _init_logger.warning("Failed to create decision record: %s", e)
 
         # Record conversation metrics
         conversation_duration = time.time() - conversation_start_time
@@ -866,58 +884,54 @@ class Agent:
             outcome = "max_iterations" if final_response and "trop longue" in final_response else "success"
             status = "completed" if outcome == "success" else "timeout"
             self.metrics.record_conversation(
-                status=status,
-                duration_seconds=conversation_duration,
-                outcome=outcome,
-                iterations=iterations
+                status=status, duration_seconds=conversation_duration, outcome=outcome, iterations=iterations
             )
             # Record token usage
             self.metrics.record_tokens(
-                prompt_tokens=usage["prompt_tokens"],
-                completion_tokens=usage["completion_tokens"]
+                prompt_tokens=usage["prompt_tokens"], completion_tokens=usage["completion_tokens"]
             )
-        
+
         # COMPLIANCE: Auditer l'exécution et générer Decision Record
         if self.compliance_guardian:
             try:
-                cg_config = getattr(self.config, 'compliance_guardian', None)
-                
+                cg_config = getattr(self.config, "compliance_guardian", None)
+
                 # Auditer l'exécution
                 if cg_config and cg_config.audit_executions:
                     exec_result_audit: ExecutionResultDict = {
-                        'success': final_response is not None and "Erreur" not in final_response,
-                        'errors': [] if final_response is not None else ['No response generated']
+                        "success": final_response is not None and "Erreur" not in final_response,
+                        "errors": [] if final_response is not None else ["No response generated"],
                     }
                     audit_context: ContextDict = {
-                        'conversation_id': conversation_id,
-                        'task_id': task_id or '',
+                        "conversation_id": conversation_id,
+                        "task_id": task_id or "",
                     }
                     self.compliance_guardian.audit_execution(exec_result_audit, audit_context)
 
                 # Générer Decision Record
                 if cg_config and cg_config.auto_generate_dr:
                     dr_plan: PlanDict = {
-                        'actions': [{'tool': tool, 'params': ''} for tool in unique_tools],
-                        'tools_used': set(unique_tools)
+                        "actions": [{"tool": tool, "params": ""} for tool in unique_tools],
+                        "tools_used": set(unique_tools),
                     }
                     exec_result_dr: ExecutionResultDict = {
-                        'success': final_response is not None and "Erreur" not in final_response,
-                        'errors': [] if final_response is not None else ['No response generated']
+                        "success": final_response is not None and "Erreur" not in final_response,
+                        "errors": [] if final_response is not None else ["No response generated"],
                     }
                     dr_context: ContextDict = {
-                        'actor': 'agent.core',
-                        'conversation_id': conversation_id,
-                        'task_id': task_id or '',
+                        "actor": "agent.core",
+                        "conversation_id": conversation_id,
+                        "task_id": task_id or "",
                     }
                     self.compliance_guardian.generate_decision_record(
-                        decision_type='simple_execution',
+                        decision_type="simple_execution",
                         query=message,
                         plan=dr_plan,
                         execution_result=exec_result_dr,
-                        context=dr_context
+                        context=dr_context,
                     )
             except Exception as e:
-                print(f"⚠ Compliance audit/DR generation warning: {e}")
+                _init_logger.warning("Compliance audit/DR generation warning: %s", e)
 
         if self.logger:
             try:
@@ -930,7 +944,7 @@ class Agent:
                     metadata={"iterations": iterations},
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.end event: {e}")
+                _init_logger.warning("Failed to log conversation.end event: %s", e)
 
         return {
             "response": final_response,
@@ -944,7 +958,7 @@ class Agent:
     # =============================================================================
     # DEPRECATED METHODS - Kept for backward compatibility, delegate to components
     # =============================================================================
-    
+
     def _compose_prompt(self, context: str, message: str) -> str:
         """
         DEPRECATED: Use context_builder.compose_prompt() instead.
@@ -983,18 +997,15 @@ class Agent:
         """
         DEPRECATED: Use tool_parser.parse() instead.
         Kept for backward compatibility with tests.
-        
+
         Note: Returns list of dicts for compatibility, not ToolCall objects.
         """
         # Create a mock generation result
-        mock_result = type('obj', (object,), {'tool_calls': None})()
+        mock_result = type("obj", (object,), {"tool_calls": None})()
         parsing_result = self.tool_parser.parse(mock_result, text)
 
         # Convert ToolCall objects back to dicts for compatibility
-        return [
-            {"tool": tc.tool, "arguments": tc.arguments}
-            for tc in parsing_result.tool_calls
-        ]
+        return [{"tool": tc.tool, "arguments": tc.arguments} for tc in parsing_result.tool_calls]
 
     def _execute_tool(self, tool_call: ToolCallDict) -> ToolResult:
         """
@@ -1023,6 +1034,7 @@ class Agent:
         """
         # Convert ToolResult list to ToolExecutionResult list
         from runtime.tool_executor import ToolExecutionResult
+
         exec_results = [
             ToolExecutionResult(
                 tool_name=f"tool_{i}",
@@ -1072,19 +1084,22 @@ class Agent:
         conversation_id = params.get("conversation_id", "default")
         task_id: Optional[str] = params.get("task_id")
 
-        # DEBUG: Log avant exécution
-        print(f"\n[HTN-DEBUG] _generic_execute INPUT:")
-        print(f"  - Query length: {len(query)} chars")
-        print(f"  - Query preview: {query[:100] if len(query) > 100 else query}...")
+        # Log input for debugging
+        _init_logger.debug(
+            "_generic_execute INPUT: query_length=%d chars, query_preview=%s",
+            len(query),
+            query[:100] if len(query) > 100 else query,
+        )
 
         result = self._run_simple(query, conversation_id, task_id)
         response = result.get("response", "")
 
-        # DEBUG: Log après exécution
-        print(f"\n[HTN-DEBUG] _generic_execute OUTPUT:")
-        print(f"  - Response type: {type(response)}")
-        print(f"  - Response length: {len(str(response))} chars")
-        print(f"  - Response preview: {str(response)[:300] if len(str(response)) > 300 else str(response)}...")
+        # Log output for debugging
+        _init_logger.debug(
+            "_generic_execute OUTPUT: response_type=%s, response_length=%d chars",
+            type(response).__name__,
+            len(str(response)),
+        )
 
         return response
 
@@ -1102,18 +1117,19 @@ class Agent:
         results = []
         sorted_tasks = plan_result.graph.topological_sort()
 
-        # DEBUG: Log avant agrégation
-        print(f"\n[HTN-DEBUG] _format_htn_response - Aggregating results:")
-        print(f"  - Number of sorted tasks: {len(sorted_tasks)}")
+        # Log aggregation details
+        _init_logger.debug("_format_htn_response - Aggregating results: %d sorted tasks", len(sorted_tasks))
 
         for task in sorted_tasks:
             if task.status == TaskStatus.COMPLETED:
-                # DEBUG: Log de chaque résultat de tâche
-                print(f"\n[HTN-DEBUG] Processing task: {task.task_id}")
-                print(f"  - Task name: {task.name}")
-                print(f"  - Task result type: {type(task.result)}")
-                print(f"  - Task result length: {len(str(task.result))} chars")
-                print(f"  - Task result preview: {str(task.result)[:300] if len(str(task.result)) > 300 else str(task.result)}...")
+                # Log each task result
+                _init_logger.debug(
+                    "Processing task: %s (name=%s, result_type=%s, result_length=%d chars)",
+                    task.task_id,
+                    task.name,
+                    type(task.result).__name__,
+                    len(str(task.result)),
+                )
 
                 verification = verifications.get(task.task_id, None) if isinstance(verifications, dict) else None
                 results.append(
@@ -1138,7 +1154,7 @@ class Agent:
                 task_id=task_id,
             )
         except Exception as e:
-            print(f"⚠ Failed to persist assistant message: {e}")
+            _init_logger.warning("Failed to persist assistant message: %s", e)
 
         # Logger la fin de la conversation HTN
         if self.logger:
@@ -1156,7 +1172,7 @@ class Agent:
                     },
                 )
             except Exception as e:
-                print(f"⚠ Failed to log conversation.end.htn event: {e}")
+                _init_logger.warning("Failed to log conversation.end.htn event: %s", e)
 
         return {
             "response": response_text,
@@ -1184,14 +1200,13 @@ class Agent:
         if not results:
             return "Aucun résultat disponible."
 
-        # DEBUG: Log des résultats reçus
-        print(f"\n[HTN-DEBUG] _generate_response_from_results INPUT:")
-        print(f"  - Number of results: {len(results)}")
+        # Log input for debugging
+        _init_logger.debug("_generate_response_from_results INPUT: %d results", len(results))
         for i, result in enumerate(results):
             task_result = result.get("result", "")
-            print(f"  - Result {i+1} type: {type(task_result)}")
-            print(f"  - Result {i+1} length: {len(str(task_result))} chars")
-            print(f"  - Result {i+1} preview: {str(task_result)[:200] if len(str(task_result)) > 200 else str(task_result)}...")
+            _init_logger.debug(
+                "Result %d: type=%s, length=%d chars", i + 1, type(task_result).__name__, len(str(task_result))
+            )
 
         response_parts = []
         response_parts.append("J'ai complété les tâches suivantes:\n")
@@ -1215,9 +1230,9 @@ class Agent:
                 response_parts.append(f"   Résultat: {result_str}")
 
         final_response = "\n".join(response_parts)
-        print(f"\n[HTN-DEBUG] _generate_response_from_results OUTPUT:")
-        print(f"  - Final response length: {len(final_response)} chars")
-        print(f"  - Final response preview: {final_response[:300]}...")
+        _init_logger.debug(
+            "_generate_response_from_results OUTPUT: final_response_length=%d chars", len(final_response)
+        )
 
         return final_response
 

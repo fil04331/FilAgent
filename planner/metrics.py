@@ -15,6 +15,7 @@ Usage:
 """
 
 from typing import Optional
+import threading
 
 # Try to import prometheus_client, but make it optional
 try:
@@ -331,11 +332,12 @@ class HTNMetrics:
 
 # Instance globale (singleton)
 _metrics_instance: Optional[HTNMetrics] = None
+_metrics_lock = threading.RLock()
 
 
 def get_metrics(enabled: bool = True) -> HTNMetrics:
     """
-    Récupère l'instance globale de métriques
+    Récupère l'instance globale de métriques (thread-safe)
 
     Args:
         enabled: Active la collecte de métriques
@@ -346,7 +348,9 @@ def get_metrics(enabled: bool = True) -> HTNMetrics:
     global _metrics_instance
 
     if _metrics_instance is None:
-        _metrics_instance = HTNMetrics(enabled=enabled)
+        with _metrics_lock:  # Double-checked locking
+            if _metrics_instance is None:
+                _metrics_instance = HTNMetrics(enabled=enabled)
 
     return _metrics_instance
 
@@ -354,4 +358,5 @@ def get_metrics(enabled: bool = True) -> HTNMetrics:
 def reset_metrics():
     """Réinitialise l'instance de métriques (utile pour tests)"""
     global _metrics_instance
-    _metrics_instance = None
+    with _metrics_lock:
+        _metrics_instance = None
