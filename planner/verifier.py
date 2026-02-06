@@ -18,11 +18,20 @@ Niveaux de validation:
 - PARANOID: Vérifications exhaustives (sémantique, cohérence)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Dict, Optional, Any, Callable
+from typing import TYPE_CHECKING, List, Dict, Optional, Union, Callable
 from datetime import datetime, timezone
 from .metrics import get_metrics
+
+if TYPE_CHECKING:
+    from .task_graph import Task, TaskGraph
+
+# Types stricts pour le vérificateur
+SchemaValue = Union[str, type, tuple[type, ...], Dict[str, Union[str, int, List[str]]]]
+VerificationMetadataValue = Union[str, int, float, bool, List[str]]
 
 
 class VerificationLevel(str, Enum):
@@ -54,14 +63,14 @@ class VerificationResult:
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     confidence_score: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, VerificationMetadataValue] = field(default_factory=dict)
 
     def __post_init__(self):
         """Initialise métadonnées de traçabilité"""
         if "verified_at" not in self.metadata:
             self.metadata["verified_at"] = datetime.now(timezone.utc).isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Union[bool, str, float, Dict[str, bool], List[str], Dict[str, VerificationMetadataValue]]]:
         """Sérialise pour logging"""
         return {
             "passed": self.passed,
@@ -128,9 +137,9 @@ class TaskVerifier:
 
     def verify_task(
         self,
-        task: Any,  # Task object
+        task: "Task",
         level: Optional[VerificationLevel] = None,
-        expected_schema: Optional[Dict[str, Any]] = None,
+        expected_schema: Optional[Dict[str, SchemaValue]] = None,
     ) -> VerificationResult:
         """
         Vérifie le résultat d'une tâche
@@ -262,7 +271,7 @@ class TaskVerifier:
 
     def verify_graph_results(
         self,
-        graph: Any,  # TaskGraph
+        graph: "TaskGraph",
         level: Optional[VerificationLevel] = None,
     ) -> Dict[str, VerificationResult]:
         """
@@ -284,7 +293,7 @@ class TaskVerifier:
 
         return results
 
-    def _verify_schema(self, result: Any, schema: Dict[str, Any]) -> bool:
+    def _verify_schema(self, result: object, schema: Dict[str, SchemaValue]) -> bool:
         """Vérifie que le résultat correspond au schéma attendu."""
         if not isinstance(schema, dict):
             return False
@@ -333,7 +342,7 @@ class TaskVerifier:
 
         return True
 
-    def _verify_temporal_coherence(self, task: Any) -> bool:
+    def _verify_temporal_coherence(self, task: "Task") -> bool:
         """
         Vérifie la cohérence temporelle des métadonnées
 
@@ -373,7 +382,7 @@ class TaskVerifier:
             # Métadonnées manquantes ou invalides
             return False
 
-    def self_check(self) -> Dict[str, Any]:
+    def self_check(self) -> Dict[str, Union[bool, Dict[str, bool], Dict[str, int], str]]:
         """
         Self-check du vérificateur lui-même
 
@@ -385,7 +394,7 @@ class TaskVerifier:
         Returns:
             Dict avec résultats du self-check
         """
-        checks = {}
+        checks: Dict[str, bool] = {}
 
         # Check 1: Statistiques cohérentes
         total = self._stats["total_verifications"]
@@ -406,6 +415,6 @@ class TaskVerifier:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> Dict[str, int]:
         """Retourne les statistiques de vérification"""
         return self._stats.copy()

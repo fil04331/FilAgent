@@ -19,30 +19,46 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from planner.compliance_guardian import (
     ComplianceGuardian,
     ValidationResult,
-    ComplianceError
+    QueryValidationResult,
+    PlanValidationResult,
+    ValidationMetadata,
+    RiskLevel,
+    ComplianceError,
 )
 
 
 @pytest.fixture
 def mock_compliance_rules():
-    """Mock compliance rules YAML"""
+    """Mock compliance rules YAML - matches expected structure in ComplianceGuardian"""
     return {
-        "pii_patterns": {
-            "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-            "phone": r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
-            "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
-            "credit_card": r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b"
+        "validation": {
+            "max_query_length": 10000,
+            "forbidden_patterns": [
+                r"(?i)(password|secret|token|api[_-]?key)",
+                r"(?i)(hack|exploit|bypass|inject)",
+            ],
+            "pii_patterns": [
+                r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
+                r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",  # Phone
+            ],
+            "required_fields": ["query", "user_id"],
         },
-        "forbidden_queries": [
-            "password",
-            "secret",
-            "confidential",
-            "private key"
-        ],
-        "risk_levels": {
-            "high": ["delete", "remove", "drop table"],
-            "medium": ["modify", "update", "change"],
-            "low": ["read", "list", "view"]
+        "execution": {
+            "max_plan_depth": 5,
+            "max_tools_per_plan": 20,
+            "forbidden_tools": [],
+            "require_approval_for": ["file_delete", "system_command"],
+        },
+        "audit": {
+            "log_all_queries": True,
+            "log_all_plans": True,
+            "log_all_executions": True,
+            "retention_days": 365,
+        },
+        "legal": {
+            "frameworks": ["loi25", "gdpr", "ai_act", "nist_ai_rmf"],
+            "data_classification": ["public", "internal", "confidential", "restricted"],
         }
     }
 
@@ -62,35 +78,34 @@ def guardian(mock_compliance_rules, tmp_path):
 @pytest.mark.coverage
 class TestComplianceGuardian:
     """Comprehensive tests for ComplianceGuardian"""
-    
+
     def test_guardian_initialization(self, guardian):
         """Test ComplianceGuardian initialization"""
         assert guardian is not None
         assert guardian.rules is not None
         assert isinstance(guardian.audit_log, list)
-    
+
     def test_guardian_with_missing_config(self):
-        """Test guardian with missing config file"""
-        with pytest.raises(FileNotFoundError):
-            ComplianceGuardian(config_path="/nonexistent/path.yaml")
-    
+        """Test guardian with missing config file - uses default rules"""
+        # ComplianceGuardian uses default rules if file not found
+        guardian = ComplianceGuardian(config_path="/nonexistent/path.yaml")
+        assert guardian.rules is not None
+
     def test_validate_query_compliant(self, guardian):
         """Test validation of compliant query"""
+        # validate_query returns QueryValidationResult (Pydantic model)
         result = guardian.validate_query("Calculate the sum of numbers")
-        
-        assert isinstance(result, ValidationResult)
-        assert result.is_compliant is True
-        assert len(result.violations) == 0
-    
+
+        assert isinstance(result, QueryValidationResult)
+        assert result.valid is True
+        assert len(result.errors) == 0
+
     def test_validate_query_with_forbidden_keyword(self, guardian):
         """Test validation with forbidden keyword"""
-        result = guardian.validate_query("Show me the password for this account")
-        
-        assert isinstance(result, ValidationResult)
-        # Depending on implementation, this might be non-compliant
-        if not result.is_compliant:
-            assert len(result.violations) > 0
-    
+        # validate_query raises ComplianceError for forbidden patterns
+        with pytest.raises(ComplianceError):
+            guardian.validate_query("Show me the password for this account")
+
     def test_validate_task_compliant(self, guardian):
         """Test task validation for compliant task"""
         task = {
@@ -99,21 +114,23 @@ class TestComplianceGuardian:
             "tool": "file_reader",
             "parameters": {"path": "/safe/file.txt"}
         }
-        
+
         result = guardian.validate_task(task)
         assert isinstance(result, ValidationResult)
-    
-    def test_validate_plan_compliant(self, guardian):
-        """Test plan validation for compliant plan"""
+
+    def test_validate_execution_plan_compliant(self, guardian):
+        """Test execution plan validation for compliant plan"""
         plan = {
-            "tasks": [
-                {"id": "task-1", "name": "Read file", "tool": "file_reader"},
-                {"id": "task-2", "name": "Calculate sum", "tool": "calculator"}
+            "actions": [
+                {"tool": "file_reader"},
+                {"tool": "calculator"}
             ]
         }
-        
-        result = guardian.validate_plan(plan)
-        assert isinstance(result, ValidationResult)
+
+        # validate_execution_plan returns PlanValidationResult (Pydantic model)
+        result = guardian.validate_execution_plan(plan)
+        assert isinstance(result, PlanValidationResult)
+        assert result.valid is True
 
 
 @pytest.mark.unit
@@ -179,7 +196,7 @@ class TestPIIRedaction:
 @pytest.mark.coverage
 class TestForbiddenQueries:
     """Tests for forbidden query detection"""
-    
+
     def test_detect_forbidden_password(self, guardian):
         """Test detection of password queries"""
         queries = [
@@ -187,24 +204,26 @@ class TestForbiddenQueries:
             "Show me user passwords",
             "Password: secret123"
         ]
-        
+
         for query in queries:
-            result = guardian.validate_query(query)
-            # Should either mark as non-compliant or handle appropriately
-            assert isinstance(result, ValidationResult)
-    
+            # validate_query raises ComplianceError for forbidden patterns
+            with pytest.raises(ComplianceError):
+                guardian.validate_query(query)
+
     def test_detect_forbidden_secret(self, guardian):
         """Test detection of secret queries"""
         query = "Reveal the secret key"
-        result = guardian.validate_query(query)
-        assert isinstance(result, ValidationResult)
-    
+        with pytest.raises(ComplianceError):
+            guardian.validate_query(query)
+
     def test_detect_forbidden_confidential(self, guardian):
-        """Test detection of confidential queries"""
+        """Test detection of confidential queries - 'confidential' not in default forbidden patterns"""
         query = "Access confidential documents"
+        # 'confidential' is NOT in the forbidden patterns, so this should pass
         result = guardian.validate_query(query)
-        assert isinstance(result, ValidationResult)
-    
+        assert isinstance(result, QueryValidationResult)
+        assert result.valid is True
+
     def test_case_insensitive_detection(self, guardian):
         """Test case-insensitive forbidden query detection"""
         queries = [
@@ -212,55 +231,55 @@ class TestForbiddenQueries:
             "Password",
             "PaSsWoRd"
         ]
-        
+
         for query in queries:
-            result = guardian.validate_query(f"Show me the {query}")
-            assert isinstance(result, ValidationResult)
+            # validate_query raises ComplianceError for forbidden patterns
+            with pytest.raises(ComplianceError):
+                guardian.validate_query(f"Show me the {query}")
 
 
 @pytest.mark.unit
 @pytest.mark.compliance
 @pytest.mark.coverage
 class TestRiskAssessment:
-    """Tests for risk level assessment"""
-    
+    """Tests for risk level assessment via validate_task (which returns ValidationResult)"""
+
     def test_high_risk_operations(self, guardian):
-        """Test high-risk operation detection"""
-        high_risk_queries = [
-            "Delete all user data",
-            "Remove database entries",
-            "Drop table users"
+        """Test high-risk operation detection via tasks requiring approval"""
+        # Tasks with tools in require_approval_for get HIGH risk
+        high_risk_tasks = [
+            {"name": "Delete files", "tool": "file_delete"},
+            {"name": "Run command", "tool": "system_command"},
         ]
-        
-        for query in high_risk_queries:
-            result = guardian.validate_query(query)
+
+        for task in high_risk_tasks:
+            result = guardian.validate_task(task)
             assert isinstance(result, ValidationResult)
-            # High risk queries might have HIGH risk_level
-            if hasattr(result, 'risk_level'):
-                assert result.risk_level in ["HIGH", "CRITICAL", "MEDIUM", "LOW"]
-    
+            assert result.risk_level in ["HIGH", "CRITICAL"]
+
     def test_medium_risk_operations(self, guardian):
         """Test medium-risk operation detection"""
-        medium_risk_queries = [
-            "Update user profile",
-            "Modify settings",
-            "Change configuration"
+        # Regular tasks should validate without issues
+        medium_risk_tasks = [
+            {"name": "Update profile", "tool": "database_update"},
+            {"name": "Modify settings", "tool": "config_editor"},
         ]
-        
-        for query in medium_risk_queries:
-            result = guardian.validate_query(query)
+
+        for task in medium_risk_tasks:
+            result = guardian.validate_task(task)
             assert isinstance(result, ValidationResult)
-    
+            assert result.risk_level in ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+
     def test_low_risk_operations(self, guardian):
         """Test low-risk operation detection"""
-        low_risk_queries = [
-            "Read file contents",
-            "List directory",
-            "View dashboard"
+        low_risk_tasks = [
+            {"name": "Read file", "tool": "file_reader"},
+            {"name": "List directory", "tool": "directory_lister"},
+            {"name": "View data", "tool": "data_viewer"},
         ]
-        
-        for query in low_risk_queries:
-            result = guardian.validate_query(query)
+
+        for task in low_risk_tasks:
+            result = guardian.validate_task(task)
             assert isinstance(result, ValidationResult)
             assert result.risk_level in ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
@@ -308,15 +327,16 @@ class TestValidationResult:
         assert result.warnings == ["Consider review"]
     
     def test_validation_result_with_metadata(self):
-        """Test ValidationResult with metadata"""
+        """Test ValidationResult with metadata (Pydantic ValidationMetadata)"""
         result = ValidationResult(
             is_compliant=True,
             violations=[],
-            risk_level="LOW",
-            metadata={"timestamp": "2024-01-01T00:00:00Z"}
+            risk_level=RiskLevel.LOW,
+            metadata=ValidationMetadata(timestamp="2024-01-01T00:00:00Z")
         )
-        
-        assert result.metadata["timestamp"] == "2024-01-01T00:00:00Z"
+
+        assert result.metadata is not None
+        assert result.metadata.timestamp == "2024-01-01T00:00:00Z"
 
 
 @pytest.mark.unit
@@ -341,29 +361,31 @@ class TestComplianceError:
 @pytest.mark.coverage
 class TestAuditLogging:
     """Tests for audit logging functionality"""
-    
+
     def test_audit_log_initialized(self, guardian):
         """Test audit log is initialized"""
         assert isinstance(guardian.audit_log, list)
-    
+
     def test_audit_log_entry_added(self, guardian):
         """Test audit log entries are added"""
         initial_count = len(guardian.audit_log)
-        
-        # Perform validation
-        guardian.validate_query("Test query")
-        
-        # Check if audit log grew (implementation dependent)
-        assert len(guardian.audit_log) >= initial_count
-    
+
+        # Perform validation (use a compliant query)
+        guardian.validate_query("Test query without forbidden words")
+
+        # Check if audit log grew
+        assert len(guardian.audit_log) > initial_count
+
     def test_audit_log_contains_metadata(self, guardian):
         """Test audit log entries contain metadata"""
-        guardian.validate_query("Test query")
-        
-        if len(guardian.audit_log) > 0:
-            entry = guardian.audit_log[-1]
-            # Should have some structure
-            assert isinstance(entry, dict) or isinstance(entry, object)
+        guardian.validate_query("Test query without forbidden words")
+
+        assert len(guardian.audit_log) > 0
+        entry = guardian.audit_log[-1]
+        # Should have structure with event_type and data
+        assert isinstance(entry, dict)
+        assert 'event_type' in entry
+        assert 'timestamp' in entry
 
 
 @pytest.mark.unit
@@ -371,28 +393,28 @@ class TestAuditLogging:
 @pytest.mark.coverage
 class TestComplianceIntegration:
     """Integration tests for compliance checks"""
-    
+
     def test_end_to_end_compliant_workflow(self, guardian):
         """Test complete compliant workflow"""
-        # Validate query
+        # Validate query - returns QueryValidationResult (Pydantic model)
         query_result = guardian.validate_query("Calculate sum of numbers")
-        assert query_result.is_compliant
-        
-        # Validate task
+        assert isinstance(query_result, QueryValidationResult)
+        assert query_result.valid is True
+
+        # Validate task - returns ValidationResult (Pydantic model)
         task = {"id": "task-1", "name": "Calculate", "tool": "calculator"}
         task_result = guardian.validate_task(task)
         assert isinstance(task_result, ValidationResult)
-        
-        # Validate plan
-        plan = {"tasks": [task]}
-        plan_result = guardian.validate_plan(plan)
-        assert isinstance(plan_result, ValidationResult)
-    
+        assert task_result.is_compliant is True
+
+        # Validate execution plan - returns PlanValidationResult (Pydantic model)
+        plan = {"actions": [{"tool": "calculator"}]}
+        plan_result = guardian.validate_execution_plan(plan)
+        assert isinstance(plan_result, PlanValidationResult)
+        assert plan_result.valid is True
+
     def test_end_to_end_non_compliant_workflow(self, guardian):
         """Test complete non-compliant workflow"""
-        # Query with forbidden keyword
-        query_result = guardian.validate_query("Show password")
-        
-        # Should detect violation
-        if not query_result.is_compliant:
-            assert len(query_result.violations) > 0
+        # Query with forbidden keyword raises ComplianceError
+        with pytest.raises(ComplianceError):
+            guardian.validate_query("Show password")

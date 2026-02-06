@@ -1,29 +1,41 @@
 """
-Calculateur mathématique sécurisé
-Évalue des expressions mathématiques sans risque d'exécution arbitraire
+Calculateur mathématique securise
+Evalue des expressions mathematiques sans risque d'execution arbitraire
 """
+
+from __future__ import annotations
 
 import math
 import operator
-from typing import Dict, Any, Optional
-import re
+from typing import Callable, Dict, List, Optional, Union
 import ast  # For safe expression evaluation
 
-from .base import BaseTool, ToolResult, ToolStatus
+from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
+
+# Types stricts pour le calculateur
+MathOperation = Callable[[float, float], float]
+MathFunction = Callable[..., float]
+MathConstant = float
+SafeFunctionValue = Union[MathFunction, MathConstant]
+CalculatorMetadataValue = Union[str, int, float, bool]
+ParameterSchemaValue = Union[str, Dict[str, str], List[str]]
 
 
 class CalculatorTool(BaseTool):
     """
-    Outil pour évaluer des expressions mathématiques
-    Utilise seulement des opérations mathématiques sûres
+    Outil pour evaluer des expressions mathematiques
+    Utilise seulement des operations mathematiques sures
     """
 
-    def __init__(self):
+    safe_operations: Dict[str, MathOperation]
+    safe_functions: Dict[str, SafeFunctionValue]
+
+    def __init__(self) -> None:
         super().__init__(
-            name="math_calculator", description="Évaluer des expressions mathématiques de manière sécurisée"
+            name="math_calculator", description="Evaluer des expressions mathematiques de maniere securisee"
         )
 
-        # Opérations autorisées
+        # Operations autorisees
         self.safe_operations = {
             "+": operator.add,
             "-": operator.sub,
@@ -40,7 +52,7 @@ class CalculatorTool(BaseTool):
             ">=": operator.ge,
         }
 
-        # Fonctions mathématiques autorisées
+        # Fonctions mathematiques autorisees
         self.safe_functions = {
             "abs": abs,
             "round": round,
@@ -57,20 +69,20 @@ class CalculatorTool(BaseTool):
             "e": math.e,
         }
 
-    def execute(self, arguments: Dict[str, Any]) -> ToolResult:
-        """Évaluer l'expression"""
+    def execute(self, arguments: Dict[str, ToolParamValue]) -> ToolResult:
+        """Evaluer l'expression"""
         # Valider les arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}")
 
-        expression = arguments["expression"]
+        expression = str(arguments["expression"])
 
         try:
-            # Évaluer de manière sûre
+            # Evaluer de maniere sure
             result = self._safe_eval(expression)
 
-            # Convertir le résultat en string
+            # Convertir le resultat en string
             if isinstance(result, float):
                 # Arrondir pour les floats proches d'entiers
                 if abs(result - round(result)) < 1e-10:
@@ -80,24 +92,34 @@ class CalculatorTool(BaseTool):
             else:
                 result_str = str(result)
 
+            metadata: Dict[str, ToolMetadataValue] = {
+                "expression": expression,
+                "result": float(result) if isinstance(result, (int, float)) else str(result),
+                "result_type": type(result).__name__,
+            }
+
             return ToolResult(
                 status=ToolStatus.SUCCESS,
                 output=result_str,
-                metadata={"expression": expression, "result": result, "result_type": type(result).__name__},
+                metadata=metadata,
             )
 
-        except Exception as e:
+        except ValueError as e:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Failed to evaluate expression: {str(e)}")
+        except ZeroDivisionError:
+            return ToolResult(status=ToolStatus.ERROR, output="", error="Division by zero")
+        except OverflowError:
+            return ToolResult(status=ToolStatus.ERROR, output="", error="Numeric overflow")
 
-    def _safe_eval(self, expression: str):
+    def _safe_eval(self, expression: str) -> Union[int, float, bool]:
         """
-        Évaluer de manière SÉCURISÉE sans utiliser eval()
-        Utilise ast pour parser et évaluer des expressions mathématiques simples.
-        Possibilités : nombres, opérations arithmétiques, appels de fonctions sûres.
+        Evaluer de maniere SECURISEE sans utiliser eval()
+        Utilise ast pour parser et evaluer des expressions mathematiques simples.
+        Possibilites : nombres, operations arithmetiques, appels de fonctions sures.
         """
-        # Autoriser uniquement les noms sûrs (fonctions et constantes)
-        allowed_names = {**self.safe_functions}
-        allowed_func_names = set(self.safe_functions.keys())
+        # Autoriser uniquement les noms surs (fonctions et constantes)
+        allowed_names: Dict[str, SafeFunctionValue] = {**self.safe_functions}
+        allowed_func_names: set[str] = set(self.safe_functions.keys())
         allowed_ops = (
             ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd
         )
@@ -105,14 +127,16 @@ class CalculatorTool(BaseTool):
         # Parse l'expression en AST
         try:
             node = ast.parse(expression.strip(), mode='eval')
-        except Exception:
-            raise ValueError("Expression non valide")
+        except SyntaxError as exc:
+            raise ValueError("Expression non valide") from exc
 
-        def _eval(node):
+        def _eval(node: ast.AST) -> Union[int, float, bool]:
             if isinstance(node, ast.Expression):
                 return _eval(node.body)
             elif isinstance(node, ast.Num):  # Python <=3.7
-                return node.n
+                if isinstance(node.n, (int, float)):
+                    return node.n
+                raise ValueError("Nombre non autorisé")
             elif isinstance(node, ast.Constant):  # Python >=3.8
                 if isinstance(node.value, (int, float)):
                     return node.value
@@ -150,15 +174,23 @@ class CalculatorTool(BaseTool):
                 if func_name not in allowed_func_names:
                     raise ValueError(f"Fonction non autorisée: {func_name}")
                 func = allowed_names[func_name]
+                if not callable(func):
+                    raise ValueError(f"Fonction non appelable: {func_name}")
                 args = [_eval(arg) for arg in node.args]
-                return func(*args)
+                result = func(*args)
+                if isinstance(result, (int, float)):
+                    return result
+                raise ValueError(f"Résultat non numérique: {func_name}")
             elif isinstance(node, ast.Name):
                 name = node.id
                 if name not in {'pi', 'e'}:
                     raise ValueError(f"Nom non autorisé: {name}")
                 if name not in allowed_names:
                     raise ValueError(f"Constante non disponible: {name}")
-                return allowed_names[name]
+                const_val = allowed_names[name]
+                if isinstance(const_val, (int, float)):
+                    return const_val
+                raise ValueError(f"Constante non numérique: {name}")
             elif isinstance(node, ast.Compare):
                 # Only allow single comparisons (no chaining)
                 if len(node.ops) != 1 or len(node.comparators) != 1:
@@ -187,7 +219,7 @@ class CalculatorTool(BaseTool):
                 raise ValueError("Expression non autorisée")
 
         return _eval(node)
-    def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"
@@ -203,14 +235,14 @@ class CalculatorTool(BaseTool):
 
         return True, None
 
-    def _get_parameters_schema(self) -> Dict[str, Any]:
-        """Schéma des paramètres"""
+    def _get_parameters_schema(self) -> ToolSchemaDict:
+        """Schema des parametres"""
         return {
             "type": "object",
             "properties": {
                 "expression": {
                     "type": "string",
-                    "description": "Expression mathématique à évaluer (ex: '2 + 3 * 4', 'sqrt(16)')",
+                    "description": "Expression mathematique a evaluer (ex: '2 + 3 * 4', 'sqrt(16)')",
                 }
             },
             "required": ["expression"],

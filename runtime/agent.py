@@ -5,25 +5,52 @@ Gère les boucles de raisonnement et les appels d'outils
 REFACTORED: Now uses Clean Architecture with dependency injection
 """
 
+from __future__ import annotations
+
 import json
 import re
 import hashlib
 import textwrap
 import time
-from typing import List, Dict, Optional, Any
+from typing import TYPE_CHECKING, List, Dict, Optional, Union, Callable, cast
 from datetime import datetime
 
-from .config import get_config
+from .config import get_config, AgentConfig
 from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry, ToolRegistry
-from tools.base import ToolResult, ToolStatus
+from tools.base import ToolResult, ToolStatus, BaseTool
+
+if TYPE_CHECKING:
+    from .middleware.logging import EventLogger
+    from .middleware.audittrail import DRManager
+    from .middleware.provenance import ProvenanceTracker
+    from .model_interface import ModelInterface
+    from planner.planner import (
+        HierarchicalPlanner as HierarchicalPlannerType,
+        ModelInterface as PlannerModelInterface,
+    )
+    from planner.executor import TaskExecutor as TaskExecutorType
+    from planner.verifier import TaskVerifier as TaskVerifierType
+
+
+# Types stricts pour l'agent
+AgentMetadataValue = Union[str, int, float, bool, List[str]]
+ToolCallDict = Dict[str, Union[str, Dict[str, str]]]
+# ChatResponseValue: Flexible type for complex HTN responses with nested dicts
+ChatResponseValue = Union[str, int, float, bool, None, List[str], Dict[str, object]]
+ToolArgsDict = Dict[str, str]
 
 # Import des middlewares de conformité
 from .middleware.logging import get_logger
 from .middleware.audittrail import get_dr_manager
 from .middleware.provenance import get_tracker
-from planner.compliance_guardian import ComplianceGuardian
+from planner.compliance_guardian import (
+    ComplianceGuardian,
+    ContextDict,
+    ExecutionResultDict,
+    PlanDict,
+)
 
 # Import metrics for observability
 try:
@@ -54,8 +81,11 @@ from planner import (
     TaskExecutor,
     TaskVerifier,
     PlanningStrategy,
+    PlanningResult,
     ExecutionStrategy,
+    ExecutionResult,
     VerificationLevel,
+    VerificationResult,
 )
 from planner.task_graph import TaskStatus
 
@@ -82,22 +112,35 @@ class Agent:
     Components can be injected for testing or will be created with defaults.
     """
 
+    # Type hints for instance attributes
+    config: AgentConfig
+    model: Optional["ModelInterface"]
+    tool_registry: ToolRegistry
+    conversation_history: List[Dict[str, str]]
+    logger: Optional["EventLogger"]
+    dr_manager: Optional["DRManager"]
+    tracker: Optional["ProvenanceTracker"]
+    compliance_guardian: Optional[ComplianceGuardian]
+    planner: Optional["HierarchicalPlannerType"]
+    executor: Optional["TaskExecutorType"]
+    verifier: Optional["TaskVerifierType"]
+
     def __init__(
         self,
-        config=None,
+        config: Optional[AgentConfig] = None,
         tool_registry: Optional[ToolRegistry] = None,
-        logger=None,
-        dr_manager=None,
-        tracker=None,
+        logger: Optional["EventLogger"] = None,
+        dr_manager: Optional["DRManager"] = None,
+        tracker: Optional["ProvenanceTracker"] = None,
         router: Optional[StrategyRouter] = None,
         tool_executor: Optional[ToolExecutor] = None,
         tool_parser: Optional[ToolParser] = None,
         context_builder: Optional[ContextBuilder] = None,
-        compliance_guardian=None,
-    ):
+        compliance_guardian: Optional[ComplianceGuardian] = None,
+    ) -> None:
         """
         Initialize Agent with dependency injection.
-        
+
         Args:
             config: Agent configuration (created if None)
             tool_registry: Tool registry (created if None)
@@ -113,10 +156,10 @@ class Agent:
         # Core configuration
         self.config = config or get_config()
         self.model = None  # Sera initialisé plus tard
-        
+
         # Tool registry (injected or default)
         self.tool_registry = tool_registry or get_registry()
-        
+
         # Legacy conversation history (kept for backward compatibility)
         self.conversation_history: List[Dict[str, str]] = []
 
@@ -211,11 +254,11 @@ class Agent:
         self.verifier = None
 
     @staticmethod
-    def _is_mock(obj: Any) -> bool:
+    def _is_mock(obj: object) -> bool:
         """Déterminer si l'objet est un mock unittest."""
         return hasattr(obj, "__class__") and getattr(obj.__class__, "__module__", "").startswith("unittest.mock")
 
-    def _refresh_middlewares(self):
+    def _refresh_middlewares(self) -> None:
         """Synchroniser logger, DR manager et tracker avec les singletons (patchables)."""
         from .middleware import logging as logging_mw
         from .middleware import audittrail as audittrail_mw
@@ -254,7 +297,7 @@ class Agent:
         except Exception as e:
             print(f"⚠ Failed to refresh ComplianceGuardian: {e}")
 
-    def initialize_model(self):
+    def initialize_model(self) -> None:
         """Initialiser le modèle"""
         from .model_interface import init_model
 
@@ -268,7 +311,7 @@ class Agent:
         # Initialiser le planificateur HTN après l'initialisation du modèle
         self._initialize_htn()
 
-    def _initialize_htn(self):
+    def _initialize_htn(self) -> None:
         """Initialiser le système HTN (planificateur, exécuteur, vérificateur)"""
         # Récupérer la configuration HTN depuis config
         htn_config = getattr(self.config, "htn_planning", None)
@@ -294,8 +337,11 @@ class Agent:
             verif_level = VerificationLevel.STRICT
 
         # Ajouter le planificateur HTN
+        # Note: cast nécessaire car runtime.ModelInterface (ABC) et planner.ModelInterface (Protocol)
+        # sont structurellement compatibles mais mypy ne le détecte pas automatiquement
+        model_for_planner = cast("PlannerModelInterface | None", self.model)
         self.planner = HierarchicalPlanner(
-            model_interface=self.model,
+            model_interface=model_for_planner,
             tools_registry=self.tool_registry,
             max_decomposition_depth=max_depth,
             enable_tracing=True,
@@ -317,7 +363,7 @@ class Agent:
         )
         print("✓ HTN system initialized")
 
-    def _resolve_verification_level(self, verif_config: Any) -> VerificationLevel:
+    def _resolve_verification_level(self, verif_config: object) -> VerificationLevel:
         """Normalise le niveau de vérification issu de la configuration."""
         if not verif_config or self._is_mock(verif_config):
             return VerificationLevel.STRICT
@@ -343,10 +389,10 @@ class Agent:
         # Gestion des mocks ou valeurs inattendues
         return VerificationLevel.STRICT
 
-    def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """
         Analyser un message utilisateur et orchestrer la réponse de l'agent.
-        
+
         REFACTORED: Now uses Router component for strategy decision.
         NEW: Checks semantic cache before routing to reduce inference costs.
         """
@@ -461,8 +507,13 @@ class Agent:
 
         return result
 
-    def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def _run_with_htn(self, user_query: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Exécution avec planification HTN"""
+
+        # Vérifier que HTN est initialisé
+        if self.planner is None or self.executor is None or self.verifier is None:
+            # Fallback au mode simple si HTN non initialisé
+            return self._run_simple(user_query, conversation_id, task_id)
 
         # Rafraîchir les middlewares patchables
         self._refresh_middlewares()
@@ -494,10 +545,15 @@ class Agent:
         elif strategy_str == "llm_based":
             strategy = PlanningStrategy.LLM_BASED
 
+        # Build context dict without None values
+        plan_context: Dict[str, str] = {"conversation_id": conversation_id}
+        if task_id is not None:
+            plan_context["task_id"] = task_id
+
         plan_result = self.planner.plan(
             query=user_query,
             strategy=strategy,
-            context={"conversation_id": conversation_id, "task_id": task_id},
+            context=plan_context,
         )
 
         # Log decision record (conformité Loi 25)
@@ -524,7 +580,7 @@ class Agent:
         # 2. Exécuter
         exec_result = self.executor.execute(
             graph=plan_result.graph,
-            context={"conversation_id": conversation_id, "task_id": task_id},
+            context=plan_context,
         )
 
         # 3. Vérifier
@@ -550,11 +606,15 @@ class Agent:
 
         return response
 
-    def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def _run_simple(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
         """Exécution en mode simple (ancien comportement sans HTN)"""
         
         # Track conversation start time
         conversation_start_time = time.time()
+
+        # Vérifier que le modèle est initialisé
+        if self.model is None:
+            raise RuntimeError("Model not initialized. Call initialize_model() first.")
 
         # Rafraîchir les middlewares patchables (important pour les tests)
         self._refresh_middlewares()
@@ -564,12 +624,12 @@ class Agent:
             try:
                 cg_config = getattr(self.config, 'compliance_guardian', None)
                 if cg_config and cg_config.validate_queries:
-                    context = {
+                    validation_context: ContextDict = {
                         'conversation_id': conversation_id,
-                        'task_id': task_id,
+                        'task_id': task_id or '',
                         'user_id': conversation_id  # Utiliser conversation_id comme proxy pour user_id
                     }
-                    self.compliance_guardian.validate_query(message, context)
+                    self.compliance_guardian.validate_query(message, validation_context)
             except Exception as e:
                 # En mode strict, propager l'erreur
                 cg_config = getattr(self.config, 'compliance_guardian', None)
@@ -731,13 +791,15 @@ class Agent:
 
         response_hash = hashlib.sha256(final_response.encode("utf-8")).hexdigest()
         unique_tools = list(dict.fromkeys(tools_used))
+        # Ensure prompt_hash has a value for logging
+        prompt_hash_for_logging = final_prompt_hash or hashlib.sha256(message.encode("utf-8")).hexdigest()
 
         if self.logger:
             try:
                 self.logger.log_generation(
                     conversation_id=conversation_id,
                     task_id=task_id,
-                    prompt_hash=final_prompt_hash,
+                    prompt_hash=prompt_hash_for_logging,
                     response_hash=response_hash,
                     tokens_used=usage["total_tokens"],
                 )
@@ -750,7 +812,7 @@ class Agent:
                     agent_id="agent:llmagenta",
                     agent_version=self.config.version,
                     task_id=task_id or conversation_id,
-                    prompt_hash=final_prompt_hash,
+                    prompt_hash=prompt_hash_for_logging,
                     response_hash=response_hash,
                     start_time=start_time,
                     end_time=end_time,
@@ -772,7 +834,7 @@ class Agent:
                     actor="agent.core",
                     task_id=task_id or conversation_id,
                     decision="generate_response_with_tools" if unique_tools else "generate_response",
-                    prompt_hash=final_prompt_hash,
+                    prompt_hash=prompt_hash_for_logging,
                     tools_used=unique_tools,
                     reasoning_markers=[f"iterations:{iterations}"],
                     alternatives_considered=["do_nothing", "ask_clarification"],
@@ -822,36 +884,36 @@ class Agent:
                 
                 # Auditer l'exécution
                 if cg_config and cg_config.audit_executions:
-                    exec_result = {
+                    exec_result_audit: ExecutionResultDict = {
                         'success': final_response is not None and "Erreur" not in final_response,
                         'errors': [] if final_response is not None else ['No response generated']
                     }
-                    audit_context = {
+                    audit_context: ContextDict = {
                         'conversation_id': conversation_id,
-                        'task_id': task_id,
+                        'task_id': task_id or '',
                     }
-                    self.compliance_guardian.audit_execution(exec_result, audit_context)
-                
+                    self.compliance_guardian.audit_execution(exec_result_audit, audit_context)
+
                 # Générer Decision Record
                 if cg_config and cg_config.auto_generate_dr:
-                    plan = {
-                        'actions': [{'tool': tool, 'params': {}} for tool in unique_tools],
-                        'tools_used': unique_tools
+                    dr_plan: PlanDict = {
+                        'actions': [{'tool': tool, 'params': ''} for tool in unique_tools],
+                        'tools_used': set(unique_tools)
                     }
-                    exec_result = {
+                    exec_result_dr: ExecutionResultDict = {
                         'success': final_response is not None and "Erreur" not in final_response,
                         'errors': [] if final_response is not None else ['No response generated']
                     }
-                    dr_context = {
+                    dr_context: ContextDict = {
                         'actor': 'agent.core',
                         'conversation_id': conversation_id,
-                        'task_id': task_id,
+                        'task_id': task_id or '',
                     }
                     self.compliance_guardian.generate_decision_record(
                         decision_type='simple_execution',
                         query=message,
-                        plan=plan,
-                        execution_result=exec_result,
+                        plan=dr_plan,
+                        execution_result=exec_result_dr,
                         context=dr_context
                     )
             except Exception as e:
@@ -890,7 +952,7 @@ class Agent:
         """
         return self.context_builder.compose_prompt(context, message)
 
-    def _build_context(self, history: List[Dict], conversation_id: str, task_id: Optional[str]) -> str:
+    def _build_context(self, history: List[Dict[str, str]], conversation_id: str, task_id: Optional[str]) -> str:
         """
         DEPRECATED: Use context_builder.build_context() instead.
         Kept for backward compatibility with tests.
@@ -917,7 +979,7 @@ class Agent:
         """
         return self.context_builder.build_system_prompt(self.tool_registry)
 
-    def _parse_tool_calls(self, text: str) -> List[Dict[str, Any]]:
+    def _parse_tool_calls(self, text: str) -> List[ToolCallDict]:
         """
         DEPRECATED: Use tool_parser.parse() instead.
         Kept for backward compatibility with tests.
@@ -927,27 +989,27 @@ class Agent:
         # Create a mock generation result
         mock_result = type('obj', (object,), {'tool_calls': None})()
         parsing_result = self.tool_parser.parse(mock_result, text)
-        
+
         # Convert ToolCall objects back to dicts for compatibility
         return [
             {"tool": tc.tool, "arguments": tc.arguments}
             for tc in parsing_result.tool_calls
         ]
 
-    def _execute_tool(self, tool_call: Dict[str, Any]) -> ToolResult:
+    def _execute_tool(self, tool_call: ToolCallDict) -> ToolResult:
         """
         DEPRECATED: Use tool_executor.execute_tool() instead.
         Kept for backward compatibility with tests.
         """
         # Convert dict to ToolCall
         tc = ToolCall(
-            tool=tool_call.get("tool", ""),
+            tool=str(tool_call.get("tool", "")),
             arguments=tool_call.get("arguments", {}),
         )
-        
+
         # Execute and convert result back to ToolResult
         exec_result = self.tool_executor.execute_tool(tc, "legacy", None)
-        
+
         return ToolResult(
             status=exec_result.status,
             output=exec_result.output,
@@ -977,23 +1039,21 @@ class Agent:
         ]
         return self.tool_executor.format_results(exec_results)
 
-    def _build_action_registry(self) -> Dict[str, Any]:
+    def _build_action_registry(self) -> Dict[str, Callable[[Dict[str, str]], object]]:
         """
         Mappe les actions HTN aux outils FilAgent
 
         Returns:
             Dict[action_name, fonction_executable]
         """
-        from typing import Callable
-
-        registry: Dict[str, Callable] = {}
+        registry: Dict[str, Callable[[Dict[str, str]], object]] = {}
 
         # Mapper chaque outil du registre
         tools = self.tool_registry.list_all()
         for tool_name, tool in tools.items():
             # Wrapper pour adapter l'interface (avec closure corrigée)
-            def make_tool_wrapper(t):
-                def wrapper(params: Dict):
+            def make_tool_wrapper(t: BaseTool) -> Callable[[Dict[str, str]], ToolResult]:
+                def wrapper(params: Dict[str, str]) -> ToolResult:
                     return t.execute(params)
 
                 return wrapper
@@ -1005,12 +1065,12 @@ class Agent:
 
         return registry
 
-    def _generic_execute(self, params: Dict) -> Any:
+    def _generic_execute(self, params: Dict[str, str]) -> str:
         """Action générique pour tâches non-mappées"""
         query = params.get("query", "")
         # Utiliser le mode simple pour exécuter la requête
         conversation_id = params.get("conversation_id", "default")
-        task_id = params.get("task_id")
+        task_id: Optional[str] = params.get("task_id")
 
         # DEBUG: Log avant exécution
         print(f"\n[HTN-DEBUG] _generic_execute INPUT:")
@@ -1030,12 +1090,12 @@ class Agent:
 
     def _format_htn_response(
         self,
-        plan_result,
-        exec_result,
-        verifications: Dict[str, Any],
+        plan_result: PlanningResult,
+        exec_result: ExecutionResult,
+        verifications: Dict[str, VerificationResult],
         conversation_id: str,
         task_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, ChatResponseValue]:
         """Formate la réponse finale"""
 
         # Agréger les résultats
@@ -1119,7 +1179,7 @@ class Agent:
             },
         }
 
-    def _generate_response_from_results(self, results: List[Dict[str, Any]]) -> str:
+    def _generate_response_from_results(self, results: List[Dict[str, object]]) -> str:
         """Génère un texte de réponse à partir des résultats des tâches"""
         if not results:
             return "Aucun résultat disponible."
@@ -1142,9 +1202,9 @@ class Agent:
             verified = result.get("verified", None)
 
             response_parts.append(f"{i}. {task_name}")
-            if verified and verified.get("passed", False):
+            if verified and isinstance(verified, dict) and verified.get("passed", False):
                 response_parts.append("   ✓ Vérifié")
-            elif verified:
+            elif verified and isinstance(verified, dict):
                 response_parts.append(f"   ⚠ Vérification: {verified.get('reason', 'Échec')}")
 
             if task_result:
@@ -1166,7 +1226,7 @@ class Agent:
 class AgentManager:
     """Gestionnaire de l'agent (singleton)"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.agent: Optional[Agent] = None
 
     def get_agent(self) -> Agent:
@@ -1176,14 +1236,14 @@ class AgentManager:
             self.agent.initialize_model()
         return self.agent
 
-    def reload_agent(self):
+    def reload_agent(self) -> Agent:
         """Recharger l'agent (utile pour les tests)"""
         self.agent = None
         return self.get_agent()
 
 
 # Instance globale
-_agent_manager = AgentManager()
+_agent_manager: AgentManager = AgentManager()
 
 
 def get_agent() -> Agent:
@@ -1191,6 +1251,6 @@ def get_agent() -> Agent:
     return _agent_manager.get_agent()
 
 
-def init_model(backend: str, model_path: str, config: Dict[str, Any]):
+def init_model(backend: str, model_path: str, config: Dict[str, Union[str, int, bool]]) -> ModelInterface:
     """Proxy vers runtime.model_interface.init_model pour compatibilité tests"""
     return _init_model(backend=backend, model_path=model_path, config=config)

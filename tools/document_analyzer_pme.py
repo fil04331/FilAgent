@@ -1,16 +1,18 @@
 """
-Outil d'analyse de documents pour PME québécoises
+Outil d'analyse de documents pour PME quebecoises
 Supporte: PDF, Excel, Word avec calculs TPS/TVQ
 """
 
+from __future__ import annotations
+
 import pandas as pd
-from typing import Dict, Any, Optional
-import PyPDF2
+from typing import Callable, Dict, List, Optional, Union
+import pypdf
 import docx
 import re
 import logging
 from pathlib import Path
-from .base import BaseTool, ToolResult, ToolStatus
+from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
 
 # Setup standard Python logger for testing compatibility
 logger = logging.getLogger(__name__)
@@ -19,16 +21,26 @@ logger = logging.getLogger(__name__)
 try:
     from runtime.middleware.logging import get_logger
 except ImportError:
-    get_logger = None
+    get_logger = None  # type: ignore[assignment]
+
+# Types stricts pour l'analyseur de documents PME
+ParameterSchemaValue = Union[str, Dict[str, str], List[str]]
+DocumentDataValue = Union[str, int, float, bool, List[str], Dict[str, str]]
+AnalysisResultValue = Union[str, int, float, bool, List[str], Dict[str, bool], Dict[str, int]]
+GetLoggerType = Optional[Callable[[], Optional[object]]]
 
 
 class DocumentAnalyzerPME(BaseTool):
-    """Analyseur intelligent de documents PME avec conformité Loi 25"""
+    """Analyseur intelligent de documents PME avec conformite Loi 25"""
 
-    def __init__(self):
+    tps_rate: float
+    tvq_rate: float
+    logger: Optional[object]
+
+    def __init__(self) -> None:
         super().__init__(
             name="document_analyzer_pme",
-            description="Analyse de documents PME avec calculs TPS/TVQ (Québec)",
+            description="Analyse de documents PME avec calculs TPS/TVQ (Quebec)",
         )
         self.tps_rate = 0.05  # 5%
         self.tvq_rate = 0.09975  # 9.975%
@@ -36,7 +48,7 @@ class DocumentAnalyzerPME(BaseTool):
         # Initialize logger for compliance (audit trail)
         try:
             self.logger = get_logger() if get_logger else None
-        except Exception:
+        except (ImportError, AttributeError):
             self.logger = None
 
         # Security: Allowed paths for document analysis (similar to FileReaderTool)
@@ -145,12 +157,12 @@ class DocumentAnalyzerPME(BaseTool):
         """
         Vérifier si un chemin est dans la liste autorisée
         Inclut protection contre symlinks et path traversal
-        
+
         Security: Similar implementation to FileReaderTool for consistency
-        
+
         Args:
             path: Path object to validate
-            
+
         Returns:
             bool: True if path is allowed, False otherwise
         """
@@ -191,7 +203,7 @@ class DocumentAnalyzerPME(BaseTool):
                 continue
         return False
 
-    def execute(self, arguments: Dict[str, Any]) -> ToolResult:
+    def execute(self, arguments: Dict[str, ToolParamValue]) -> ToolResult:
         """
         Execute l'analyse de document
 
@@ -199,17 +211,19 @@ class DocumentAnalyzerPME(BaseTool):
             arguments: Dict avec 'file_path' et optionnellement 'analysis_type'
 
         Returns:
-            ToolResult avec les données extraites
+            ToolResult avec les donnees extraites
         """
         # Validate arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
             return ToolResult(status=ToolStatus.ERROR, output="", error=error)
 
-        file_path = arguments["file_path"]
-        analysis_type = arguments.get("analysis_type", "invoice")
+        file_path = str(arguments["file_path"])
+        analysis_type_raw = arguments.get("analysis_type", "invoice")
+        analysis_type = str(analysis_type_raw) if analysis_type_raw is not None else "invoice"
 
         try:
+            result: Dict[str, AnalysisResultValue]
             if analysis_type == "invoice":
                 result = self.analyze_invoice(file_path)
             elif analysis_type == "financial":
@@ -221,7 +235,17 @@ class DocumentAnalyzerPME(BaseTool):
             else:  # extract or default
                 result = self._extract_data(file_path)
 
-            return ToolResult(status=ToolStatus.SUCCESS, output=str(result), metadata=result)
+            # Convert result to ToolMetadataValue compatible dict
+            metadata: Dict[str, ToolMetadataValue] = {}
+            for key, value in result.items():
+                if isinstance(value, (str, int, float, bool)):
+                    metadata[key] = value
+                elif isinstance(value, list):
+                    metadata[key] = {str(i): str(v) for i, v in enumerate(value)}
+                elif isinstance(value, dict):
+                    metadata[key] = {str(k): str(v) for k, v in value.items()}
+
+            return ToolResult(status=ToolStatus.SUCCESS, output=str(result), metadata=metadata)
         except FileNotFoundError:
             # Redact PII from file path for compliance (Loi 25, PIPEDA)
             safe_path = self._redact_file_path(file_path)
@@ -292,7 +316,7 @@ class DocumentAnalyzerPME(BaseTool):
                 error=f"Error analyzing document: {safe_error_msg}",
             )
 
-    def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
         """Validate arguments with security checks"""
         if "file_path" not in arguments:
             return False, "Missing required argument: file_path"
@@ -340,7 +364,7 @@ class DocumentAnalyzerPME(BaseTool):
 
         return True, None
 
-    def _get_parameters_schema(self) -> Dict[str, Any]:
+    def _get_parameters_schema(self) -> ToolSchemaDict:
         """Return parameter schema"""
         return {
             "type": "object",
@@ -355,13 +379,14 @@ class DocumentAnalyzerPME(BaseTool):
             "required": ["file_path"],
         }
 
-    def analyze_invoice(self, file_path: str) -> Dict[str, Any]:
-        """Analyse facture avec calculs taxes québécoises"""
-        # Extraction données
+    def analyze_invoice(self, file_path: str) -> Dict[str, AnalysisResultValue]:
+        """Analyse facture avec calculs taxes quebecoises"""
+        # Extraction donnees
         data = self._extract_data(file_path)
 
         # Calculs taxes
-        subtotal = data.get("subtotal", 0)
+        subtotal_raw = data.get("subtotal", 0)
+        subtotal = float(subtotal_raw) if isinstance(subtotal_raw, (int, float)) else 0.0
         tps = subtotal * self.tps_rate
         tvq = subtotal * self.tvq_rate
         total = subtotal + tps + tvq
@@ -373,22 +398,24 @@ class DocumentAnalyzerPME(BaseTool):
             "total": round(total, 2),
             "tps_number": self._extract_tax_number(data, "TPS"),
             "tvq_number": self._extract_tax_number(data, "TVQ"),
-            "pii_redacted": True,  # Conformité Loi 25
+            "pii_redacted": True,  # Conformite Loi 25
         }
 
-    def analyze_financial(self, file_path: str) -> Dict[str, Any]:
+    def analyze_financial(self, file_path: str) -> Dict[str, AnalysisResultValue]:
         """
-        Analyse financière pour bilans, budgets et états financiers
+        Analyse financiere pour bilans, budgets et etats financiers
 
-        Extrait les données financières clés et calcule des ratios pertinents
-        pour les PME québécoises.
+        Extrait les donnees financieres cles et calcule des ratios pertinents
+        pour les PME quebecoises.
         """
         data = self._extract_data(file_path)
-        text = data.get("text", "")
+        text_raw = data.get("text", "")
+        text = str(text_raw) if text_raw is not None else ""
 
         # Extraction des montants financiers
-        amounts = data.get("raw_amounts", [])
-        numeric_amounts = []
+        amounts_raw = data.get("raw_amounts", [])
+        amounts: List[str] = amounts_raw if isinstance(amounts_raw, list) else []
+        numeric_amounts: List[float] = []
         for amt in amounts:
             try:
                 numeric_amounts.append(float(str(amt).replace(",", "")))
@@ -396,22 +423,33 @@ class DocumentAnalyzerPME(BaseTool):
                 continue
 
         # Calcul statistiques de base
-        total_amounts = sum(numeric_amounts) if numeric_amounts else 0
-        avg_amount = total_amounts / len(numeric_amounts) if numeric_amounts else 0
-        max_amount = max(numeric_amounts) if numeric_amounts else 0
-        min_amount = min(numeric_amounts) if numeric_amounts else 0
+        total_amounts = sum(numeric_amounts) if numeric_amounts else 0.0
+        avg_amount = total_amounts / len(numeric_amounts) if numeric_amounts else 0.0
+        max_amount = max(numeric_amounts) if numeric_amounts else 0.0
+        min_amount = min(numeric_amounts) if numeric_amounts else 0.0
 
         # Detection de mots-cles financiers
-        financial_keywords = {
-            "actif": text.lower().count("actif"),
-            "passif": text.lower().count("passif"),
-            "capital": text.lower().count("capital"),
-            "revenu": text.lower().count("revenu"),
-            "depense": text.lower().count("dépense") + text.lower().count("depense"),
-            "benefice": text.lower().count("bénéfice") + text.lower().count("benefice"),
-            "perte": text.lower().count("perte"),
-            "budget": text.lower().count("budget"),
+        text_lower = text.lower()
+        financial_keywords: Dict[str, int] = {
+            "actif": text_lower.count("actif"),
+            "passif": text_lower.count("passif"),
+            "capital": text_lower.count("capital"),
+            "revenu": text_lower.count("revenu"),
+            "depense": text_lower.count("depense") + text_lower.count("depense"),
+            "benefice": text_lower.count("benefice") + text_lower.count("benefice"),
+            "perte": text_lower.count("perte"),
+            "budget": text_lower.count("budget"),
         }
+
+        # Determine data source
+        columns_raw = data.get("columns")
+        data_source: str = "text_extraction"
+        if columns_raw is not None and isinstance(columns_raw, list):
+            data_source = ",".join(str(c) for c in columns_raw)
+
+        # Determine rows analyzed
+        rows_raw = data.get("rows")
+        rows_analyzed: int = int(rows_raw) if isinstance(rows_raw, int) else len(text.split("\n"))
 
         return {
             "analysis_type": "financial",
@@ -422,12 +460,12 @@ class DocumentAnalyzerPME(BaseTool):
             "max_amount": round(max_amount, 2),
             "min_amount": round(min_amount, 2),
             "financial_keywords": financial_keywords,
-            "data_source": data.get("columns", []) if "columns" in data else "text_extraction",
-            "rows_analyzed": data.get("rows", 0) if "rows" in data else len(text.split("\n")),
+            "data_source": data_source,
+            "rows_analyzed": rows_analyzed,
             "pii_redacted": True,
         }
 
-    def analyze_contract(self, file_path: str) -> Dict[str, Any]:
+    def analyze_contract(self, file_path: str) -> Dict[str, AnalysisResultValue]:
         """
         Analyse juridique de contrats
 
@@ -436,29 +474,30 @@ class DocumentAnalyzerPME(BaseTool):
         renseignements personnels.
         """
         data = self._extract_data(file_path)
-        text = data.get("text", "")
+        text_raw = data.get("text", "")
+        text = str(text_raw) if text_raw is not None else ""
         text_lower = text.lower()
 
         # Detection des parties contractantes (patterns rediges)
         parties_patterns = [
-            r"entre\s+([^,]+),?\s+(?:ci-après|d'une part)",
+            r"entre\s+([^,]+),?\s+(?:ci-apres|d'une part)",
             r"(?:le client|l'acheteur|le vendeur|le fournisseur)\s*:?\s*([^,\n]+)",
         ]
-        parties_found = []
+        parties_found: List[str] = []
         for pattern in parties_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             parties_found.extend(matches[:2])  # Limiter a 2 par pattern
 
         # Detection de clauses importantes
-        clause_keywords = {
-            "confidentialite": "confidentialité" in text_lower or "confidentialite" in text_lower,
+        clause_keywords: Dict[str, bool] = {
+            "confidentialite": "confidentialite" in text_lower or "confidentialite" in text_lower,
             "non_concurrence": "non-concurrence" in text_lower or "non concurrence" in text_lower,
-            "resiliation": "résiliation" in text_lower or "resiliation" in text_lower,
+            "resiliation": "resiliation" in text_lower or "resiliation" in text_lower,
             "garantie": "garantie" in text_lower,
-            "responsabilite": "responsabilité" in text_lower or "responsabilite" in text_lower,
+            "responsabilite": "responsabilite" in text_lower or "responsabilite" in text_lower,
             "force_majeure": "force majeure" in text_lower,
-            "propriete_intellectuelle": "propriété intellectuelle" in text_lower,
-            "protection_donnees": "protection des données" in text_lower or "loi 25" in text_lower,
+            "propriete_intellectuelle": "propriete intellectuelle" in text_lower,
+            "protection_donnees": "protection des donnees" in text_lower or "loi 25" in text_lower,
         }
 
         # Detection de dates
@@ -467,13 +506,18 @@ class DocumentAnalyzerPME(BaseTool):
             r"\d{4}[\s/-]\d{2}[\s/-]\d{2}",  # 2024-01-15
             r"\d{1,2}/\d{1,2}/\d{4}",        # 15/01/2024
         ]
-        dates_found = []
+        dates_found: List[str] = []
         for pattern in date_patterns:
             matches = re.findall(pattern, text)
             dates_found.extend(matches[:5])  # Limiter
 
         # Detection de montants
-        amounts = data.get("raw_amounts", [])
+        amounts_raw = data.get("raw_amounts", [])
+        amounts: List[str] = amounts_raw if isinstance(amounts_raw, list) else []
+
+        # Get paragraphs count
+        paragraphs_raw = data.get("paragraphs")
+        paragraphs: int = int(paragraphs_raw) if isinstance(paragraphs_raw, int) else len(text.split("\n\n"))
 
         return {
             "analysis_type": "contract",
@@ -481,18 +525,18 @@ class DocumentAnalyzerPME(BaseTool):
             "parties_detected": len(parties_found),
             "parties": ["[REDACTED]" for _ in parties_found],  # PII redaction
             "clauses_detected": clause_keywords,
-            "important_clauses_count": sum(clause_keywords.values()),
+            "important_clauses_count": sum(1 for v in clause_keywords.values() if v),
             "dates_found": len(dates_found),
             "amounts_detected": len(amounts),
             "has_confidentiality": clause_keywords.get("confidentialite", False),
             "has_data_protection": clause_keywords.get("protection_donnees", False),
             "word_count": len(text.split()),
-            "paragraphs": data.get("paragraphs", len(text.split("\n\n"))),
+            "paragraphs": paragraphs,
             "pii_redacted": True,
             "loi25_compliance_check": clause_keywords.get("protection_donnees", False),
         }
 
-    def analyze_report(self, file_path: str) -> Dict[str, Any]:
+    def analyze_report(self, file_path: str) -> Dict[str, AnalysisResultValue]:
         """
         Analyse generale de rapports
 
@@ -500,14 +544,15 @@ class DocumentAnalyzerPME(BaseTool):
         cles du document.
         """
         data = self._extract_data(file_path)
-        text = data.get("text", "")
+        text_raw = data.get("text", "")
+        text = str(text_raw) if text_raw is not None else ""
 
         # Analyse de structure
         lines = text.split("\n")
-        non_empty_lines = [l for l in lines if l.strip()]
+        non_empty_lines = [line for line in lines if line.strip()]
 
         # Detection de sections/titres (lignes courtes en majuscules ou avec numerotation)
-        sections = []
+        sections: List[str] = []
         for line in non_empty_lines:
             line_stripped = line.strip()
             # Titres potentiels: lignes courtes, numerotees, ou en majuscules
@@ -519,20 +564,25 @@ class DocumentAnalyzerPME(BaseTool):
                     sections.append(line_stripped[:50])  # Tronquer
 
         # Extraction de mots-cles de rapport
-        report_keywords = {
-            "introduction": "introduction" in text.lower(),
-            "conclusion": "conclusion" in text.lower(),
-            "recommandations": "recommandation" in text.lower(),
-            "resume": "résumé" in text.lower() or "resume" in text.lower(),
-            "analyse": "analyse" in text.lower(),
-            "resultats": "résultat" in text.lower() or "resultat" in text.lower(),
-            "methodologie": "méthodologie" in text.lower() or "methodologie" in text.lower(),
+        text_lower = text.lower()
+        report_keywords: Dict[str, bool] = {
+            "introduction": "introduction" in text_lower,
+            "conclusion": "conclusion" in text_lower,
+            "recommandations": "recommandation" in text_lower,
+            "resume": "resume" in text_lower or "resume" in text_lower,
+            "analyse": "analyse" in text_lower,
+            "resultats": "resultat" in text_lower or "resultat" in text_lower,
+            "methodologie": "methodologie" in text_lower or "methodologie" in text_lower,
         }
 
         # Statistiques du document
         word_count = len(text.split())
         char_count = len(text)
-        amounts = data.get("raw_amounts", [])
+        amounts_raw = data.get("raw_amounts", [])
+        amounts: List[str] = amounts_raw if isinstance(amounts_raw, list) else []
+
+        # Determine data source
+        data_source: str = "excel" if "columns" in data else "text_document"
 
         return {
             "analysis_type": "report",
@@ -544,15 +594,15 @@ class DocumentAnalyzerPME(BaseTool):
             "sections_detected": len(sections),
             "section_titles": sections[:10],  # Limiter a 10 sections
             "structure_keywords": report_keywords,
-            "has_standard_structure": sum(report_keywords.values()) >= 2,
+            "has_standard_structure": sum(1 for v in report_keywords.values() if v) >= 2,
             "amounts_detected": len(amounts),
             "estimated_pages": max(1, word_count // 300),  # ~300 mots/page
-            "data_source": "excel" if "columns" in data else "text_document",
+            "data_source": data_source,
             "pii_redacted": True,
         }
 
-    def _extract_data(self, file_path: str) -> Dict:
-        """Extraction sécurisée avec redaction PII"""
+    def _extract_data(self, file_path: str) -> Dict[str, DocumentDataValue]:
+        """Extraction securisee avec redaction PII"""
         # Check file exists
         path = Path(file_path)
         if not path.exists():
@@ -571,20 +621,22 @@ class DocumentAnalyzerPME(BaseTool):
             return self._extract_word(file_path)
         return {}
 
-    def _extract_pdf(self, file_path: str) -> Dict:
+    def _extract_pdf(self, file_path: str) -> Dict[str, DocumentDataValue]:
         """Extract data from PDF file"""
         try:
             with open(file_path, "rb") as file:
-                reader = PyPDF2.PdfReader(file)
+                reader = pypdf.PdfReader(file)
 
                 # Extract text from all pages
                 text = ""
                 for page in reader.pages:
-                    text += page.extract_text()
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text
 
                 # Extract monetary values
-                amounts = re.findall(r"\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)", text)
-                subtotal = 0
+                amounts: List[str] = re.findall(r"\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)", text)
+                subtotal: float = 0.0
                 if amounts:
                     # Try to find subtotal (usually largest or last before total)
                     try:
@@ -593,16 +645,16 @@ class DocumentAnalyzerPME(BaseTool):
                         pass
 
                 return {"text": text, "subtotal": subtotal, "raw_amounts": amounts}
-        except Exception as e:
-            raise ValueError(f"Error reading PDF: {str(e)}")
+        except (OSError, pypdf.errors.PdfReadError) as e:
+            raise ValueError(f"Error reading PDF: {str(e)}") from e
 
-    def _extract_excel(self, file_path: str) -> Dict:  # noqa: C901
+    def _extract_excel(self, file_path: str) -> Dict[str, DocumentDataValue]:  # noqa: C901
         """Extract data from Excel file"""
         try:
             df = pd.read_excel(file_path)
 
             # Look for common invoice columns
-            subtotal = 0
+            subtotal: float = 0.0
 
             # Try to find subtotal in various ways
             for col in df.columns:
@@ -617,7 +669,7 @@ class DocumentAnalyzerPME(BaseTool):
                     break
 
             # If no subtotal column, try to find numeric values
-            if subtotal == 0:
+            if subtotal == 0.0:
                 numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns
                 if len(numeric_cols) > 0:
                     values = df[numeric_cols[0]].dropna()
@@ -627,16 +679,18 @@ class DocumentAnalyzerPME(BaseTool):
                         except (ValueError, TypeError):
                             pass
 
+            # Convert columns to list of strings
+            columns: List[str] = [str(col) for col in df.columns]
+
             return {
-                "data": df.to_dict(),
                 "subtotal": subtotal,
-                "columns": list(df.columns),
+                "columns": columns,
                 "rows": len(df),
             }
-        except Exception as e:
-            raise ValueError(f"Error reading Excel: {str(e)}")
+        except (OSError, ValueError) as e:
+            raise ValueError(f"Error reading Excel: {str(e)}") from e
 
-    def _extract_word(self, file_path: str) -> Dict:
+    def _extract_word(self, file_path: str) -> Dict[str, DocumentDataValue]:
         """Extract data from Word document"""
         try:
             doc = docx.Document(file_path)
@@ -645,8 +699,8 @@ class DocumentAnalyzerPME(BaseTool):
             text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
 
             # Extract monetary values
-            amounts = re.findall(r"\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)", text)
-            subtotal = 0
+            amounts: List[str] = re.findall(r"\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)", text)
+            subtotal: float = 0.0
             if amounts:
                 try:
                     subtotal = float(amounts[-1].replace(",", ""))
@@ -659,18 +713,22 @@ class DocumentAnalyzerPME(BaseTool):
                 "paragraphs": len(doc.paragraphs),
                 "raw_amounts": amounts,
             }
-        except Exception as e:
-            raise ValueError(f"Error reading Word document: {str(e)}")
+        except OSError as e:
+            raise ValueError(f"Error reading Word document: {str(e)}") from e
 
-    def _extract_tax_number(self, data: Dict, tax_type: str) -> str:
-        """Extraction numéros taxes (TPS/TVQ)"""
-        patterns = {"TPS": r"TPS[:\s]*(\d{9}RT\d{4})", "TVQ": r"TVQ[:\s]*(\d{10}TQ\d{4})"}
+    def _extract_tax_number(self, data: Dict[str, DocumentDataValue], tax_type: str) -> str:
+        """Extraction numeros taxes (TPS/TVQ)"""
+        patterns: Dict[str, str] = {
+            "TPS": r"TPS[:\s]*(\d{9}RT\d{4})",
+            "TVQ": r"TVQ[:\s]*(\d{10}TQ\d{4})",
+        }
 
         # Search in text if available
-        text = data.get("text", "")
+        text_raw = data.get("text", "")
+        text = str(text_raw) if text_raw is not None else ""
         if text and tax_type in patterns:
             match = re.search(patterns[tax_type], text)
             if match:
                 return "REDACTED"  # For security/compliance
 
-        return "REDACTED"  # Par défaut pour sécurité
+        return "REDACTED"  # Par defaut pour securite

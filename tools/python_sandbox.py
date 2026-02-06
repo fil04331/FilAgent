@@ -4,15 +4,17 @@ Limites CPU, mémoire, réseau et filesystem
 Zero Trust: tout code est considéré comme potentiellement malveillant
 """
 
+from __future__ import annotations
+
 import tempfile
 import os
 import time
 import ast
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, List, Optional, Union
 import logging
 
-from .base import BaseTool, ToolResult, ToolStatus
+from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
 
 # Import Docker SDK
 try:
@@ -24,11 +26,15 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Types stricts pour le sandbox Python
+ParameterSchemaValue = Union[str, Dict[str, str], List[str]]
+SandboxMetadataValue = Union[str, int, float, bool]
+
 
 class PythonSandboxTool(BaseTool):
     """
     Outil pour exécuter du code Python en sandbox Docker isolé
-    
+
     Principes de sécurité Zero Trust:
     - Conteneur éphémère détruit après exécution
     - User non-root (nobody:nogroup / 65534:65534)
@@ -42,9 +48,9 @@ class PythonSandboxTool(BaseTool):
     - Double validation: AST parsing + Docker isolation
     """
 
-    def __init__(self, dangerous_patterns: Optional[List[str]] = None, docker_image: str = "python:3.12-slim"):
+    def __init__(self, dangerous_patterns: Optional[List[str]] = None, docker_image: str = "python:3.12-slim") -> None:
         super().__init__(
-            name="python_sandbox", 
+            name="python_sandbox",
             description="Exécuter du code Python de manière sécurisée dans un conteneur Docker isolé"
         )
         
@@ -92,7 +98,7 @@ class PythonSandboxTool(BaseTool):
         # Essayer de pull l'image si nécessaire
         self._ensure_docker_image()
 
-    def _ensure_docker_image(self):
+    def _ensure_docker_image(self) -> None:
         """
         S'assurer que l'image Docker est disponible localement
         Pull l'image si nécessaire
@@ -109,10 +115,10 @@ class PythonSandboxTool(BaseTool):
                 logger.error(f"Failed to pull Docker image: {e}")
                 raise RuntimeError(f"Cannot pull Docker image {self.docker_image}: {e}")
 
-    def execute(self, arguments: Dict[str, Any]) -> ToolResult:
+    def execute(self, arguments: Dict[str, ToolParamValue]) -> ToolResult:
         """
         Exécuter le code Python dans un conteneur Docker isolé
-        
+
         Sécurité Zero Trust:
         - Conteneur éphémère créé et détruit pour chaque exécution
         - User non-root
@@ -125,26 +131,26 @@ class PythonSandboxTool(BaseTool):
         if not is_valid:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}")
 
-        code = arguments["code"]
-        
+        code = str(arguments["code"])
+
         # Créer un répertoire temporaire pour l'exécution
         temp_dir = None
         container = None
-        
+
         try:
             temp_dir = tempfile.mkdtemp(prefix="sandbox_")
             code_file = Path(temp_dir) / "code.py"
-            
+
             # Écrire le code dans le fichier
             code_file.write_text(code)
-            
+
             # Rendre le fichier lisible par tous (nécessaire pour l'user nobody)
             os.chmod(code_file, 0o644)
             os.chmod(temp_dir, 0o755)
-            
+
             # Mesurer le temps d'exécution
             start_time = time.time()
-            
+
             # Configuration du conteneur Docker
             container_config = {
                 "image": self.docker_image,
@@ -172,26 +178,26 @@ class PythonSandboxTool(BaseTool):
                 "read_only": True,  # Filesystem read-only
                 "tmpfs": {"/tmp": "size=10m,mode=1777"}  # Petit tmpfs pour /tmp si besoin
             }
-            
+
             try:
                 # Créer et démarrer le conteneur en mode détaché pour contrôle manuel
                 container = self.docker_client.containers.run(**container_config)
-                
+
                 # Attendre que le conteneur se termine avec un timeout
                 try:
                     exit_code = container.wait(timeout=self.timeout)
-                    
+
                     # Récupérer les logs
                     output = container.logs().decode('utf-8')
-                    
+
                     elapsed_time = time.time() - start_time
-                    
+
                     # Nettoyer le conteneur
                     try:
                         container.remove(force=True)
                     except Exception:
                         pass
-                    
+
                     # Extraire le code de sortie (Docker SDK retourne un dict avec 'StatusCode')
                     if isinstance(exit_code, dict):
                         status_code = exit_code.get('StatusCode', 0)
@@ -199,12 +205,12 @@ class PythonSandboxTool(BaseTool):
                         status_code = exit_code
                     else:
                         status_code = 0
-                    
+
                     if status_code == 0:
                         # Succès
                         if not output.strip():
                             output = "[Code exécuté avec succès, pas de sortie]"
-                        
+
                         return ToolResult(
                             status=ToolStatus.SUCCESS,
                             output=output,
@@ -226,18 +232,18 @@ class PythonSandboxTool(BaseTool):
                                 "elapsed_time": elapsed_time
                             }
                         )
-                        
+
                 except Exception as wait_error:
                     # Timeout ou erreur durant l'attente
                     elapsed_time = time.time() - start_time
-                    
+
                     # Arrêter et supprimer le conteneur
                     try:
                         container.stop(timeout=1)
                         container.remove(force=True)
                     except Exception:
                         pass
-                    
+
                     # Vérifier si c'est un timeout
                     if "timeout" in str(wait_error).lower() or elapsed_time >= self.timeout:
                         return ToolResult(
@@ -253,12 +259,12 @@ class PythonSandboxTool(BaseTool):
                             error=f"Container wait error: {str(wait_error)}",
                             metadata={"elapsed_time": elapsed_time}
                         )
-                
+
             except ContainerError as e:
                 # Erreur d'exécution dans le conteneur
                 elapsed_time = time.time() - start_time
                 stderr = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
-                
+
                 return ToolResult(
                     status=ToolStatus.ERROR,
                     output="",
@@ -268,25 +274,25 @@ class PythonSandboxTool(BaseTool):
                         "elapsed_time": elapsed_time
                     }
                 )
-            
+
             except Exception as e:
                 # Autre erreur Docker
                 elapsed_time = time.time() - start_time
-                
+
                 return ToolResult(
                     status=ToolStatus.ERROR,
                     output="",
                     error=f"Docker execution error: {str(e)}",
                     metadata={"elapsed_time": elapsed_time}
                 )
-        
+
         except Exception as e:
             return ToolResult(
                 status=ToolStatus.ERROR,
                 output="",
                 error=f"Failed to execute Python code: {str(e)}"
             )
-        
+
         finally:
             # Nettoyer le répertoire temporaire
             if temp_dir and os.path.exists(temp_dir):
@@ -356,7 +362,7 @@ class PythonSandboxTool(BaseTool):
 
         return True, None
 
-    def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"
@@ -370,12 +376,12 @@ class PythonSandboxTool(BaseTool):
         if len(arguments["code"]) > 50000:  # Limiter la taille
             return False, "Code too long (max 50000 characters)"
 
-        # Validation AST (plus sûre que les patterns)
+        # Validation AST (plus sure que les patterns)
         is_valid, error = self._validate_ast(arguments["code"])
         if not is_valid:
             return False, error
 
-        # Bloquer certaines opérations dangereuses (double vérification)
+        # Bloquer certaines operations dangereuses (double verification)
         code_lower = arguments["code"].lower()
         for pattern, pattern_lower in zip(self.dangerous_patterns, self.dangerous_patterns_lower):
             if pattern_lower in code_lower:
@@ -383,10 +389,10 @@ class PythonSandboxTool(BaseTool):
 
         return True, None
 
-    def _get_parameters_schema(self) -> Dict[str, Any]:
-        """Schéma des paramètres"""
+    def _get_parameters_schema(self) -> ToolSchemaDict:
+        """Schema des parametres"""
         return {
             "type": "object",
-            "properties": {"code": {"type": "string", "description": "Code Python à exécuter"}},
+            "properties": {"code": {"type": "string", "description": "Code Python a executer"}},
             "required": ["code"],
         }

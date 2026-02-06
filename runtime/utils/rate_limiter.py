@@ -12,13 +12,31 @@ Security features:
 - Audit trail logging
 """
 
+from __future__ import annotations
+
 import time
 import threading
-from typing import Optional, Callable, Any, Dict
+from typing import Optional, Callable, TypeVar, ParamSpec
 from datetime import datetime, timedelta
 from collections import deque
 import hashlib
 import json
+
+# Type variables for generic callable typing
+P = ParamSpec("P")
+T = TypeVar("T")
+
+# TypeAlias for internal tracking
+FailureCount = int
+RequestTimestamp = datetime
+
+
+class RateLimitError(Exception):
+    """Exception raised when rate limit is exceeded after all retries."""
+
+    def __init__(self, message: str, attempts: int = 0) -> None:
+        super().__init__(message)
+        self.attempts = attempts
 
 
 class RateLimiter:
@@ -37,7 +55,7 @@ class RateLimiter:
         initial_backoff: float = 1.0,
         max_backoff: float = 32.0,
         backoff_multiplier: float = 2.0
-    ):
+    ) -> None:
         """
         Initialize rate limiter
 
@@ -60,14 +78,14 @@ class RateLimiter:
         self.lock = threading.Lock()
 
         # Request tracking (sliding window)
-        self.minute_requests = deque()
-        self.hour_requests = deque()
+        self.minute_requests: deque[RequestTimestamp] = deque()
+        self.hour_requests: deque[RequestTimestamp] = deque()
 
         # Failure tracking for backoff
-        self.failure_counts: Dict[str, int] = {}
-        self.last_failure_time: Dict[str, datetime] = {}
+        self.failure_counts: dict[str, FailureCount] = {}
+        self.last_failure_time: dict[str, RequestTimestamp] = {}
 
-    def _cleanup_old_requests(self):
+    def _cleanup_old_requests(self) -> None:
         """Remove expired requests from tracking queues"""
         now = datetime.now()
         minute_ago = now - timedelta(minutes=1)
@@ -81,11 +99,17 @@ class RateLimiter:
         while self.hour_requests and self.hour_requests[0] < hour_ago:
             self.hour_requests.popleft()
 
-    def _get_request_id(self, func: Callable, args: tuple, kwargs: dict) -> str:
+    def _get_request_id(
+        self,
+        func: Callable[..., object],
+        args: tuple[object, ...],
+        kwargs: dict[str, object]
+    ) -> str:
         """Generate unique ID for request based on function and arguments"""
         # Create hash of function name and arguments for tracking
-        data = {
-            'func': func.__name__ if hasattr(func, '__name__') else str(func),
+        func_name: str = func.__name__ if hasattr(func, '__name__') else str(func)
+        data: dict[str, str] = {
+            'func': func_name,
             'args': str(args),
             'kwargs': str(sorted(kwargs.items()))
         }
@@ -145,10 +169,10 @@ class RateLimiter:
 
     def execute_with_backoff(
         self,
-        func: Callable,
-        *args,
-        **kwargs
-    ) -> Any:
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs
+    ) -> T:
         """
         Execute function with rate limiting and exponential backoff
 
@@ -161,9 +185,12 @@ class RateLimiter:
             Result from function execution
 
         Raises:
-            Exception: If all retries are exhausted
+            RateLimitError: If all retries are exhausted
         """
-        request_id = self._get_request_id(func, args, kwargs)
+        # Cast args/kwargs to tuple/dict for request ID generation
+        args_tuple: tuple[object, ...] = tuple(args) if args else ()
+        kwargs_dict: dict[str, object] = dict(kwargs) if kwargs else {}
+        request_id = self._get_request_id(func, args_tuple, kwargs_dict)
 
         for attempt in range(self.max_retries):
             # Wait for rate limit
@@ -206,12 +233,15 @@ class RateLimiter:
 
                 # If this was the last attempt, raise
                 if attempt == self.max_retries - 1:
-                    raise Exception(f"{safe_error} after {self.max_retries} attempts")
+                    raise RateLimitError(
+                        f"{safe_error} after {self.max_retries} attempts",
+                        attempts=self.max_retries
+                    ) from e
 
                 print(f"Request failed: {safe_error}. Retrying...")
 
-        # Should never reach here
-        raise Exception(f"Failed after {self.max_retries} attempts")
+        # Should never reach here, but required for type checker
+        raise RateLimitError(f"Failed after {self.max_retries} attempts", attempts=self.max_retries)
 
 
 # Global singleton instance

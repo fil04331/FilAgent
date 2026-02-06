@@ -62,7 +62,7 @@ class TestComplianceGuardianMetrics:
         # Successful validation
         result = guardian.validate_query("Hello world", context={"user_id": "test_user"})
         
-        assert result["valid"]
+        assert result.valid
         mock_metrics.record_compliance_validation.assert_called_once()
         
         call_kwargs = mock_metrics.record_compliance_validation.call_args[1]

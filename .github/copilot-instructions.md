@@ -1,7 +1,7 @@
 ---
 title: "GitHub Copilot Instructions for FilAgent"
-description: "Expert en développement backend haute performance (MCP), systèmes massivement concurrents à faible latence"
-version: "1.0.0"
+description: "Backend MCP/HTN agent with strong governance and compliance"
+version: "1.1.0"
 role: "Ingénieur Backend MCP & Agent System Developer"
 format: "system-prompt"
 language: "en/fr"
@@ -9,46 +9,52 @@ language: "en/fr"
 
 # GitHub Copilot Instructions for FilAgent
 
-## Project Overview
+FilAgent is a Python 3.10+ LLM agent with hard governance, traceability, and HTN planning. Documentation is largely in French; code, comments, and docstrings stay in English.
 
-FilAgent is an LLM-based agent system with a fundamental focus on governance, legal traceability, security, and reproducibility of decisions. The architecture is designed to run locally while complying with strict regulatory standards (Québec Law 25, EU AI Act, NIST AI RMF).
+## Quick Workflow
 
-This is a **Python-based project** with French documentation and English code/comments.
+- Install: `pdm install --dev` (alt: `pip install -r requirements.txt` + `requirements-dev.txt`).
+- Run API: `pdm run server-dev` (hot reload) or `pdm run server` (prod-like) from [runtime/server.py](runtime/server.py); OpenAI-compatible at <http://localhost:8000/docs>.
+- Run MCP: `pdm run mcp` (see [mcp_server.py](mcp_server.py)).
+- Tests: `pdm run test` or targeted `pdm run test-unit|test-integration|test-compliance|test-e2e|test-performance`; markers in [tests/README.md](tests/README.md).
+- Format/lint/typecheck: `pdm run format && pdm run lint && pdm run typecheck`; `pdm run check` bundles them.
 
-## Getting Started
+## Architecture Landmarks
 
-### Prerequisites
-- Python 3.10 or higher
-- Git
-- 8+ GB RAM (16GB recommended)
+- Runtime: [runtime/agent.py](runtime/agent.py) orchestration, [runtime/server.py](runtime/server.py) FastAPI surface, `runtime/middleware/*` singletons (`get_logger`, `get_dr_manager`, `get_provenance_tracker`), [runtime/config.py](runtime/config.py) `get_config()` singleton.
+- Planning: HTN in [planner/](planner/README.md) with `HierarchicalPlanner`, `TaskExecutor`, `TaskVerifier`, state machine in [planner/state_machine.yaml](planner/state_machine.yaml).
+- Governance: policy gate in [policy/engine.py](policy/engine.py), PII in [policy/pii.py](policy/pii.py), audit/provenance in [provenance/](provenance/logger.py) + WORM chain in [provenance/worm.py](provenance/worm.py), decision records in [provenance/decision.py](provenance/decision.py).
+- Memory: SQLite episodic store in [memory/episodic.py](memory/episodic.py); retention logic in [memory/retention.py](memory/retention.py).
+- Tools: registry in [tools/registry.py](tools/registry.py); sandboxed execution in [tools/sandbox.py](tools/sandbox.py); follow BaseTool pattern from [tools/base.py](tools/base.py).
+- Config: YAML in [config/](config/); avoid hardcoding, always pull via `get_config()`.
 
-### Initial Setup
+## Required Practices (governance first)
 
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+- No secrets in code; use `.env.example` patterns. Respect RBAC/allowlists in [config/policies.yaml](config/policies.yaml) before any file or network access.
+- All tool calls and risky actions must pass `policy/engine` and be logged: emit decision records (provenance), redact PII, and keep WORM integrity.
+- Use middleware singletons (do not instantiate directly) to ensure shared audit/provenance state.
+- Code execution must route through sandboxed tools; never run arbitrary code paths outside [tools/sandbox.py](tools/sandbox.py).
+- Preserve reproducibility: include model version, seed, and temperature in model-facing changes.
 
-# Install dependencies
-pip install -r requirements.txt
+## Patterns to Follow
 
-# Initialize database
-python -c "from memory.episodic import create_tables; create_tables()"
-```
+- Keep async I/O; avoid blocking in FastAPI handlers and planners. Use semaphores/backpressure when launching concurrent tasks (see `TaskExecutor` strategies in [planner/executor.py](planner/executor.py)).
+- When adding a tool: register in [tools/registry.py](tools/registry.py), validate inputs, enforce policy checks, and log provenance + decision record. Tests live next to `tests/test_tools*.py`.
+- When touching planning: keep HTN graphs acyclic, honor `state_machine.yaml` limits (timeouts, retries, circuit breakers), and validate with `TaskVerifier`.
+- When changing middleware or policy paths, update/consult coverage at `htmlcov/index.html` and relevant docs in [docs/COMPLIANCE_GUARDIAN.md](docs/COMPLIANCE_GUARDIAN.md).
 
-### Running the Server
+## Testing Expectations
 
-```bash
-# Start the API server
-python runtime/server.py
+- Prefer pytest markers `unit`, `integration`, `compliance`, `e2e`, `performance` (see [tests/README.md](tests/README.md)).
+- Reuse fixtures in [tests/conftest.py](tests/conftest.py) and generators in [tests/utils/test_data_generators.py](tests/utils/test_data_generators.py); avoid bespoke setup.
 
-# Server will be accessible at http://localhost:8000
-# API documentation at http://localhost:8000/docs
-```
+## Documentation Pointers
 
-## Build and Test Commands
+- High-level repo guidance in [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md); French overview in [README.md](README.md); planner details in [planner/README.md](planner/README.md).
 
-### Testing
+## When unsure
+
+- Default to governance-safe choice: validate inputs, route through policy/middleware, log provenance, and keep operations sandboxed. Ask before skipping any of these.
 
 ```bash
 # Install test dependencies if not already installed
@@ -144,13 +150,13 @@ FilAgent/
 
 ## Critical Security and Governance Requirements
 
-### ⚠️ Security Constraints
+### Security Constraints
 1. **No secrets in code**: Never commit API keys, passwords, or credentials
 2. **PII protection**: All personally identifiable information must be masked/redacted
 3. **Sandbox isolation**: All code execution must go through the sandbox
 4. **Input validation**: Validate all user inputs and tool parameters
 
-### 🔒 Governance Requirements
+### Governance Requirements
 1. **Traceability**: Every action must be logged with provenance metadata
 2. **Decision records**: Generate signed decision records for critical actions
 3. **WORM logging**: All audit logs are append-only and cryptographically verified
@@ -223,11 +229,11 @@ FilAgent/
 ## Performance Targets
 
 Based on `config/eval_targets.yaml`:
-- HumanEval pass@1: ≥ 0.65
-- MBPP: ≥ 0.60
+- HumanEval pass@1: >= 0.65
+- MBPP: >= 0.60
 - SWE-bench lite: 50% on 50 tasks
-- Agentic scenarios: ≥ 0.75
-- Decision record coverage: ≥ 95%
+- Agentic scenarios: >= 0.75
+- Decision record coverage: >= 95%
 - Zero critical violations per 1000 tasks
 
 ## References
@@ -258,50 +264,6 @@ Apply high-performance backend patterns when:
 4. **Backpressure Handling**: Implement flow control to prevent memory overflow
 5. **Graceful Degradation**: System must remain operational under high load
 
-**MCP Server Architecture:**
-```python
-# Conceptual architecture pattern based on mcp_server.py
-# This is a design template - see mcp_server.py for full working implementation
-# Method bodies use 'pass' as this shows structure, not complete code
-class FilAgentMCPServer:
-    async def initialize(self) -> Dict[str, Any]:
-        """Initialize server components with dependency injection"""
-        self.agent = get_agent()
-        self.config = get_config()
-        self.tool_registry = get_tool_registry()
-        self._register_base_tools()
-        return {
-            "name": "filagent",
-            "version": "1.0.0",
-            "protocolVersion": "1.0.0",
-            "capabilities": {"tools": {}, "prompts": {}}
-        }
-    
-    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle incoming MCP request with validation and timeout
-        
-        Args:
-            request: MCP request dictionary with method, params, and id
-            
-        Returns:
-            MCP response dictionary with result or error
-        """
-        # 1. Validate request schema with Pydantic
-        # 2. Apply policy engine checks (RBAC, PII masking)
-        # 3. Execute tool with asyncio.wait_for(timeout=30s)
-        # 4. Log to provenance tracker with decision record
-        # 5. Return structured response with usage metrics
-        pass
-    
-    async def shutdown(self):
-        """Graceful shutdown with connection draining"""
-        # 1. Stop accepting new requests (set shutdown flag)
-        # 2. Wait for pending requests with timeout
-        # 3. Close database connection pools
-        # 4. Flush logs and metrics to disk
-        pass
-```
-
 ### Performance Optimization Techniques
 
 **1. Concurrency Patterns:**
@@ -328,74 +290,9 @@ class FilAgentMCPServer:
 - Cache invalidation: Time-based or event-driven
 - Cache warming for predictable patterns
 
-### Language-Specific Guidance
-
-**Python (Current Backend):**
-- FastAPI for HTTP APIs with async support
-- asyncio for concurrency, avoid threading unless CPU-bound
-- uvloop for 2-4x performance boost: `uvloop.install()`
-- Pydantic V2 for validation (10x faster than V1)
-- Use `asyncpg` over `psycopg2` for PostgreSQL
-
-**Go (Future Performance-Critical Paths):**
-- Goroutines for concurrency with channel-based communication
-- Context for cancellation and timeout propagation
-- Sync.Pool for object reuse
-- pprof for profiling CPU and memory
-
-**Rust (Future Ultra-Low-Latency):**
-- Tokio for async runtime
-- Zero-copy serialization with serde
-- Arc<Mutex<T>> for shared state
-- Avoid allocations in hot paths
-
-### Monitoring & Observability
-
-**Required Metrics:**
-```python
-# Prometheus metrics for MCP server
-# Install: pip install prometheus-client
-# Note: In production, wrap metric usage in conditionals or use a metrics facade
-import logging
-
-try:
-    from prometheus_client import Counter, Histogram, Gauge
-    
-    mcp_requests_total = Counter('mcp_requests_total', 'Total MCP requests', ['method', 'status'])
-    mcp_request_duration = Histogram('mcp_request_duration_seconds', 'MCP request duration', ['method'])
-    mcp_active_connections = Gauge('mcp_active_connections', 'Active MCP connections')
-    mcp_errors_total = Counter('mcp_errors_total', 'Total MCP errors', ['type'])
-    METRICS_ENABLED = True
-except ImportError:
-    # Metrics disabled if prometheus-client not installed
-    logging.warning("prometheus-client not available, metrics disabled")
-    METRICS_ENABLED = False
-```
-
-**Performance Targets:**
-- P50 latency: < 5ms
-- P95 latency: < 10ms
-- P99 latency: < 50ms
-- Error rate: < 0.1%
-- Throughput: > 500 req/s per instance
-
-### Load Testing & Benchmarking
-
-**Before deploying performance-critical changes:**
-```bash
-# Load test with wrk
-wrk -t12 -c400 -d30s http://localhost:8000/endpoint
-
-# Profile with py-spy
-py-spy record -o profile.svg -- python runtime/server.py
-
-# Memory profiling
-python -m memory_profiler runtime/server.py
-```
-
 ### Common Anti-Patterns to Avoid
 
-❌ **DON'T:**
+**DON'T:**
 - Synchronous I/O in async functions (blocking operations)
 - Creating new connections per request
 - Unbounded queues or buffers
@@ -404,6 +301,7 @@ python -m memory_profiler runtime/server.py
 - Using global locks for frequently accessed data
 
 ✅ **DO:**
+
 - Use connection pooling and keep-alive
 - Implement circuit breakers for external services
 - Set timeouts on all I/O operations (default: 30s)
@@ -414,6 +312,7 @@ python -m memory_profiler runtime/server.py
 ### MCP Server Checklist
 
 Before merging MCP server changes:
+
 - [ ] All handlers are async with proper error handling
 - [ ] Timeouts configured on all external calls
 - [ ] Connection pooling implemented and tested

@@ -1,0 +1,14 @@
+{
+  "finalization_id": "FINAL-20251215210454-528a95ec",
+  "log_file": "/private/var/folders/k8/bhmvnb0j1_b83_7183b7vyh80000gn/T/pytest-of-felixlefebvre/pytest-0/test_finalize_archives_to_audi0/logs/events.jsonl",
+  "timestamp": "2025-12-15T21:04:54.232088",
+  "sha256": "2d8c42f5aa74f1feae07e121aaee30a7368730c2af04830f85116ce219357d6c",
+  "merkle_root": "528a95ec1b354a19c0cf66c4e45c2abfcd5d4b5209cedac8e9a8d112562134bb",
+  "num_entries": 2,
+  "signature": "ed25519:7bc17fdf575f91bdacc9b7551d13e161c47edd3728b2e7559a8a73dca75019098357ac16830f5776b04b1f511285d72c1b969a54c62fa1def06866269219e901",
+  "compliance": {
+    "standard": "Loi 25 (Qu\u00e9bec)",
+    "immutable": true,
+    "tamper_evident": true
+  }
+}

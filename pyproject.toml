@@ -83,7 +83,7 @@ dependencies = [
     "filelock>=3.13.0,<4",
 
     # Document processing
-    "PyPDF2>=3.0.0,<4",  # PDF document analysis for DocumentAnalyzerPME tool
+    "pypdf>=4.0.0,<6",  # PDF document analysis (successor to PyPDF2, fixes CVE)
     "python-docx>=1.1.0,<2",  # Word document analysis (imports as 'docx')
     "openpyxl>=3.0.0,<4",  # Excel document analysis for DocumentAnalyzerPME tool
     "openai>=2.8.0",
@@ -133,6 +133,7 @@ dev = [
     "safety>=3.0.0,<4",
     "pylint>=4.0.3",
     "mutmut>=3.0.0,<4",  # Mutation testing pour valider la robustesse des tests
+    "types-PyYAML>=6.0.12.20250915",
 ]
 
 # Benchmarking dependencies
@@ -251,8 +252,9 @@ split_on_trailing_comma = true
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_any_generics = false
+disallow_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
 ignore_missing_imports = true
 follow_imports = "silent"
 no_implicit_reexport = false

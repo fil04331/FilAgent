@@ -1,12 +1,17 @@
 """
-Outil pour lire des fichiers de manière sécurisée
+Outil pour lire des fichiers de maniere securisee
 Avec allowlist et validation de chemins
 """
 
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 
-from .base import BaseTool, ToolResult, ToolStatus
+from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
+
+# Types stricts pour le lecteur de fichiers
+ParameterSchemaValue = Union[str, Dict[str, str], List[str]]
 
 
 class FileReaderTool(BaseTool):
@@ -15,9 +20,12 @@ class FileReaderTool(BaseTool):
     Restrictions: allowlist de chemins, lecture seule
     """
 
-    def __init__(self):
-        super().__init__(name="file_read", description="Lire le contenu d'un fichier de manière sécurisée")
-        # Chemins autorisés (peuvent être configurés via policies.yaml)
+    allowed_paths: List[str]
+    max_file_size: int
+
+    def __init__(self) -> None:
+        super().__init__(name="file_read", description="Lire le contenu d'un fichier de maniere securisee")
+        # Chemins autorises (peuvent etre configures via policies.yaml)
         self.allowed_paths = [
             "working_set/",
             "temp/",
@@ -25,31 +33,31 @@ class FileReaderTool(BaseTool):
         ]
         self.max_file_size = 10 * 1024 * 1024  # 10 MB
 
-    def execute(self, arguments: Dict[str, Any]) -> ToolResult:
+    def execute(self, arguments: Dict[str, ToolParamValue]) -> ToolResult:
         """Lire un fichier"""
         # Valider les arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
             return ToolResult(status=ToolStatus.BLOCKED, output="", error=f"Invalid arguments: {error}")
 
-        file_path = arguments["file_path"]
+        file_path = str(arguments["file_path"])
 
         try:
             path = Path(file_path).resolve()
 
-            # Vérifier que le chemin est autorisé
+            # Verifier que le chemin est autorise
             if not self._is_path_allowed(path):
                 return ToolResult(status=ToolStatus.BLOCKED, output="", error=f"Path not allowed: {file_path}")
 
-            # Vérifier que le fichier existe
+            # Verifier que le fichier existe
             if not path.exists():
                 return ToolResult(status=ToolStatus.ERROR, output="", error=f"File not found: {file_path}")
 
-            # Vérifier que c'est un fichier (pas un dossier)
+            # Verifier que c'est un fichier (pas un dossier)
             if not path.is_file():
                 return ToolResult(status=ToolStatus.ERROR, output="", error=f"Path is not a file: {file_path}")
 
-            # Vérifier la taille du fichier
+            # Verifier la taille du fichier
             file_size = path.stat().st_size
             if file_size > self.max_file_size:
                 return ToolResult(
@@ -62,11 +70,17 @@ class FileReaderTool(BaseTool):
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
 
+            metadata: Dict[str, ToolMetadataValue] = {"file_path": str(path), "file_size": file_size}
+
             return ToolResult(
-                status=ToolStatus.SUCCESS, output=content, metadata={"file_path": str(path), "file_size": file_size}
+                status=ToolStatus.SUCCESS, output=content, metadata=metadata
             )
 
-        except Exception as e:
+        except PermissionError:
+            return ToolResult(status=ToolStatus.BLOCKED, output="", error=f"Permission denied: {file_path}")
+        except UnicodeDecodeError:
+            return ToolResult(status=ToolStatus.ERROR, output="", error=f"File encoding error: {file_path}")
+        except OSError as e:
             return ToolResult(status=ToolStatus.ERROR, output="", error=f"Failed to read file: {str(e)}")
 
     def _is_path_allowed(self, path: Path) -> bool:
@@ -111,10 +125,10 @@ class FileReaderTool(BaseTool):
                 continue
         return False
 
-    def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
         """
         Valider les arguments
-        Note: La validation complète du chemin (allowlist, symlinks) est faite dans _is_path_allowed
+        Note: La validation complete du chemin (allowlist, symlinks) est faite dans _is_path_allowed
         """
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"
@@ -131,23 +145,23 @@ class FileReaderTool(BaseTool):
         if len(arguments["file_path"]) > 4096:  # Limite raisonnable pour les chemins
             return False, "file_path too long (max 4096 characters)"
 
-        # Bloquer les caractères NULL (attaque par injection de null byte)
+        # Bloquer les caracteres NULL (attaque par injection de null byte)
         if '\0' in arguments["file_path"]:
             return False, "Null byte detected in path"
 
-        # Note: La vérification ".." n'est plus nécessaire ici car _is_path_allowed
+        # Note: La verification ".." n'est plus necessaire ici car _is_path_allowed
         # utilise Path.resolve() qui normalise automatiquement les chemins
 
         return True, None
 
-    def _get_parameters_schema(self) -> Dict[str, Any]:
-        """Schéma des paramètres"""
+    def _get_parameters_schema(self) -> ToolSchemaDict:
+        """Schema des parametres"""
         return {
             "type": "object",
             "properties": {
                 "file_path": {
                     "type": "string",
-                    "description": "Chemin du fichier à lire (doit être dans les chemins autorisés)",
+                    "description": "Chemin du fichier a lire (doit etre dans les chemins autorises)",
                 }
             },
             "required": ["file_path"],

@@ -5,7 +5,7 @@ Applique les politiques de TTL et de purge automatique
 import yaml
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import shutil
 import json
 
@@ -158,9 +158,94 @@ class RetentionManager:
         
         if deleted > 0:
             print(f"✓ Cleaned up {deleted} old provenance traces (TTL: {ttl_days} days)")
-        
+
         return deleted
-    
+
+    def cleanup_old_conversations(self, days: Optional[int] = None) -> int:
+        """
+        Nettoyer les vieilles conversations avec override de TTL optionnel.
+
+        Cette méthode permet de spécifier explicitement le nombre de jours
+        de rétention, contrairement à cleanup_conversations() qui utilise
+        la configuration.
+
+        Args:
+            days: TTL en jours. Si None, utilise la valeur de config.
+
+        Returns:
+            Nombre de conversations supprimées.
+        """
+        from memory.episodic import cleanup_old_conversations as _cleanup_conversations
+
+        ttl = days if days is not None else self.get_ttl_days('conversations')
+        deleted = _cleanup_conversations(ttl)
+
+        # Record to central stats manager
+        try:
+            from runtime.middleware.stats import get_stats_manager
+            get_stats_manager().record_operation('retention')
+        except ImportError:
+            pass
+
+        if deleted > 0:
+            print(f"✓ Cleaned up {deleted} old conversations (TTL: {ttl} days)")
+
+        return deleted
+
+    def cleanup_semantic_passages(self, days: Optional[int] = None) -> int:
+        """
+        Nettoyer les passages de mémoire sémantique.
+
+        Args:
+            days: TTL en jours. Si None, utilise la valeur de config (ou 30 par défaut).
+
+        Returns:
+            Nombre de passages supprimés.
+        """
+        ttl = days if days is not None else self.get_ttl_days('semantic')
+
+        try:
+            from memory.semantic import get_semantic_memory
+            mem = get_semantic_memory()
+            if mem and hasattr(mem, 'cleanup_old_passages'):
+                deleted = mem.cleanup_old_passages(ttl)
+                if deleted > 0:
+                    print(f"✓ Cleaned up {deleted} old semantic passages (TTL: {ttl} days)")
+                return deleted
+        except (ImportError, AttributeError):
+            pass
+
+        return 0
+
+    def get_retention_stats(self) -> Dict[str, Any]:
+        """
+        Retourne les statistiques de rétention pour audit/monitoring.
+
+        Conforme Loi 25/PIPEDA - toutes les données sont sérialisables JSON.
+
+        Returns:
+            Dict avec les TTL configurés, nombre de politiques, et stats globales.
+        """
+        # Get global stats from central manager if available
+        global_stats: Dict[str, Any] = {}
+        try:
+            from runtime.middleware.stats import get_stats_manager
+            global_stats = get_stats_manager().get_summary()
+        except ImportError:
+            global_stats = {"status": "stats_manager_unavailable"}
+
+        return {
+            "conversations_ttl_days": self.get_ttl_days('conversations'),
+            "events_ttl_days": self.get_ttl_days('events'),
+            "decisions_ttl_days": self.get_ttl_days('decisions'),
+            "provenance_ttl_days": self.get_ttl_days('provenance'),
+            "semantic_ttl_days": self.get_ttl_days('semantic'),
+            "policies_count": len(self.policies),
+            "policies": {k: {"ttl_days": v.ttl_days, "purpose": v.purpose}
+                        for k, v in self.policies.items()},
+            "global_stats": global_stats,
+        }
+
     def run_cleanup(self, dry_run: bool = False) -> Dict[str, int]:
         """
         Exécuter le nettoyage complet selon les politiques
@@ -171,28 +256,30 @@ class RetentionManager:
         Returns:
             Dict avec le nombre d'éléments supprimés par type
         """
-        results = {
+        results: Dict[str, int] = {
             "conversations": 0,
             "events": 0,
             "decisions": 0,
-            "provenance": 0
+            "provenance": 0,
+            "semantic": 0,
         }
-        
+
         if dry_run:
             print("🔍 DRY RUN: Simulation du nettoyage")
             return results
-        
+
         print("🧹 Running retention cleanup...")
-        
+
         # Nettoyer chaque type de données
         results["conversations"] = self.cleanup_conversations()
         results["events"] = self.cleanup_events()
         results["decisions"] = self.cleanup_decisions()
         results["provenance"] = self.cleanup_provenance()
-        
+        results["semantic"] = self.cleanup_semantic_passages()
+
         total = sum(results.values())
         print(f"✓ Cleanup complete: {total} items removed")
-        
+
         return results
 
 
