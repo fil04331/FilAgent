@@ -147,7 +147,9 @@ class FileValidationError(Exception):
 
 def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
     """
-    Valider un fichier avant traitement
+    Valider un fichier avant traitement avec sécurité renforcée
+    
+    Security: Validates path against allowlist to prevent path traversal attacks
 
     Args:
         file_path: Chemin du fichier à valider
@@ -158,9 +160,48 @@ def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
     try:
         path = Path(file_path)
 
+        # Security: Check for null byte injection
+        if '\0' in file_path:
+            return False, "❌ **Erreur de sécurité**: Caractère null détecté dans le chemin"
+
+        # Security: Check path length
+        if len(file_path) > 4096:
+            return False, "❌ **Erreur**: Chemin trop long (max 4096 caractères)"
+
         # 1. Vérifier existence
         if not path.exists():
             return False, ERROR_MESSAGES["file_not_found"]
+
+        # Security: Validate path is in allowed directories
+        # Allow Gradio's temporary upload directory and configured allowed paths
+        allowed_paths = [
+            "working_set/",
+            "temp/",
+            "memory/working_set/",
+            "/tmp/",  # Gradio uploads to system temp
+        ]
+        
+        try:
+            path_resolved = path.resolve(strict=True)
+            is_allowed = False
+            
+            for allowed in allowed_paths:
+                try:
+                    allowed_resolved = Path(allowed).resolve()
+                    # Check if path is under allowed directory
+                    path_resolved.relative_to(allowed_resolved)
+                    is_allowed = True
+                    break
+                except ValueError:
+                    continue
+            
+            if not is_allowed:
+                logger.warning(f"⚠️ Blocked access to unauthorized path: {file_path}")
+                return False, "❌ **Erreur de sécurité**: Accès au fichier refusé (chemin non autorisé)"
+                
+        except (OSError, RuntimeError) as e:
+            logger.error(f"Path validation error: {e}")
+            return False, f"❌ **Erreur de validation**: {str(e)}"
 
         # 2. Vérifier extension
         if path.suffix.lower() not in ALL_SUPPORTED_EXTENSIONS:
