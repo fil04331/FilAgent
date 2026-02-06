@@ -1,0 +1,14 @@
+{
+  "finalization_id": "FINAL-20260206113017-528a95ec",
+  "log_file": "/tmp/pytest-of-runner/pytest-0/test_finalize_archives_to_audi0/logs/events.jsonl",
+  "timestamp": "2026-02-06T11:30:17.885724",
+  "sha256": "2d8c42f5aa74f1feae07e121aaee30a7368730c2af04830f85116ce219357d6c",
+  "merkle_root": "528a95ec1b354a19c0cf66c4e45c2abfcd5d4b5209cedac8e9a8d112562134bb",
+  "num_entries": 2,
+  "signature": "ed25519:a3493ce413c1b69f051223a87e9156b155a1d92d2184bbb1e9bf603499c909c85784372e4fe352b818333c9e2d5295745288d62ae6af32538326e1cdad60e802",
+  "compliance": {
+    "standard": "Loi 25 (Qu\u00e9bec)",
+    "immutable": true,
+    "tamper_evident": true
+  }
+}
