@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 from .task_graph import TaskStatus, TaskPriority
 from .metrics import get_metrics
 
-
 # Type aliases for strict typing
 TaskResult = Union[str, int, float, bool, Dict[str, object], List[object], None]
 ActionFunc = Callable[[Dict[str, object]], TaskResult]
@@ -328,7 +327,10 @@ class TaskExecutor:
                 # Log task execution result
                 _logger.debug(
                     "Task executed: %s (name=%s, result_type=%s, result_length=%d chars)",
-                    task.task_id, task.name, type(result).__name__, len(str(result))
+                    task.task_id,
+                    task.name,
+                    type(result).__name__,
+                    len(str(result)),
                 )
 
                 task.set_result(result)
@@ -454,9 +456,7 @@ class TaskExecutor:
             return result
         except Exception as e:
             # Preserve original exception type in error message for traceability
-            raise ExecutionError(
-                f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}"
-            ) from e
+            raise ExecutionError(f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}") from e
 
     def _check_dependencies(self, task: Task, graph: TaskGraph) -> bool:
         """

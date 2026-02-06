@@ -2,6 +2,7 @@
 Gestionnaire de rétention des données
 Applique les politiques de TTL et de purge automatique
 """
+
 import yaml
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -12,11 +13,11 @@ import json
 
 class RetentionPolicy:
     """Politique de rétention pour un type de données"""
-    
+
     def __init__(self, ttl_days: int, purpose: str):
         self.ttl_days = ttl_days
         self.purpose = purpose
-    
+
     def is_expired(self, timestamp: str) -> bool:
         """Vérifier si un timestamp est expiré"""
         try:
@@ -33,67 +34,66 @@ class RetentionManager:
     Gestionnaire de rétention des données
     Applique les politiques de conservation selon config/retention.yaml
     """
-    
+
     def __init__(self, config_path: str = "config/retention.yaml"):
         self.config_path = Path(config_path)
         self.policies: Dict[str, RetentionPolicy] = {}
         self._load_config()
-    
+
     def _load_config(self):
         """Charger la configuration de rétention"""
         if not self.config_path.exists():
             print(f"Warning: Retention config not found at {self.config_path}")
             return
-        
-        with open(self.config_path, 'r') as f:
+
+        with open(self.config_path, "r") as f:
             config = yaml.safe_load(f)
-        
-        retention = config.get('retention', {})
-        durations = retention.get('durations', {})
-        
+
+        retention = config.get("retention", {})
+        durations = retention.get("durations", {})
+
         for data_type, settings in durations.items():
             self.policies[data_type] = RetentionPolicy(
-                ttl_days=settings.get('ttl_days', 30),
-                purpose=settings.get('purpose', 'No specific purpose')
+                ttl_days=settings.get("ttl_days", 30), purpose=settings.get("purpose", "No specific purpose")
             )
-    
+
     def get_ttl_days(self, data_type: str) -> int:
         """Obtenir la TTL en jours pour un type de données"""
         policy = self.policies.get(data_type)
         if policy:
             return policy.ttl_days
         return 30  # Default
-    
+
     def cleanup_conversations(self) -> int:
         """Nettoyer les vieilles conversations (mémoire épisodique)"""
         from memory.episodic import cleanup_old_conversations
-        
-        ttl_days = self.get_ttl_days('conversations')
+
+        ttl_days = self.get_ttl_days("conversations")
         deleted = cleanup_old_conversations(ttl_days)
-        
+
         if deleted > 0:
             print(f"✓ Cleaned up {deleted} old conversations (TTL: {ttl_days} days)")
-        
+
         return deleted
-    
+
     def cleanup_events(self) -> int:
         """Nettoyer les vieux événements de log"""
         deleted = 0
         events_dir = Path("logs/events")
-        
+
         if not events_dir.exists():
             return 0
-        
-        ttl_days = self.get_ttl_days('events')
+
+        ttl_days = self.get_ttl_days("events")
         cutoff_date = datetime.now() - timedelta(days=ttl_days)
-        
+
         for log_file in events_dir.glob("*.jsonl"):
             # Extraire la date du nom de fichier
             try:
                 # Format: events-YYYY-MM-DD.jsonl
                 date_str = log_file.stem.replace("events-", "")
                 file_date = datetime.strptime(date_str, "%Y-%m-%d")
-                
+
                 if file_date < cutoff_date:
                     log_file.unlink()
                     deleted += 1
@@ -101,28 +101,28 @@ class RetentionManager:
             except (ValueError, OSError) as e:
                 # Skip files with invalid date format or permission issues
                 continue
-        
+
         if deleted > 0:
             print(f"✓ Cleaned up {deleted} old event logs")
-        
+
         return deleted
-    
+
     def cleanup_decisions(self) -> int:
         """Nettoyer les vieux Decision Records"""
         deleted = 0
         decisions_dir = Path("logs/decisions")
-        
+
         if not decisions_dir.exists():
             return 0
-        
-        ttl_days = self.get_ttl_days('decisions')
+
+        ttl_days = self.get_ttl_days("decisions")
         cutoff_date = datetime.now() - timedelta(days=ttl_days)
-        
+
         for dr_file in decisions_dir.glob("DR-*.json"):
             try:
-                with open(dr_file, 'r') as f:
+                with open(dr_file, "r") as f:
                     dr = json.load(f)
-                    ts_str = dr.get('ts', '')
+                    ts_str = dr.get("ts", "")
                     if ts_str:
                         dr_date = datetime.fromisoformat(ts_str)
                         if dr_date < cutoff_date:
@@ -132,23 +132,23 @@ class RetentionManager:
             except (json.JSONDecodeError, ValueError, OSError, KeyError):
                 # Skip files with invalid JSON, timestamp format, or permission issues
                 continue
-        
+
         if deleted > 0:
             print(f"✓ Cleaned up {deleted} old decision records (TTL: {ttl_days} days)")
-        
+
         return deleted
-    
+
     def cleanup_provenance(self) -> int:
         """Nettoyer les vieilles traces de provenance"""
         deleted = 0
         provenance_dir = Path("logs/traces/otlp")
-        
+
         if not provenance_dir.exists():
             return 0
-        
-        ttl_days = self.get_ttl_days('provenance')
+
+        ttl_days = self.get_ttl_days("provenance")
         cutoff_date = datetime.now() - timedelta(days=ttl_days)
-        
+
         for prov_file in provenance_dir.glob("*.json"):
             try:
                 # Vérifier la date de modification du fichier
@@ -159,7 +159,7 @@ class RetentionManager:
             except (OSError, ValueError):
                 # Skip files with permission issues or invalid timestamps
                 continue
-        
+
         if deleted > 0:
             print(f"✓ Cleaned up {deleted} old provenance traces (TTL: {ttl_days} days)")
 
@@ -181,13 +181,14 @@ class RetentionManager:
         """
         from memory.episodic import cleanup_old_conversations as _cleanup_conversations
 
-        ttl = days if days is not None else self.get_ttl_days('conversations')
+        ttl = days if days is not None else self.get_ttl_days("conversations")
         deleted = _cleanup_conversations(ttl)
 
         # Record to central stats manager
         try:
             from runtime.middleware.stats import get_stats_manager
-            get_stats_manager().record_operation('retention')
+
+            get_stats_manager().record_operation("retention")
         except ImportError:
             pass
 
@@ -206,12 +207,13 @@ class RetentionManager:
         Returns:
             Nombre de passages supprimés.
         """
-        ttl = days if days is not None else self.get_ttl_days('semantic')
+        ttl = days if days is not None else self.get_ttl_days("semantic")
 
         try:
             from memory.semantic import get_semantic_memory
+
             mem = get_semantic_memory()
-            if mem and hasattr(mem, 'cleanup_old_passages'):
+            if mem and hasattr(mem, "cleanup_old_passages"):
                 deleted = mem.cleanup_old_passages(ttl)
                 if deleted > 0:
                     print(f"✓ Cleaned up {deleted} old semantic passages (TTL: {ttl} days)")
@@ -234,29 +236,29 @@ class RetentionManager:
         global_stats: Dict[str, Any] = {}
         try:
             from runtime.middleware.stats import get_stats_manager
+
             global_stats = get_stats_manager().get_summary()
         except ImportError:
             global_stats = {"status": "stats_manager_unavailable"}
 
         return {
-            "conversations_ttl_days": self.get_ttl_days('conversations'),
-            "events_ttl_days": self.get_ttl_days('events'),
-            "decisions_ttl_days": self.get_ttl_days('decisions'),
-            "provenance_ttl_days": self.get_ttl_days('provenance'),
-            "semantic_ttl_days": self.get_ttl_days('semantic'),
+            "conversations_ttl_days": self.get_ttl_days("conversations"),
+            "events_ttl_days": self.get_ttl_days("events"),
+            "decisions_ttl_days": self.get_ttl_days("decisions"),
+            "provenance_ttl_days": self.get_ttl_days("provenance"),
+            "semantic_ttl_days": self.get_ttl_days("semantic"),
             "policies_count": len(self.policies),
-            "policies": {k: {"ttl_days": v.ttl_days, "purpose": v.purpose}
-                        for k, v in self.policies.items()},
+            "policies": {k: {"ttl_days": v.ttl_days, "purpose": v.purpose} for k, v in self.policies.items()},
             "global_stats": global_stats,
         }
 
     def run_cleanup(self, dry_run: bool = False) -> Dict[str, int]:
         """
         Exécuter le nettoyage complet selon les politiques
-        
+
         Args:
             dry_run: Si True, simuler sans supprimer
-        
+
         Returns:
             Dict avec le nombre d'éléments supprimés par type
         """
