@@ -39,6 +39,15 @@ class DocumentAnalyzerPME(BaseTool):
         except Exception:
             self.logger = None
 
+        # Security: Allowed paths for document analysis (similar to FileReaderTool)
+        self.allowed_paths = [
+            "working_set/",
+            "temp/",
+            "memory/working_set/",
+            "/tmp/",  # Gradio uploads to system temp
+        ]
+        self.max_file_size = 50 * 1024 * 1024  # 50 MB (as per documentation)
+
     def _redact_file_path(self, file_path: str) -> str:
         """
         Redact PII from file paths for compliance (Loi 25, PIPEDA)
@@ -131,6 +140,56 @@ class DocumentAnalyzerPME(BaseTool):
         error_message = re.sub(r"/(?:Users|home)/[^/\s]+", "/[REDACTED]", error_message)
 
         return error_message
+
+    def _is_path_allowed(self, path: Path) -> bool:
+        """
+        Vérifier si un chemin est dans la liste autorisée
+        Inclut protection contre symlinks et path traversal
+        
+        Security: Similar implementation to FileReaderTool for consistency
+        
+        Args:
+            path: Path object to validate
+            
+        Returns:
+            bool: True if path is allowed, False otherwise
+        """
+        try:
+            path_resolved = path.resolve(strict=True)  # strict=True vérifie l'existence
+        except (OSError, RuntimeError):
+            return False
+
+        # Vérifier chaque chemin autorisé
+        for allowed in self.allowed_paths:
+            try:
+                allowed_resolved = Path(allowed).resolve()
+
+                # Vérifier si le chemin est strictement sous le chemin autorisé
+                path_resolved.relative_to(allowed_resolved)
+
+                # Protection supplémentaire: vérifier les symlinks
+                if path.is_symlink():
+                    # Si c'est un symlink, vérifier que la cible est aussi dans l'allowlist
+                    link_target = path.readlink()
+                    if link_target.is_absolute():
+                        # Lien absolu - doit être dans l'allowlist
+                        target_resolved = link_target.resolve()
+                        try:
+                            target_resolved.relative_to(allowed_resolved)
+                        except ValueError:
+                            return False  # Lien pointe hors de l'allowlist
+                    else:
+                        # Lien relatif - résoudre depuis le répertoire du symlink
+                        target_resolved = (path.parent / link_target).resolve()
+                        try:
+                            target_resolved.relative_to(allowed_resolved)
+                        except ValueError:
+                            return False  # Lien pointe hors de l'allowlist
+
+                return True
+            except ValueError:
+                continue
+        return False
 
     def execute(self, arguments: Dict[str, Any]) -> ToolResult:
         """
@@ -234,7 +293,7 @@ class DocumentAnalyzerPME(BaseTool):
             )
 
     def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
-        """Validate arguments"""
+        """Validate arguments with security checks"""
         if "file_path" not in arguments:
             return False, "Missing required argument: file_path"
 
@@ -242,10 +301,37 @@ class DocumentAnalyzerPME(BaseTool):
         if not isinstance(file_path, str):
             return False, "file_path must be a string"
 
+        # Security: Check for null byte injection
+        if '\0' in file_path:
+            return False, "Null byte detected in path"
+
+        # Security: Check path length (prevent buffer overflow)
+        if len(file_path) > 4096:
+            return False, "file_path too long (max 4096 characters)"
+
         # Check file extension
         valid_extensions = [".pdf", ".xlsx", ".xls", ".docx", ".doc"]
         if not any(file_path.lower().endswith(ext) for ext in valid_extensions):
             return False, f"Unsupported file type. Supported: {', '.join(valid_extensions)}"
+
+        # Security: Validate path is in allowlist (path traversal protection)
+        try:
+            path = Path(file_path)
+            if not self._is_path_allowed(path):
+                # Log blocked attempt for audit trail
+                if self.logger:
+                    self.logger.log_event(
+                        actor="document_analyzer_pme",
+                        event="path.blocked",
+                        level="WARNING",
+                        metadata={
+                            "attempted_path": self._redact_file_path(file_path),
+                            "reason": "Path not in allowlist"
+                        }
+                    )
+                return False, f"Access denied: Path not in allowed directories"
+        except Exception as e:
+            return False, f"Path validation error: {str(e)}"
 
         return True, None
 
@@ -463,8 +549,13 @@ class DocumentAnalyzerPME(BaseTool):
     def _extract_data(self, file_path: str) -> Dict:
         """Extraction sécurisée avec redaction PII"""
         # Check file exists
-        if not Path(file_path).exists():
+        path = Path(file_path)
+        if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Security: Double-check path is allowed (defense in depth)
+        if not self._is_path_allowed(path):
+            raise PermissionError(f"Access denied: Path not in allowed directories")
 
         # Logique extraction selon type fichier
         if file_path.lower().endswith(".pdf"):
