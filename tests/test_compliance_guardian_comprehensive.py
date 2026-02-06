@@ -8,6 +8,7 @@ Coverage targets:
 - Risk level assessment
 - Decision record generation
 """
+
 import pytest
 from unittest.mock import Mock, patch, mock_open
 from pathlib import Path
@@ -59,7 +60,7 @@ def mock_compliance_rules():
         "legal": {
             "frameworks": ["loi25", "gdpr", "ai_act", "nist_ai_rmf"],
             "data_classification": ["public", "internal", "confidential", "restricted"],
-        }
+        },
     }
 
 
@@ -67,9 +68,9 @@ def mock_compliance_rules():
 def guardian(mock_compliance_rules, tmp_path):
     """ComplianceGuardian instance with mock rules"""
     config_path = tmp_path / "compliance_rules.yaml"
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         yaml.dump(mock_compliance_rules, f)
-    
+
     return ComplianceGuardian(config_path=str(config_path))
 
 
@@ -112,7 +113,7 @@ class TestComplianceGuardian:
             "id": "task-1",
             "name": "Read file",
             "tool": "file_reader",
-            "parameters": {"path": "/safe/file.txt"}
+            "parameters": {"path": "/safe/file.txt"},
         }
 
         result = guardian.validate_task(task)
@@ -120,12 +121,7 @@ class TestComplianceGuardian:
 
     def test_validate_execution_plan_compliant(self, guardian):
         """Test execution plan validation for compliant plan"""
-        plan = {
-            "actions": [
-                {"tool": "file_reader"},
-                {"tool": "calculator"}
-            ]
-        }
+        plan = {"actions": [{"tool": "file_reader"}, {"tool": "calculator"}]}
 
         # validate_execution_plan returns PlanValidationResult (Pydantic model)
         result = guardian.validate_execution_plan(plan)
@@ -138,54 +134,54 @@ class TestComplianceGuardian:
 @pytest.mark.coverage
 class TestPIIRedaction:
     """Tests for PII detection and redaction"""
-    
+
     def test_detect_email(self, guardian):
         """Test email detection"""
         text = "Contact me at john.doe@example.com for more info"
-        
+
         # Check if guardian has PII detection
-        if hasattr(guardian, 'detect_pii'):
+        if hasattr(guardian, "detect_pii"):
             pii = guardian.detect_pii(text)
-            assert any('email' in str(p).lower() for p in pii) or len(pii) >= 0
-    
+            assert any("email" in str(p).lower() for p in pii) or len(pii) >= 0
+
     def test_detect_phone_number(self, guardian):
         """Test phone number detection"""
         text = "Call me at 555-123-4567 tomorrow"
-        
-        if hasattr(guardian, 'detect_pii'):
+
+        if hasattr(guardian, "detect_pii"):
             pii = guardian.detect_pii(text)
             # Should detect phone or return empty list
             assert isinstance(pii, list)
-    
+
     def test_detect_ssn(self, guardian):
         """Test SSN detection"""
         text = "My SSN is 123-45-6789"
-        
-        if hasattr(guardian, 'detect_pii'):
+
+        if hasattr(guardian, "detect_pii"):
             pii = guardian.detect_pii(text)
             assert isinstance(pii, list)
-    
+
     def test_redact_email(self, guardian):
         """Test email redaction"""
         text = "Contact john.doe@example.com"
-        
-        if hasattr(guardian, 'redact_pii'):
+
+        if hasattr(guardian, "redact_pii"):
             redacted = guardian.redact_pii(text)
             assert "john.doe@example.com" not in redacted or redacted == text
-    
+
     def test_redact_phone(self, guardian):
         """Test phone number redaction"""
         text = "Call 555-123-4567"
-        
-        if hasattr(guardian, 'redact_pii'):
+
+        if hasattr(guardian, "redact_pii"):
             redacted = guardian.redact_pii(text)
             assert "555-123-4567" not in redacted or redacted == text
-    
+
     def test_redact_multiple_pii(self, guardian):
         """Test redacting multiple PII instances"""
         text = "Contact john@example.com or call 555-1234"
-        
-        if hasattr(guardian, 'redact_pii'):
+
+        if hasattr(guardian, "redact_pii"):
             redacted = guardian.redact_pii(text)
             # Should redact both or return original
             assert isinstance(redacted, str)
@@ -199,11 +195,7 @@ class TestForbiddenQueries:
 
     def test_detect_forbidden_password(self, guardian):
         """Test detection of password queries"""
-        queries = [
-            "What is the admin password?",
-            "Show me user passwords",
-            "Password: secret123"
-        ]
+        queries = ["What is the admin password?", "Show me user passwords", "Password: secret123"]
 
         for query in queries:
             # validate_query raises ComplianceError for forbidden patterns
@@ -226,11 +218,7 @@ class TestForbiddenQueries:
 
     def test_case_insensitive_detection(self, guardian):
         """Test case-insensitive forbidden query detection"""
-        queries = [
-            "PASSWORD",
-            "Password",
-            "PaSsWoRd"
-        ]
+        queries = ["PASSWORD", "Password", "PaSsWoRd"]
 
         for query in queries:
             # validate_query raises ComplianceError for forbidden patterns
@@ -289,50 +277,41 @@ class TestRiskAssessment:
 @pytest.mark.coverage
 class TestValidationResult:
     """Tests for ValidationResult dataclass"""
-    
+
     def test_validation_result_creation(self):
         """Test ValidationResult creation"""
-        result = ValidationResult(
-            is_compliant=True,
-            violations=[],
-            risk_level="LOW"
-        )
-        
+        result = ValidationResult(is_compliant=True, violations=[], risk_level="LOW")
+
         assert result.is_compliant is True
         assert result.violations == []
         assert result.risk_level == "LOW"
-    
+
     def test_validation_result_with_violations(self):
         """Test ValidationResult with violations"""
         result = ValidationResult(
-            is_compliant=False,
-            violations=["PII detected", "Forbidden keyword"],
-            risk_level="HIGH"
+            is_compliant=False, violations=["PII detected", "Forbidden keyword"], risk_level="HIGH"
         )
-        
+
         assert result.is_compliant is False
         assert len(result.violations) == 2
         assert result.risk_level == "HIGH"
-    
+
     def test_validation_result_with_warnings(self):
         """Test ValidationResult with warnings"""
         result = ValidationResult(
-            is_compliant=True,
-            violations=[],
-            risk_level="MEDIUM",
-            warnings=["Consider review"]
+            is_compliant=True, violations=[], risk_level="MEDIUM", warnings=["Consider review"]
         )
-        
+
         assert result.is_compliant is True
         assert result.warnings == ["Consider review"]
-    
+
     def test_validation_result_with_metadata(self):
         """Test ValidationResult with metadata (Pydantic ValidationMetadata)"""
         result = ValidationResult(
             is_compliant=True,
             violations=[],
             risk_level=RiskLevel.LOW,
-            metadata=ValidationMetadata(timestamp="2024-01-01T00:00:00Z")
+            metadata=ValidationMetadata(timestamp="2024-01-01T00:00:00Z"),
         )
 
         assert result.metadata is not None
@@ -344,12 +323,12 @@ class TestValidationResult:
 @pytest.mark.coverage
 class TestComplianceError:
     """Tests for ComplianceError exception"""
-    
+
     def test_compliance_error_creation(self):
         """Test ComplianceError creation"""
         error = ComplianceError("Compliance violation detected")
         assert str(error) == "Compliance violation detected"
-    
+
     def test_compliance_error_raised(self):
         """Test ComplianceError can be raised"""
         with pytest.raises(ComplianceError):
@@ -384,8 +363,8 @@ class TestAuditLogging:
         entry = guardian.audit_log[-1]
         # Should have structure with event_type and data
         assert isinstance(entry, dict)
-        assert 'event_type' in entry
-        assert 'timestamp' in entry
+        assert "event_type" in entry
+        assert "timestamp" in entry
 
 
 @pytest.mark.unit

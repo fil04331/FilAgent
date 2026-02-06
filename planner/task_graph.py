@@ -19,7 +19,6 @@ from typing import List, Dict, Optional, Union
 from datetime import datetime, timezone
 import uuid
 
-
 # Types stricts pour les tâches HTN
 TaskParamValue = Union[str, int, float, bool, None, List[str], Dict[str, str]]
 TaskResultValue = Union[str, int, float, bool, None, List[str], Dict[str, str]]
@@ -109,7 +108,12 @@ class Task:
         self.result = result
         self.metadata["completed_at"] = datetime.now(timezone.utc).isoformat()
 
-    def to_dict(self) -> Dict[str, Union[str, int, None, List[str], Dict[str, TaskParamValue], Dict[str, TaskMetadataValue]]]:
+    def to_dict(
+        self,
+    ) -> Dict[
+        str,
+        Union[str, int, None, List[str], Dict[str, TaskParamValue], Dict[str, TaskMetadataValue]],
+    ]:
         """Sérialise en dict pour logging/traçabilité"""
         return {
             "task_id": self.task_id,
@@ -132,7 +136,6 @@ class Task:
 class TaskDecompositionError(Exception):
     """Erreur lors de la décomposition ou validation du graphe"""
 
-    pass
 
 
 class TaskGraph:
@@ -172,7 +175,9 @@ class TaskGraph:
         # Valider que toutes les dépendances existent
         for dep_id in task.depends_on:
             if dep_id not in self.tasks:
-                raise TaskDecompositionError(f"Dependency {dep_id} not found for task {task.task_id}")
+                raise TaskDecompositionError(
+                    f"Dependency {dep_id} not found for task {task.task_id}"
+                )
 
         # Ajouter la tâche
         self.tasks[task.task_id] = task
@@ -282,7 +287,9 @@ class TaskGraph:
                 continue
 
             # Vérifier que toutes les dépendances sont complétées
-            deps_completed = all(self.tasks[dep_id].status == TaskStatus.COMPLETED for dep_id in task.depends_on)
+            deps_completed = all(
+                self.tasks[dep_id].status == TaskStatus.COMPLETED for dep_id in task.depends_on
+            )
 
             if deps_completed:
                 task.update_status(TaskStatus.READY)
@@ -319,7 +326,29 @@ class TaskGraph:
 
         return levels
 
-    def to_dict(self) -> Dict[str, Union[Dict[str, Dict[str, Union[str, int, None, List[str], Dict[str, TaskParamValue], Dict[str, TaskMetadataValue]]]], Dict[str, List[str]], Dict[str, Union[int, str]]]]:
+    def to_dict(
+        self,
+    ) -> Dict[
+        str,
+        Union[
+            Dict[
+                str,
+                Dict[
+                    str,
+                    Union[
+                        str,
+                        int,
+                        None,
+                        List[str],
+                        Dict[str, TaskParamValue],
+                        Dict[str, TaskMetadataValue],
+                    ],
+                ],
+            ],
+            Dict[str, List[str]],
+            Dict[str, Union[int, str]],
+        ],
+    ]:
         """Sérialise le graphe complet pour traçabilité"""
         return {
             "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},

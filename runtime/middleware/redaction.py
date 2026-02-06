@@ -45,7 +45,14 @@ class PIIDetector:
 
             pattern = self.PATTERNS[pii_type]
             for match in re.finditer(pattern, text):
-                detected.append({"type": pii_type, "value": match.group(), "start": match.start(), "end": match.end()})
+                detected.append(
+                    {
+                        "type": pii_type,
+                        "value": match.group(),
+                        "start": match.start(),
+                        "end": match.end(),
+                    }
+                )
 
         return detected
 
@@ -67,7 +74,9 @@ class PIIDetector:
 
         redacted_text = text
         for pii in detected:
-            redacted_text = redacted_text[:pii["start"]] + replacement + redacted_text[pii["end"]:]
+            redacted_text = (
+                redacted_text[: pii["start"]] + replacement + redacted_text[pii["end"] :]
+            )
 
         return redacted_text
 
@@ -153,7 +162,11 @@ class PIIRedactor:
                     actor="pii.redactor",
                     event="pii.detected",
                     level="WARNING",
-                    metadata={"pii_count": len(detected), "pii_types": list(pii_types), "context": context},
+                    metadata={
+                        "pii_count": len(detected),
+                        "pii_types": list(pii_types),
+                        "context": context,
+                    },
                 )
             except Exception:
                 # Graceful fallback if logger is unavailable

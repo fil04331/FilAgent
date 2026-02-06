@@ -61,13 +61,15 @@ class TestEventLoggerInitialization:
 
     def test_default_log_dir(self):
         """Test initialisation avec répertoire par défaut"""
-        with patch('pathlib.Path.mkdir'):
+        with patch("pathlib.Path.mkdir"):
             logger = EventLogger()
             assert "logs/events" in str(logger.log_dir)
 
     def test_worm_logger_graceful_fallback(self, temp_log_dir):
         """Test fallback gracieux si WORM logger échoue"""
-        with patch('runtime.middleware.logging.get_worm_logger', side_effect=Exception("WORM init failed")):
+        with patch(
+            "runtime.middleware.logging.get_worm_logger", side_effect=Exception("WORM init failed")
+        ):
             logger = EventLogger(log_dir=str(temp_log_dir))
 
             # Should initialize without WORM logger
@@ -97,17 +99,13 @@ class TestEventLogging:
         """Test log d'un événement basique"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        logger.log_event(
-            actor="test.actor",
-            event="test.event",
-            level="INFO"
-        )
+        logger.log_event(actor="test.actor", event="test.event", level="INFO")
 
         # Read the log file
         log_file = logger.current_file
         assert log_file.exists()
 
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             line = f.readline()
             event_data = json.loads(line)
 
@@ -122,20 +120,13 @@ class TestEventLogging:
         """Test log avec métadonnées"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        metadata = {
-            "tool_name": "python_sandbox",
-            "execution_time": 0.5,
-            "status": "success"
-        }
+        metadata = {"tool_name": "python_sandbox", "execution_time": 0.5, "status": "success"}
 
         logger.log_event(
-            actor="tool.executor",
-            event="tool.execution",
-            level="INFO",
-            metadata=metadata
+            actor="tool.executor", event="tool.execution", level="INFO", metadata=metadata
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["metadata"]["tool_name"] == "python_sandbox"
@@ -147,13 +138,10 @@ class TestEventLogging:
         logger = EventLogger(log_dir=str(temp_log_dir))
 
         logger.log_event(
-            actor="agent.core",
-            event="generation.start",
-            level="INFO",
-            conversation_id="conv-123"
+            actor="agent.core", event="generation.start", level="INFO", conversation_id="conv-123"
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["conversation_id"] == "conv-123"
@@ -163,13 +151,10 @@ class TestEventLogging:
         logger = EventLogger(log_dir=str(temp_log_dir))
 
         logger.log_event(
-            actor="agent.core",
-            event="task.execution",
-            level="INFO",
-            task_id="task-456"
+            actor="agent.core", event="task.execution", level="INFO", task_id="task-456"
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["task_id"] == "task-456"
@@ -180,14 +165,10 @@ class TestEventLogging:
 
         # Log multiple events
         for i in range(5):
-            logger.log_event(
-                actor=f"actor-{i}",
-                event=f"event-{i}",
-                level="INFO"
-            )
+            logger.log_event(actor=f"actor-{i}", event=f"event-{i}", level="INFO")
 
         # Verify JSONL format
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             lines = f.readlines()
 
         assert len(lines) == 5
@@ -203,7 +184,7 @@ class TestEventLogging:
 
         logger.log_event(actor="test", event="test.event")
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         # Verify ISO8601 format
@@ -223,7 +204,7 @@ class TestOpenTelemetryCompatibility:
 
         logger.log_event(actor="test", event="test.event")
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert "trace_id" in event_data
@@ -235,7 +216,7 @@ class TestOpenTelemetryCompatibility:
 
         logger.log_event(actor="test", event="test.event")
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert "span_id" in event_data
@@ -249,7 +230,7 @@ class TestOpenTelemetryCompatibility:
         for _ in range(10):
             logger.log_event(actor="test", event="test.event")
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             for line in f:
                 event_data = json.loads(line)
                 trace_ids.add(event_data["trace_id"])
@@ -264,18 +245,11 @@ class TestPIIRedactionIntegration:
         """Test masquage PII dans les métadonnées"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        metadata = {
-            "user_email": "test@example.com",
-            "message": "Contact me at john@example.com"
-        }
+        metadata = {"user_email": "test@example.com", "message": "Contact me at john@example.com"}
 
-        logger.log_event(
-            actor="test",
-            event="test.event",
-            metadata=metadata
-        )
+        logger.log_event(actor="test", event="test.event", metadata=metadata)
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         # PII should be redacted
@@ -286,7 +260,10 @@ class TestPIIRedactionIntegration:
         """Test fallback gracieux si redactor échoue"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        with patch('runtime.middleware.redaction.get_pii_redactor', side_effect=Exception("Redactor failed")):
+        with patch(
+            "runtime.middleware.redaction.get_pii_redactor",
+            side_effect=Exception("Redactor failed"),
+        ):
             metadata = {"email": "test@example.com"}
 
             # Should not raise exception
@@ -302,13 +279,9 @@ class TestPIIRedactionIntegration:
         metadata = {"email": "test@example.com"}
 
         # Events from pii.redactor should not trigger PII redaction
-        logger.log_event(
-            actor="pii.redactor",
-            event="pii.detected",
-            metadata=metadata
-        )
+        logger.log_event(actor="pii.redactor", event="pii.detected", metadata=metadata)
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         # Should contain original email (no redaction)
@@ -323,7 +296,7 @@ class TestWORMLoggerIntegration:
         mock_worm = MagicMock()
         mock_worm.append.return_value = True
 
-        with patch('runtime.middleware.logging.get_worm_logger', return_value=mock_worm):
+        with patch("runtime.middleware.logging.get_worm_logger", return_value=mock_worm):
             logger = EventLogger(log_dir=str(temp_log_dir))
             logger.log_event(actor="test", event="test.event")
 
@@ -335,14 +308,14 @@ class TestWORMLoggerIntegration:
         mock_worm = MagicMock()
         mock_worm.append.return_value = False  # WORM fails
 
-        with patch('runtime.middleware.logging.get_worm_logger', return_value=mock_worm):
+        with patch("runtime.middleware.logging.get_worm_logger", return_value=mock_worm):
             logger = EventLogger(log_dir=str(temp_log_dir))
             logger.log_event(actor="test", event="test.event")
 
             # Log should still be written via fallback
             assert logger.current_file.exists()
 
-            with open(logger.current_file, 'r') as f:
+            with open(logger.current_file, "r") as f:
                 event_data = json.loads(f.readline())
 
             assert event_data["actor"] == "test"
@@ -359,10 +332,10 @@ class TestToolCallLogging:
             tool_name="python_sandbox",
             arguments={"code": "print('hello')"},
             conversation_id="conv-123",
-            success=True
+            success=True,
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["actor"] == "tool.python_sandbox"
@@ -379,10 +352,10 @@ class TestToolCallLogging:
             arguments={"expression": "2+2"},
             conversation_id="conv-123",
             success=True,
-            output="4"
+            output="4",
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         # Output should be hashed
@@ -395,12 +368,10 @@ class TestToolCallLogging:
         arguments = {"code": "print('secret')"}
 
         logger.log_tool_call(
-            tool_name="python_sandbox",
-            arguments=arguments,
-            conversation_id="conv-123"
+            tool_name="python_sandbox", arguments=arguments, conversation_id="conv-123"
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         # Arguments should be hashed, not exposed in plaintext
@@ -421,10 +392,10 @@ class TestGenerationLogging:
             task_id="task-456",
             prompt_hash="abc123",
             response_hash="def456",
-            tokens_used=150
+            tokens_used=150,
         )
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["actor"] == "agent.core"
@@ -445,7 +416,7 @@ class TestErrorLogging:
 
         logger.error("Test error message")
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["level"] == "ERROR"
@@ -462,7 +433,7 @@ class TestErrorLogging:
         except ValueError as e:
             logger.error("Error occurred", exc_info=e)
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert "exception" in event_data["metadata"]
@@ -478,7 +449,7 @@ class TestErrorLogging:
         except RuntimeError:
             logger.error("Error occurred", exc_info=True)
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert "exception" in event_data["metadata"]
@@ -496,11 +467,7 @@ class TestThreadSafety:
 
         def log_events(thread_id):
             for i in range(10):
-                logger.log_event(
-                    actor=f"thread-{thread_id}",
-                    event=f"event-{i}",
-                    level="INFO"
-                )
+                logger.log_event(actor=f"thread-{thread_id}", event=f"event-{i}", level="INFO")
 
         # Create multiple threads
         threads = []
@@ -514,7 +481,7 @@ class TestThreadSafety:
             thread.join()
 
         # Verify all events were logged
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             lines = f.readlines()
 
         assert len(lines) == 50  # 5 threads * 10 events
@@ -532,8 +499,9 @@ class TestFileRotation:
         first_file = logger.current_file
 
         # Mock day change
-        with patch('runtime.middleware.logging.datetime') as mock_dt:
+        with patch("runtime.middleware.logging.datetime") as mock_dt:
             from datetime import timedelta
+
             new_date = datetime.now() + timedelta(days=1)
             mock_dt.now.return_value = new_date
             mock_dt.strftime = datetime.strftime
@@ -580,7 +548,7 @@ class TestEdgeCases:
 
         logger.log_event(actor="test", event="test.event", metadata={})
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["metadata"] == {}
@@ -591,7 +559,7 @@ class TestEdgeCases:
 
         logger.log_event(actor="test", event="test.event", metadata=None)
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["metadata"] == {}
@@ -600,19 +568,11 @@ class TestEdgeCases:
         """Test log avec métadonnées profondément imbriquées"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        metadata = {
-            "level1": {
-                "level2": {
-                    "level3": {
-                        "value": "deep"
-                    }
-                }
-            }
-        }
+        metadata = {"level1": {"level2": {"level3": {"value": "deep"}}}}
 
         logger.log_event(actor="test", event="test.event", metadata=metadata)
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["metadata"]["level1"]["level2"]["level3"]["value"] == "deep"
@@ -621,14 +581,11 @@ class TestEdgeCases:
         """Test log avec caractères spéciaux dans les métadonnées"""
         logger = EventLogger(log_dir=str(temp_log_dir))
 
-        metadata = {
-            "message": "Texte avec accents: éàü",
-            "symbols": "Special chars: €£¥"
-        }
+        metadata = {"message": "Texte avec accents: éàü", "symbols": "Special chars: €£¥"}
 
         logger.log_event(actor="test", event="test.event", metadata=metadata)
 
-        with open(logger.current_file, 'r', encoding='utf-8') as f:
+        with open(logger.current_file, "r", encoding="utf-8") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["metadata"]["message"] == "Texte avec accents: éàü"
@@ -645,7 +602,7 @@ class TestEdgeCases:
         metadata["value"] = "modified"
 
         # Logged metadata should not be affected
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         assert event_data["metadata"]["value"] == "original"
@@ -661,7 +618,7 @@ class TestComplianceRequirements:
 
         logger.log_event(actor="test", event="test.event")
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             event_data = json.loads(f.readline())
 
         required_fields = ["ts", "trace_id", "span_id", "level", "actor", "event"]
@@ -687,7 +644,7 @@ class TestComplianceRequirements:
         # File should be immediately available (fsync was called)
         assert logger.current_file.exists()
 
-        with open(logger.current_file, 'r') as f:
+        with open(logger.current_file, "r") as f:
             content = f.read()
 
         assert len(content) > 0

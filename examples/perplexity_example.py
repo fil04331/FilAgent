@@ -65,13 +65,15 @@ def main():
         model = init_model(
             backend="perplexity",
             model_path=model_name,
-            config={"api_key": api_key}  # Optional, uses env var by default
+            config={"api_key": api_key},  # Optional, uses env var by default
         )
     except Exception as e:
         # Sanitize error message to avoid leaking sensitive information
         error_msg = str(e)
         if "api" in error_msg.lower() or "key" in error_msg.lower():
-            print("❌ Failed to initialize Perplexity: Authentication error. Please check your API key.")
+            print(
+                "❌ Failed to initialize Perplexity: Authentication error. Please check your API key."
+            )
         else:
             print("❌ Failed to initialize Perplexity: Connection or configuration error.")
         sys.exit(1)
@@ -81,11 +83,7 @@ def main():
     print("Example 1: Simple Question")
     print("=" * 80)
 
-    config = GenerationConfig(
-        temperature=0.2,
-        max_tokens=512,
-        top_p=0.95
-    )
+    config = GenerationConfig(temperature=0.2, max_tokens=512, top_p=0.95)
 
     prompt = "What are the key differences between Python 3.11 and Python 3.12?"
 
@@ -93,9 +91,7 @@ def main():
     print("\n🤖 Generating response...")
 
     result = model.generate(
-        prompt=prompt,
-        config=config,
-        system_prompt="You are a helpful Python expert assistant."
+        prompt=prompt, config=config, system_prompt="You are a helpful Python expert assistant."
     )
 
     print(f"\n✅ Response ({result.tokens_generated} tokens):")
@@ -103,7 +99,9 @@ def main():
     print(result.text)
     print("-" * 80)
     print(f"Finish reason: {result.finish_reason}")
-    print(f"Tokens: {result.prompt_tokens} prompt + {result.tokens_generated} generated = {result.total_tokens} total")
+    print(
+        f"Tokens: {result.prompt_tokens} prompt + {result.tokens_generated} generated = {result.total_tokens} total"
+    )
 
     # Example 2: Real-time search with Perplexity (sonar models)
     if "sonar" in model_name:
@@ -119,7 +117,7 @@ def main():
         result = model.generate(
             prompt=prompt,
             config=config,
-            system_prompt="You are a knowledgeable AI researcher. Provide current, accurate information."
+            system_prompt="You are a knowledgeable AI researcher. Provide current, accurate information.",
         )
 
         print(f"\n✅ Response ({result.tokens_generated} tokens):")
@@ -148,7 +146,7 @@ Include type hints and a docstring.
     result = model.generate(
         prompt=code_prompt,
         config=GenerationConfig(temperature=0.1, max_tokens=256),
-        system_prompt="You are an expert Python developer. Write clean, well-documented code."
+        system_prompt="You are an expert Python developer. Write clean, well-documented code.",
     )
 
     print(f"\n✅ Response ({result.tokens_generated} tokens):")

@@ -107,6 +107,7 @@ class HTNVerificationConfig(BaseModel):
 
 class ComplianceGuardianConfig(BaseModel):
     """Configuration du ComplianceGuardian"""
+
     enabled: bool = True
     rules_path: str = "config/compliance_rules.yaml"
     validate_queries: bool = True
@@ -115,7 +116,9 @@ class ComplianceGuardianConfig(BaseModel):
     auto_generate_dr: bool = True
     strict_mode: bool = True
     log_compliance_events: bool = True
-    active_frameworks: list[str] = Field(default_factory=lambda: ["loi25", "gdpr", "ai_act", "nist_ai_rmf"])
+    active_frameworks: list[str] = Field(
+        default_factory=lambda: ["loi25", "gdpr", "ai_act", "nist_ai_rmf"]
+    )
 
 
 class AgentConfig(BaseModel):
@@ -184,7 +187,9 @@ class AgentConfig(BaseModel):
             if "ttl_days" in episodic_cfg:
                 memory_kwargs.setdefault("episodic_ttl_days", episodic_cfg["ttl_days"])
             if "max_conversations" in episodic_cfg:
-                memory_kwargs.setdefault("episodic_max_conversations", episodic_cfg["max_conversations"])
+                memory_kwargs.setdefault(
+                    "episodic_max_conversations", episodic_cfg["max_conversations"]
+                )
 
         semantic_cfg = memory_data.get("semantic", {})
         if isinstance(semantic_cfg, dict):
@@ -193,7 +198,9 @@ class AgentConfig(BaseModel):
             if "max_items" in semantic_cfg:
                 memory_kwargs.setdefault("semantic_max_items", semantic_cfg["max_items"])
             if "similarity_threshold" in semantic_cfg:
-                memory_kwargs.setdefault("semantic_similarity_threshold", semantic_cfg["similarity_threshold"])
+                memory_kwargs.setdefault(
+                    "semantic_similarity_threshold", semantic_cfg["similarity_threshold"]
+                )
 
         memory_config = MemoryConfig(**memory_kwargs)
 
@@ -205,10 +212,16 @@ class AgentConfig(BaseModel):
 
         # Configurations HTN optionnelles
         htn_planning_config = HTNPlanningConfig(**htn_planning_data) if htn_planning_data else None
-        htn_execution_config = HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
-        htn_verification_config = HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
+        htn_execution_config = (
+            HTNExecutionConfig(**htn_execution_data) if htn_execution_data else None
+        )
+        htn_verification_config = (
+            HTNVerificationConfig(**htn_verification_data) if htn_verification_data else None
+        )
         compliance_guardian_config = (
-            ComplianceGuardianConfig(**compliance_guardian_data) if compliance_guardian_data else None
+            ComplianceGuardianConfig(**compliance_guardian_data)
+            if compliance_guardian_data
+            else None
         )
 
         return cls(
@@ -249,29 +262,29 @@ class AgentConfig(BaseModel):
                 memory_dict["semantic"][key] = value
 
         config_dict = {
-            'agent': {
-                'name': self.name,
-                'version': self.version,
-                'max_iterations': self.runtime_settings.max_iterations,
-                'timeout': self.runtime_settings.timeout,
+            "agent": {
+                "name": self.name,
+                "version": self.version,
+                "max_iterations": self.runtime_settings.max_iterations,
+                "timeout": self.runtime_settings.timeout,
             },
-            'generation': self.generation.model_dump(),
-            'timeouts': self.timeouts.model_dump(),
-            'model': self.model.model_dump(),
-            'memory': memory_dict,
-            'logging': self.logging.model_dump(),
-            'compliance': self.compliance.model_dump(),
+            "generation": self.generation.model_dump(),
+            "timeouts": self.timeouts.model_dump(),
+            "model": self.model.model_dump(),
+            "memory": memory_dict,
+            "logging": self.logging.model_dump(),
+            "compliance": self.compliance.model_dump(),
         }
 
         # Add optional HTN configurations if they exist
         if self.htn_planning is not None:
-            config_dict['htn_planning'] = self.htn_planning.model_dump()
+            config_dict["htn_planning"] = self.htn_planning.model_dump()
         if self.htn_execution is not None:
-            config_dict['htn_execution'] = self.htn_execution.model_dump()
+            config_dict["htn_execution"] = self.htn_execution.model_dump()
         if self.htn_verification is not None:
-            config_dict['htn_verification'] = self.htn_verification.model_dump()
+            config_dict["htn_verification"] = self.htn_verification.model_dump()
         if self.compliance_guardian is not None:
-            config_dict['compliance_guardian'] = self.compliance_guardian.model_dump()
+            config_dict["compliance_guardian"] = self.compliance_guardian.model_dump()
 
         return config_dict
 
@@ -284,42 +297,42 @@ class AgentConfig(BaseModel):
 
         # Build YAML structure matching load() format
         config_dict = {
-            'agent': {
-                'name': self.name,
-                'version': self.version,
-                'max_iterations': self.runtime_settings.max_iterations,
-                'timeout': self.runtime_settings.timeout,
+            "agent": {
+                "name": self.name,
+                "version": self.version,
+                "max_iterations": self.runtime_settings.max_iterations,
+                "timeout": self.runtime_settings.timeout,
             },
-            'generation': self.generation.model_dump(),
-            'timeouts': self.timeouts.model_dump(),
-            'model': self.model.model_dump(),
-            'memory': {
-                'episodic': {
-                    'ttl_days': self.memory.episodic_ttl_days,
-                    'max_conversations': self.memory.episodic_max_conversations,
+            "generation": self.generation.model_dump(),
+            "timeouts": self.timeouts.model_dump(),
+            "model": self.model.model_dump(),
+            "memory": {
+                "episodic": {
+                    "ttl_days": self.memory.episodic_ttl_days,
+                    "max_conversations": self.memory.episodic_max_conversations,
                 },
-                'semantic': {
-                    'rebuild_days': self.memory.semantic_rebuild_days,
-                    'max_items': self.memory.semantic_max_items,
-                    'similarity_threshold': self.memory.semantic_similarity_threshold,
-                }
+                "semantic": {
+                    "rebuild_days": self.memory.semantic_rebuild_days,
+                    "max_items": self.memory.semantic_max_items,
+                    "similarity_threshold": self.memory.semantic_similarity_threshold,
+                },
             },
-            'logging': self.logging.model_dump(),
-            'compliance': self.compliance.model_dump(),
+            "logging": self.logging.model_dump(),
+            "compliance": self.compliance.model_dump(),
         }
 
         # Add optional HTN configurations if present
         if self.htn_planning is not None:
-            config_dict['htn_planning'] = self.htn_planning.model_dump()
+            config_dict["htn_planning"] = self.htn_planning.model_dump()
         if self.htn_execution is not None:
-            config_dict['htn_execution'] = self.htn_execution.model_dump()
+            config_dict["htn_execution"] = self.htn_execution.model_dump()
         if self.htn_verification is not None:
-            config_dict['htn_verification'] = self.htn_verification.model_dump()
+            config_dict["htn_verification"] = self.htn_verification.model_dump()
         if self.compliance_guardian is not None:
-            config_dict['compliance_guardian'] = self.compliance_guardian.model_dump()
+            config_dict["compliance_guardian"] = self.compliance_guardian.model_dump()
 
         # Save to YAML file
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False, indent=2)
 
 

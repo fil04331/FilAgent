@@ -14,7 +14,6 @@ import hashlib
 
 from .worm import get_worm_logger
 
-
 # Type aliases for strict typing
 LogMetadataValue = Union[str, int, float, bool, None]
 LogMetadataDict = Dict[str, Union[LogMetadataValue, List[LogMetadataValue], "LogMetadataDict"]]
@@ -202,7 +201,12 @@ class EventLogger:
         )
 
     def log_generation(
-        self, conversation_id: str, task_id: Optional[str], prompt_hash: str, response_hash: str, tokens_used: int
+        self,
+        conversation_id: str,
+        task_id: Optional[str],
+        prompt_hash: str,
+        response_hash: str,
+        tokens_used: int,
     ) -> None:
         """Enregistrer une generation de texte"""
         metadata: LogMetadataDict = {

@@ -21,7 +21,7 @@ from runtime.middleware.redaction import (
     PIIRedactor,
     get_pii_redactor,
     init_pii_redactor,
-    reset_pii_redactor
+    reset_pii_redactor,
 )
 
 
@@ -46,12 +46,12 @@ def temp_config_file(tmp_path):
                 "enabled": True,
                 "replacement_pattern": "[REDACTED]",
                 "fields_to_mask": ["email", "phone", "ssn"],
-                "scan_before_logging": True
+                "scan_before_logging": True,
             }
         }
     }
 
-    with open(config_file, 'w') as f:
+    with open(config_file, "w") as f:
         yaml.dump(config, f)
 
     return config_file
@@ -362,15 +362,9 @@ class TestPIIRedactorRedaction:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "pii": {
-                    "enabled": False
-                }
-            }
-        }
+        config = {"policies": {"pii": {"enabled": False}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         redactor = PIIRedactor(config_path=str(config_file))
@@ -391,12 +385,12 @@ class TestPIIRedactorRedaction:
                 "pii": {
                     "enabled": True,
                     "replacement_pattern": "[XXX]",
-                    "fields_to_mask": ["email"]
+                    "fields_to_mask": ["email"],
                 }
             }
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         redactor = PIIRedactor(config_path=str(config_file))
@@ -413,7 +407,7 @@ class TestScanAndLog:
 
     def test_scan_and_log_with_pii(self, temp_config_file):
         """Test scan avec PII présent"""
-        with patch('runtime.middleware.logging.get_logger') as mock_logger:
+        with patch("runtime.middleware.logging.get_logger") as mock_logger:
             mock_logger_instance = MagicMock()
             mock_logger.return_value = mock_logger_instance
 
@@ -442,7 +436,7 @@ class TestScanAndLog:
 
     def test_scan_and_log_with_context(self, temp_config_file):
         """Test scan avec contexte"""
-        with patch('runtime.middleware.logging.get_logger') as mock_logger:
+        with patch("runtime.middleware.logging.get_logger") as mock_logger:
             mock_logger_instance = MagicMock()
             mock_logger.return_value = mock_logger_instance
 
@@ -461,15 +455,11 @@ class TestScanAndLog:
 
         config = {
             "policies": {
-                "pii": {
-                    "enabled": True,
-                    "scan_before_logging": False,
-                    "fields_to_mask": ["email"]
-                }
+                "pii": {"enabled": True, "scan_before_logging": False, "fields_to_mask": ["email"]}
             }
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         redactor = PIIRedactor(config_path=str(config_file))
@@ -573,7 +563,7 @@ class TestGracefulFallbacks:
 
     def test_logger_failure_graceful(self, temp_config_file):
         """Test gestion gracieuse d'échec du logger"""
-        with patch('runtime.middleware.logging.get_logger', side_effect=Exception("Logger failed")):
+        with patch("runtime.middleware.logging.get_logger", side_effect=Exception("Logger failed")):
             redactor = PIIRedactor(config_path=str(temp_config_file))
 
             text = "Contact john@example.com"
@@ -590,7 +580,7 @@ class TestGracefulFallbacks:
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Invalid YAML
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             f.write("{ invalid yaml")
 
         # Should handle gracefully
@@ -627,7 +617,7 @@ class TestComplianceRequirements:
 
     def test_pii_logged_before_redaction(self, temp_config_file):
         """Test que la détection de PII est loggée"""
-        with patch('runtime.middleware.logging.get_logger') as mock_logger:
+        with patch("runtime.middleware.logging.get_logger") as mock_logger:
             mock_logger_instance = MagicMock()
             mock_logger.return_value = mock_logger_instance
 

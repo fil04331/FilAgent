@@ -24,7 +24,7 @@ from runtime.tool_executor import ToolCall
 
 class ParsingResult(BaseModel):
     """Result of tool call parsing"""
-    
+
     tool_calls: List[ToolCall]
     parsing_method: str  # 'native_structured', 'json_extraction', 'none'
     raw_text: Optional[str] = None
@@ -34,16 +34,15 @@ class ParsingResult(BaseModel):
 class ToolParser:
     """
     Parses tool calls from LLM outputs.
-    
+
     This component handles the complexity of extracting structured tool calls
     from various LLM output formats, with graceful fallback to JSON extraction
     when native structured output is not available.
     """
-    
+
     def __init__(self):
         """Initialize parser (stateless)"""
-        pass
-    
+
     def parse(
         self,
         generation_result: Any,
@@ -51,16 +50,16 @@ class ToolParser:
     ) -> ParsingResult:
         """
         Parse tool calls from generation result.
-        
+
         Tries multiple methods in order:
         1. Native structured output (generation_result.tool_calls)
         2. JSON extraction from text (looking for <tool_call> tags)
         3. Direct JSON in text (no tags)
-        
+
         Args:
             generation_result: Model generation result object
             response_text: Text response from model
-            
+
         Returns:
             ParsingResult with extracted tool calls
         """
@@ -79,7 +78,7 @@ class ToolParser:
                 parsing_errors = [f"Native structured validation failed: {str(e)}"]
         else:
             parsing_errors = []
-        
+
         # Method 2: JSON extraction from <tool_call> tags
         if "<tool_call>" in response_text:
             try:
@@ -93,7 +92,7 @@ class ToolParser:
                     )
             except (json.JSONDecodeError, ValidationError) as e:
                 parsing_errors.append(f"JSON extraction failed: {str(e)}")
-        
+
         # Method 3: Direct JSON parsing (last resort)
         try:
             direct_call = self._extract_direct_json(response_text)
@@ -106,7 +105,7 @@ class ToolParser:
                 )
         except (json.JSONDecodeError, ValidationError) as e:
             parsing_errors.append(f"Direct JSON parsing failed: {str(e)}")
-        
+
         # No tool calls found
         return ParsingResult(
             tool_calls=[],
@@ -114,14 +113,14 @@ class ToolParser:
             raw_text=response_text,
             parsing_errors=parsing_errors,
         )
-    
+
     def _validate_tool_calls(self, raw_calls: List[dict]) -> List[ToolCall]:
         """
         Validate and convert raw tool calls to ToolCall objects.
-        
+
         Args:
             raw_calls: List of raw dictionaries from LLM
-            
+
         Returns:
             List of validated ToolCall objects
         """
@@ -134,35 +133,35 @@ class ToolParser:
                     arguments=call_dict.get("arguments", {}),
                 )
                 validated.append(tool_call)
-        
+
         return validated
-    
+
     def _extract_from_tags(self, text: str) -> List[ToolCall]:
         """
         Extract tool calls from <tool_call> XML-like tags.
-        
+
         Format:
         <tool_call>
         {"tool": "name", "arguments": {...}}
         </tool_call>
-        
+
         Args:
             text: Text containing tool call tags
-            
+
         Returns:
             List of ToolCall objects
         """
         # Use regex only to locate JSON blocks, not to parse content
         pattern = r"<tool_call>(.*?)</tool_call>"
         matches = re.findall(pattern, text, re.DOTALL)
-        
+
         tool_calls = []
         for match in matches:
             try:
                 # Parse JSON from extracted content
                 json_content = match.strip()
                 tool_dict = json.loads(json_content)
-                
+
                 # Validate structure
                 if "tool" in tool_dict and "arguments" in tool_dict:
                     tool_call = ToolCall(
@@ -173,18 +172,18 @@ class ToolParser:
             except (json.JSONDecodeError, ValidationError):
                 # Skip malformed tool calls
                 continue
-        
+
         return tool_calls
-    
+
     def _extract_direct_json(self, text: str) -> Optional[ToolCall]:
         """
         Try to parse entire text as JSON tool call.
-        
+
         This is a last-resort fallback for models that output raw JSON.
-        
+
         Args:
             text: Text that might be JSON
-            
+
         Returns:
             ToolCall if valid JSON found, None otherwise
         """
@@ -197,7 +196,7 @@ class ToolParser:
         if cleaned.endswith("```"):
             cleaned = cleaned[:-3]
         cleaned = cleaned.strip()
-        
+
         try:
             tool_dict = json.loads(cleaned)
             if "tool" in tool_dict and "arguments" in tool_dict:
@@ -207,17 +206,17 @@ class ToolParser:
                 )
         except (json.JSONDecodeError, ValidationError):
             pass
-        
+
         return None
-    
+
     def has_tool_calls(self, text: str) -> bool:
         """
         Quick check if text contains tool call markers.
-        
+
         Args:
             text: Text to check
-            
+
         Returns:
             True if tool call markers found
         """
-        return "<tool_call>" in text or (text.strip().startswith("{") and "\"tool\"" in text)
+        return "<tool_call>" in text or (text.strip().startswith("{") and '"tool"' in text)

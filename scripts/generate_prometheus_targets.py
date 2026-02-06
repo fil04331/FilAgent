@@ -33,10 +33,10 @@ def generate_targets():
     port = os.getenv("FILAGENT_PORT", "8000")
     environment = os.getenv("ENVIRONMENT", "development")
     output_file = os.getenv("OUTPUT_FILE", "config/prometheus_targets.json")
-    
+
     # Build target address
     target = f"{host}:{port}"
-    
+
     # Create target configuration
     targets_config = [
         {
@@ -45,18 +45,18 @@ def generate_targets():
                 "env": environment,
                 "service": "filagent-api",
                 "job": "filagent",
-            }
+            },
         }
     ]
-    
+
     # Ensure output directory exists
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Write configuration
     with open(output_path, "w") as f:
         json.dump(targets_config, f, indent=2)
-    
+
     print(f"✓ Generated Prometheus targets: {output_path}")
     print(f"  Target: {target}")
     print(f"  Environment: {environment}")

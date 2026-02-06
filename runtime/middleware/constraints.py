@@ -10,7 +10,6 @@ import json
 from typing import Dict, List, Optional, Union
 from jsonschema import validate, ValidationError
 
-
 # Type aliases for strict typing
 JsonPrimitive = Union[str, int, float, bool, None]
 JsonValue = Union[JsonPrimitive, List["JsonValue"], Dict[str, "JsonValue"]]
@@ -66,7 +65,10 @@ class Guardrail:
                     found_allowed = True
                     break
             if not found_allowed:
-                return False, f"Value not in allowedlist. Allowed values: {', '.join(self.allowedlist)}"
+                return (
+                    False,
+                    f"Value not in allowedlist. Allowed values: {', '.join(self.allowedlist)}",
+                )
 
         # Verifier regex
         if self.pattern:
@@ -132,10 +134,14 @@ class ConstraintsEngine:
         max_response = guardrails_config.get("max_response_length")
 
         if max_prompt and isinstance(max_prompt, int):
-            self.guardrails.append(Guardrail(name="max_prompt_length", pattern=rf".{{0,{max_prompt}}}"))
+            self.guardrails.append(
+                Guardrail(name="max_prompt_length", pattern=rf".{{0,{max_prompt}}}")
+            )
 
         if max_response and isinstance(max_response, int):
-            self.guardrails.append(Guardrail(name="max_response_length", pattern=rf".{{0,{max_response}}}"))
+            self.guardrails.append(
+                Guardrail(name="max_response_length", pattern=rf".{{0,{max_response}}}")
+            )
 
     def validate_output(self, text: str) -> tuple[bool, List[str]]:
         """

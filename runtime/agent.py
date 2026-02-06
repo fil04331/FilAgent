@@ -7,10 +7,7 @@ REFACTORED: Now uses Clean Architecture with dependency injection
 
 from __future__ import annotations
 
-import json
-import re
 import hashlib
-import textwrap
 import time
 import logging
 from typing import TYPE_CHECKING, List, Dict, Optional, Union, Callable, cast
@@ -20,7 +17,7 @@ from .config import get_config, AgentConfig
 from .model_interface import GenerationConfig, init_model as _init_model
 from memory.episodic import add_message, get_messages
 from tools.registry import get_registry, ToolRegistry
-from tools.base import ToolResult, ToolStatus, BaseTool
+from tools.base import ToolResult, BaseTool
 
 if TYPE_CHECKING:
     from .middleware.logging import EventLogger
@@ -269,7 +266,9 @@ class Agent:
     @staticmethod
     def _is_mock(obj: object) -> bool:
         """Déterminer si l'objet est un mock unittest."""
-        return hasattr(obj, "__class__") and getattr(obj.__class__, "__module__", "").startswith("unittest.mock")
+        return hasattr(obj, "__class__") and getattr(obj.__class__, "__module__", "").startswith(
+            "unittest.mock"
+        )
 
     def _refresh_middlewares(self) -> None:
         """Synchroniser logger, DR manager et tracker avec les singletons (patchables)."""
@@ -314,10 +313,15 @@ class Agent:
         """Initialiser le modèle"""
         from .model_interface import init_model
 
-        model_config = {"context_size": self.config.model.context_size, "n_gpu_layers": self.config.model.n_gpu_layers}
+        model_config = {
+            "context_size": self.config.model.context_size,
+            "n_gpu_layers": self.config.model.n_gpu_layers,
+        }
 
         self.model = init_model(
-            backend=self.config.model.backend, model_path=self.config.model.path, config=model_config
+            backend=self.config.model.backend,
+            model_path=self.config.model.path,
+            config=model_config,
         )
         _init_logger.info("Model initialized successfully")
 
@@ -402,7 +406,9 @@ class Agent:
         # Gestion des mocks ou valeurs inattendues
         return VerificationLevel.STRICT
 
-    def chat(self, message: str, conversation_id: str, task_id: Optional[str] = None) -> Dict[str, ChatResponseValue]:
+    def chat(
+        self, message: str, conversation_id: str, task_id: Optional[str] = None
+    ) -> Dict[str, ChatResponseValue]:
         """
         Analyser un message utilisateur et orchestrer la réponse de l'agent.
 
@@ -424,7 +430,9 @@ class Agent:
 
                 if cache_result:
                     # Cache hit! Return cached response immediately
-                    _init_logger.debug("Cache hit (similarity: %.3f)", cache_result["similarity_score"])
+                    _init_logger.debug(
+                        "Cache hit (similarity: %.3f)", cache_result["similarity_score"]
+                    )
 
                     # Add cache metadata to response
                     cached_response = {
@@ -464,7 +472,9 @@ class Agent:
                 else:
                     _init_logger.debug("Cache miss - executing query")
             except Exception as e:
-                _init_logger.warning("Cache lookup failed: %s. Falling back to normal execution.", e)
+                _init_logger.warning(
+                    "Cache lookup failed: %s. Falling back to normal execution.", e
+                )
                 cache_result = None
 
         # NOUVEAU: Use Router component for strategy decision
@@ -605,7 +615,11 @@ class Agent:
 
         # 3. Vérifier
         verif_config = getattr(self.config, "htn_verification", None)
-        verif_level = VerificationLevel(verif_config.default_level) if verif_config else VerificationLevel.STRICT
+        verif_level = (
+            VerificationLevel(verif_config.default_level)
+            if verif_config
+            else VerificationLevel.STRICT
+        )
         verifications = self.verifier.verify_graph_results(
             graph=plan_result.graph,
             level=verif_level,
@@ -614,7 +628,9 @@ class Agent:
         # 4. Construire la réponse
         if exec_result.success:
             # Toutes les tâches critiques réussies
-            response = self._format_htn_response(plan_result, exec_result, verifications, conversation_id, task_id)
+            response = self._format_htn_response(
+                plan_result, exec_result, verifications, conversation_id, task_id
+            )
         else:
             # Échec critique: fallback sur mode simple
             _init_logger.warning("HTN execution failed, falling back to simple mode")
@@ -779,7 +795,9 @@ class Agent:
                 formatted_results = self.tool_executor.format_results(execution_results)
 
                 # REFACTORED: Use ContextBuilder to inject results
-                context = self.context_builder.format_tool_results_for_context(context, formatted_results)
+                context = self.context_builder.format_tool_results_for_context(
+                    context, formatted_results
+                )
                 current_message = self.context_builder.create_followup_message(formatted_results)
                 continue
 
@@ -810,7 +828,9 @@ class Agent:
         response_hash = hashlib.sha256(final_response.encode("utf-8")).hexdigest()
         unique_tools = list(dict.fromkeys(tools_used))
         # Ensure prompt_hash has a value for logging
-        prompt_hash_for_logging = final_prompt_hash or hashlib.sha256(message.encode("utf-8")).hexdigest()
+        prompt_hash_for_logging = (
+            final_prompt_hash or hashlib.sha256(message.encode("utf-8")).hexdigest()
+        )
 
         if self.logger:
             try:
@@ -845,13 +865,18 @@ class Agent:
 
         if self.dr_manager and (
             unique_tools
-            or any(keyword in final_response.lower() for keyword in ["execute", "write", "delete", "create"])
+            or any(
+                keyword in final_response.lower()
+                for keyword in ["execute", "write", "delete", "create"]
+            )
         ):
             try:
                 dr = self.dr_manager.create_dr(
                     actor="agent.core",
                     task_id=task_id or conversation_id,
-                    decision="generate_response_with_tools" if unique_tools else "generate_response",
+                    decision=(
+                        "generate_response_with_tools" if unique_tools else "generate_response"
+                    ),
                     prompt_hash=prompt_hash_for_logging,
                     tools_used=unique_tools,
                     reasoning_markers=[f"iterations:{iterations}"],
@@ -881,10 +906,17 @@ class Agent:
         # Record conversation metrics
         conversation_duration = time.time() - conversation_start_time
         if self.metrics:
-            outcome = "max_iterations" if final_response and "trop longue" in final_response else "success"
+            outcome = (
+                "max_iterations"
+                if final_response and "trop longue" in final_response
+                else "success"
+            )
             status = "completed" if outcome == "success" else "timeout"
             self.metrics.record_conversation(
-                status=status, duration_seconds=conversation_duration, outcome=outcome, iterations=iterations
+                status=status,
+                duration_seconds=conversation_duration,
+                outcome=outcome,
+                iterations=iterations,
             )
             # Record token usage
             self.metrics.record_tokens(
@@ -966,7 +998,9 @@ class Agent:
         """
         return self.context_builder.compose_prompt(context, message)
 
-    def _build_context(self, history: List[Dict[str, str]], conversation_id: str, task_id: Optional[str]) -> str:
+    def _build_context(
+        self, history: List[Dict[str, str]], conversation_id: str, task_id: Optional[str]
+    ) -> str:
         """
         DEPRECATED: Use context_builder.build_context() instead.
         Kept for backward compatibility with tests.
@@ -1118,7 +1152,9 @@ class Agent:
         sorted_tasks = plan_result.graph.topological_sort()
 
         # Log aggregation details
-        _init_logger.debug("_format_htn_response - Aggregating results: %d sorted tasks", len(sorted_tasks))
+        _init_logger.debug(
+            "_format_htn_response - Aggregating results: %d sorted tasks", len(sorted_tasks)
+        )
 
         for task in sorted_tasks:
             if task.status == TaskStatus.COMPLETED:
@@ -1131,13 +1167,19 @@ class Agent:
                     len(str(task.result)),
                 )
 
-                verification = verifications.get(task.task_id, None) if isinstance(verifications, dict) else None
+                verification = (
+                    verifications.get(task.task_id, None)
+                    if isinstance(verifications, dict)
+                    else None
+                )
                 results.append(
                     {
                         "task": task.name,
                         "result": task.result,
                         "verified": (
-                            verification.to_dict() if verification and hasattr(verification, "to_dict") else None
+                            verification.to_dict()
+                            if verification and hasattr(verification, "to_dict")
+                            else None
                         ),
                     }
                 )
@@ -1205,7 +1247,10 @@ class Agent:
         for i, result in enumerate(results):
             task_result = result.get("result", "")
             _init_logger.debug(
-                "Result %d: type=%s, length=%d chars", i + 1, type(task_result).__name__, len(str(task_result))
+                "Result %d: type=%s, length=%d chars",
+                i + 1,
+                type(task_result).__name__,
+                len(str(task_result)),
             )
 
         response_parts = []
@@ -1231,7 +1276,8 @@ class Agent:
 
         final_response = "\n".join(response_parts)
         _init_logger.debug(
-            "_generate_response_from_results OUTPUT: final_response_length=%d chars", len(final_response)
+            "_generate_response_from_results OUTPUT: final_response_length=%d chars",
+            len(final_response),
         )
 
         return final_response
@@ -1266,6 +1312,8 @@ def get_agent() -> Agent:
     return _agent_manager.get_agent()
 
 
-def init_model(backend: str, model_path: str, config: Dict[str, Union[str, int, bool]]) -> ModelInterface:
+def init_model(
+    backend: str, model_path: str, config: Dict[str, Union[str, int, bool]]
+) -> ModelInterface:
     """Proxy vers runtime.model_interface.init_model pour compatibilité tests"""
     return _init_model(backend=backend, model_path=model_path, config=config)

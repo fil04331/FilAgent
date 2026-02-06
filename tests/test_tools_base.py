@@ -6,6 +6,7 @@ Tests cover:
 2. Validation error paths - Test all validation error scenarios
 3. Status handling - Test all ToolStatus values and ToolResult behavior
 """
+
 import pytest
 import sys
 from pathlib import Path
@@ -14,7 +15,6 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tools.base import BaseTool, ToolResult, ToolStatus
-
 
 # ============================================================================
 # Test Fixtures: Mock Tool Implementations
@@ -25,20 +25,13 @@ class ConcreteToolGood(BaseTool):
     """Concrete implementation of BaseTool for testing"""
 
     def __init__(self):
-        super().__init__(
-            name="test_tool",
-            description="A test tool for unit testing"
-        )
+        super().__init__(name="test_tool", description="A test tool for unit testing")
 
     def execute(self, arguments: Dict[str, Any]) -> ToolResult:
         """Execute the tool"""
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
-            return ToolResult(
-                status=ToolStatus.ERROR,
-                output="",
-                error=error
-            )
+            return ToolResult(status=ToolStatus.ERROR, output="", error=error)
 
         operation = arguments.get("operation", "default")
 
@@ -46,30 +39,19 @@ class ConcreteToolGood(BaseTool):
             return ToolResult(
                 status=ToolStatus.SUCCESS,
                 output="Operation completed successfully",
-                metadata={"operation": operation}
+                metadata={"operation": operation},
             )
         elif operation == "error":
-            return ToolResult(
-                status=ToolStatus.ERROR,
-                output="",
-                error="Simulated error"
-            )
+            return ToolResult(status=ToolStatus.ERROR, output="", error="Simulated error")
         elif operation == "timeout":
-            return ToolResult(
-                status=ToolStatus.TIMEOUT,
-                output="",
-                error="Operation timed out"
-            )
+            return ToolResult(status=ToolStatus.TIMEOUT, output="", error="Operation timed out")
         elif operation == "blocked":
             return ToolResult(
-                status=ToolStatus.BLOCKED,
-                output="",
-                error="Operation blocked by policy"
+                status=ToolStatus.BLOCKED, output="", error="Operation blocked by policy"
             )
         else:
             return ToolResult(
-                status=ToolStatus.SUCCESS,
-                output=f"Executed with operation: {operation}"
+                status=ToolStatus.SUCCESS, output=f"Executed with operation: {operation}"
             )
 
     def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
@@ -88,15 +70,9 @@ class ConcreteToolGood(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "operation": {
-                    "type": "string",
-                    "description": "Operation to perform"
-                },
-                "required_param": {
-                    "type": "string",
-                    "description": "Required parameter"
-                }
-            }
+                "operation": {"type": "string", "description": "Operation to perform"},
+                "required_param": {"type": "string", "description": "Required parameter"},
+            },
         }
 
 
@@ -198,8 +174,8 @@ def test_missing_get_parameters_schema_raises_type_error():
 def test_base_tool_has_name_and_description():
     """Test that BaseTool properly initializes name and description"""
     tool = ConcreteToolGood()
-    assert hasattr(tool, 'name')
-    assert hasattr(tool, 'description')
+    assert hasattr(tool, "name")
+    assert hasattr(tool, "description")
     assert tool.name == "test_tool"
     assert tool.description == "A test tool for unit testing"
 
@@ -286,10 +262,10 @@ def test_execute_with_validation_failure():
 @pytest.mark.unit
 def test_tool_status_enum_values():
     """Test all ToolStatus enum values exist"""
-    assert hasattr(ToolStatus, 'SUCCESS')
-    assert hasattr(ToolStatus, 'ERROR')
-    assert hasattr(ToolStatus, 'TIMEOUT')
-    assert hasattr(ToolStatus, 'BLOCKED')
+    assert hasattr(ToolStatus, "SUCCESS")
+    assert hasattr(ToolStatus, "ERROR")
+    assert hasattr(ToolStatus, "TIMEOUT")
+    assert hasattr(ToolStatus, "BLOCKED")
 
     assert ToolStatus.SUCCESS.value == "success"
     assert ToolStatus.ERROR.value == "error"
@@ -300,10 +276,7 @@ def test_tool_status_enum_values():
 @pytest.mark.unit
 def test_tool_result_success():
     """Test ToolResult with SUCCESS status"""
-    result = ToolResult(
-        status=ToolStatus.SUCCESS,
-        output="Operation successful"
-    )
+    result = ToolResult(status=ToolStatus.SUCCESS, output="Operation successful")
 
     assert result.status == ToolStatus.SUCCESS
     assert result.output == "Operation successful"
@@ -314,11 +287,7 @@ def test_tool_result_success():
 @pytest.mark.unit
 def test_tool_result_error():
     """Test ToolResult with ERROR status"""
-    result = ToolResult(
-        status=ToolStatus.ERROR,
-        output="",
-        error="Something went wrong"
-    )
+    result = ToolResult(status=ToolStatus.ERROR, output="", error="Something went wrong")
 
     assert result.status == ToolStatus.ERROR
     assert result.is_success() is False
@@ -328,11 +297,7 @@ def test_tool_result_error():
 @pytest.mark.unit
 def test_tool_result_timeout():
     """Test ToolResult with TIMEOUT status"""
-    result = ToolResult(
-        status=ToolStatus.TIMEOUT,
-        output="",
-        error="Operation timed out after 30s"
-    )
+    result = ToolResult(status=ToolStatus.TIMEOUT, output="", error="Operation timed out after 30s")
 
     assert result.status == ToolStatus.TIMEOUT
     assert result.is_success() is False
@@ -343,9 +308,7 @@ def test_tool_result_timeout():
 def test_tool_result_blocked():
     """Test ToolResult with BLOCKED status"""
     result = ToolResult(
-        status=ToolStatus.BLOCKED,
-        output="",
-        error="Operation blocked by security policy"
+        status=ToolStatus.BLOCKED, output="", error="Operation blocked by security policy"
     )
 
     assert result.status == ToolStatus.BLOCKED
@@ -370,16 +333,9 @@ def test_tool_result_is_success_method():
 @pytest.mark.unit
 def test_tool_result_with_metadata():
     """Test ToolResult with metadata"""
-    metadata = {
-        "execution_time": 1.23,
-        "resource_usage": {"cpu": 0.5, "memory": 1024}
-    }
+    metadata = {"execution_time": 1.23, "resource_usage": {"cpu": 0.5, "memory": 1024}}
 
-    result = ToolResult(
-        status=ToolStatus.SUCCESS,
-        output="Done",
-        metadata=metadata
-    )
+    result = ToolResult(status=ToolStatus.SUCCESS, output="Done", metadata=metadata)
 
     assert result.metadata is not None
     assert result.metadata["execution_time"] == 1.23
@@ -390,21 +346,13 @@ def test_tool_result_with_metadata():
 def test_tool_result_error_message_alias():
     """Test error_message alias harmonization"""
     # Create with error_message (should populate error)
-    result1 = ToolResult(
-        status=ToolStatus.ERROR,
-        output="",
-        error_message="Test error"
-    )
+    result1 = ToolResult(status=ToolStatus.ERROR, output="", error_message="Test error")
 
     assert result1.error == "Test error"
     assert result1.error_message == "Test error"
 
     # Create with error (should populate error_message)
-    result2 = ToolResult(
-        status=ToolStatus.ERROR,
-        output="",
-        error="Another error"
-    )
+    result2 = ToolResult(status=ToolStatus.ERROR, output="", error="Another error")
 
     assert result2.error == "Another error"
     assert result2.error_message == "Another error"
@@ -414,10 +362,7 @@ def test_tool_result_error_message_alias():
 def test_tool_result_both_error_fields():
     """Test when both error and error_message are provided"""
     result = ToolResult(
-        status=ToolStatus.ERROR,
-        output="",
-        error="Primary error",
-        error_message="Secondary error"
+        status=ToolStatus.ERROR, output="", error="Primary error", error_message="Secondary error"
     )
 
     # When both are provided, they remain unchanged
@@ -504,10 +449,7 @@ def test_concrete_tool_empty_arguments():
 @pytest.mark.unit
 def test_tool_result_with_empty_output():
     """Test ToolResult with empty output string"""
-    result = ToolResult(
-        status=ToolStatus.SUCCESS,
-        output=""
-    )
+    result = ToolResult(status=ToolStatus.SUCCESS, output="")
 
     assert result.status == ToolStatus.SUCCESS
     assert result.output == ""
@@ -517,11 +459,7 @@ def test_tool_result_with_empty_output():
 @pytest.mark.unit
 def test_tool_result_with_none_metadata():
     """Test ToolResult with None metadata"""
-    result = ToolResult(
-        status=ToolStatus.SUCCESS,
-        output="test",
-        metadata=None
-    )
+    result = ToolResult(status=ToolStatus.SUCCESS, output="test", metadata=None)
 
     assert result.metadata is None
 
@@ -529,11 +467,7 @@ def test_tool_result_with_none_metadata():
 @pytest.mark.unit
 def test_tool_result_with_empty_metadata():
     """Test ToolResult with empty metadata dict"""
-    result = ToolResult(
-        status=ToolStatus.SUCCESS,
-        output="test",
-        metadata={}
-    )
+    result = ToolResult(status=ToolStatus.SUCCESS, output="test", metadata={})
 
     assert result.metadata == {}
     assert isinstance(result.metadata, dict)
@@ -601,14 +535,14 @@ def test_tool_result_dataclass_fields():
         output="test output",
         error="test error",
         metadata={"key": "value"},
-        error_message="test error message"
+        error_message="test error message",
     )
 
-    assert hasattr(result, 'status')
-    assert hasattr(result, 'output')
-    assert hasattr(result, 'error')
-    assert hasattr(result, 'metadata')
-    assert hasattr(result, 'error_message')
+    assert hasattr(result, "status")
+    assert hasattr(result, "output")
+    assert hasattr(result, "error")
+    assert hasattr(result, "metadata")
+    assert hasattr(result, "error_message")
 
 
 @pytest.mark.unit

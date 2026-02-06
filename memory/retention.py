@@ -6,8 +6,7 @@ Applique les politiques de TTL et de purge automatique
 import yaml
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Union
-import shutil
+from typing import Any, Dict, Optional
 import json
 
 
@@ -54,7 +53,8 @@ class RetentionManager:
 
         for data_type, settings in durations.items():
             self.policies[data_type] = RetentionPolicy(
-                ttl_days=settings.get("ttl_days", 30), purpose=settings.get("purpose", "No specific purpose")
+                ttl_days=settings.get("ttl_days", 30),
+                purpose=settings.get("purpose", "No specific purpose"),
             )
 
     def get_ttl_days(self, data_type: str) -> int:
@@ -98,7 +98,7 @@ class RetentionManager:
                     log_file.unlink()
                     deleted += 1
                     print(f"  Deleted old log file: {log_file.name}")
-            except (ValueError, OSError) as e:
+            except (ValueError, OSError):
                 # Skip files with invalid date format or permission issues
                 continue
 
@@ -248,7 +248,9 @@ class RetentionManager:
             "provenance_ttl_days": self.get_ttl_days("provenance"),
             "semantic_ttl_days": self.get_ttl_days("semantic"),
             "policies_count": len(self.policies),
-            "policies": {k: {"ttl_days": v.ttl_days, "purpose": v.purpose} for k, v in self.policies.items()},
+            "policies": {
+                k: {"ttl_days": v.ttl_days, "purpose": v.purpose} for k, v in self.policies.items()
+            },
             "global_stats": global_stats,
         }
 

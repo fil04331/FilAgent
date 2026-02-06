@@ -19,12 +19,7 @@ from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch
 
-from runtime.middleware.provenance import (
-    ProvBuilder,
-    ProvenanceTracker,
-    get_tracker,
-    init_tracker
-)
+from runtime.middleware.provenance import ProvBuilder, ProvenanceTracker, get_tracker, init_tracker
 
 
 @pytest.fixture
@@ -63,10 +58,7 @@ class TestProvBuilderEntities:
 
     def test_add_entity_basic(self, prov_builder):
         """Test ajout d'entité basique"""
-        prov_builder.add_entity(
-            entity_id="entity:1",
-            label="Test Entity"
-        )
+        prov_builder.add_entity(entity_id="entity:1", label="Test Entity")
 
         assert "entity:1" in prov_builder.entities
         assert prov_builder.entities["entity:1"]["prov:label"] == "Test Entity"
@@ -76,10 +68,7 @@ class TestProvBuilderEntities:
         prov_builder.add_entity(
             entity_id="entity:1",
             label="Test Entity",
-            attributes={
-                "hash": "sha256:abc123",
-                "type": "response"
-            }
+            attributes={"hash": "sha256:abc123", "type": "response"},
         )
 
         entity = prov_builder.entities["entity:1"]
@@ -108,9 +97,7 @@ class TestProvBuilderActivities:
         end_time = "2025-01-01T00:01:00"
 
         prov_builder.add_activity(
-            activity_id="activity:1",
-            start_time=start_time,
-            end_time=end_time
+            activity_id="activity:1", start_time=start_time, end_time=end_time
         )
 
         assert "activity:1" in prov_builder.activities
@@ -125,7 +112,7 @@ class TestProvBuilderActivities:
             prov_builder.add_activity(
                 activity_id=f"activity:{i}",
                 start_time=f"2025-01-01T00:0{i}:00",
-                end_time=f"2025-01-01T00:0{i+1}:00"
+                end_time=f"2025-01-01T00:0{i+1}:00",
             )
 
         assert len(prov_builder.activities) == 3
@@ -136,10 +123,7 @@ class TestProvBuilderAgents:
 
     def test_add_agent_basic(self, prov_builder):
         """Test ajout d'agent basique"""
-        prov_builder.add_agent(
-            agent_id="agent:filagent",
-            agent_type="softwareAgent"
-        )
+        prov_builder.add_agent(agent_id="agent:filagent", agent_type="softwareAgent")
 
         assert "agent:filagent" in prov_builder.agents
         agent = prov_builder.agents["agent:filagent"]
@@ -148,9 +132,7 @@ class TestProvBuilderAgents:
     def test_add_agent_with_version(self, prov_builder):
         """Test ajout d'agent avec version"""
         prov_builder.add_agent(
-            agent_id="agent:filagent",
-            agent_type="softwareAgent",
-            version="1.0.0"
+            agent_id="agent:filagent", agent_type="softwareAgent", version="1.0.0"
         )
 
         agent = prov_builder.agents["agent:filagent"]
@@ -285,7 +267,7 @@ class TestProvenanceTrackerInitialization:
 
     def test_default_storage_directory(self):
         """Test répertoire de stockage par défaut"""
-        with patch('pathlib.Path.mkdir'):
+        with patch("pathlib.Path.mkdir"):
             tracker = ProvenanceTracker()
             assert "logs/traces/otlp" in str(tracker.output_dir)
 
@@ -302,7 +284,7 @@ class TestGenerationTrackingNewAPI:
             input_message="What is 2+2?",
             output_message="4",
             tool_calls=[{"name": "calculator", "args": {}}],
-            metadata={"model": "test"}
+            metadata={"model": "test"},
         )
 
         assert prov_id.startswith("prov-conv-123-")
@@ -316,15 +298,13 @@ class TestGenerationTrackingNewAPI:
         tracker = ProvenanceTracker(storage_dir=str(temp_prov_dir))
 
         prov_id = tracker.track_generation(
-            conversation_id="conv-123",
-            input_message="Test",
-            output_message="Response"
+            conversation_id="conv-123", input_message="Test", output_message="Response"
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
         assert prov_file.exists()
 
-        with open(prov_file, 'r') as f:
+        with open(prov_file, "r") as f:
             prov_data = json.load(f)
 
         assert "entity" in prov_data
@@ -336,13 +316,11 @@ class TestGenerationTrackingNewAPI:
         tracker = ProvenanceTracker(storage_dir=str(temp_prov_dir))
 
         prov_id = tracker.track_generation(
-            conversation_id="conv-123",
-            input_message="What is 2+2?",
-            output_message="4"
+            conversation_id="conv-123", input_message="What is 2+2?", output_message="4"
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
-        with open(prov_file, 'r') as f:
+        with open(prov_file, "r") as f:
             prov_data = json.load(f)
 
         # Check that entities have hashes
@@ -367,7 +345,7 @@ class TestGenerationTrackingLegacyAPI:
             response_hash="def456",
             start_time="2025-01-01T00:00:00",
             end_time="2025-01-01T00:01:00",
-            metadata={"test": "data"}
+            metadata={"test": "data"},
         )
 
         assert prov_id.startswith("prov-task-123-")
@@ -389,11 +367,11 @@ class TestGenerationTrackingLegacyAPI:
             response_hash="def456",
             start_time="2025-01-01T00:00:00",
             end_time="2025-01-01T00:01:00",
-            metadata=metadata
+            metadata=metadata,
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
-        with open(prov_file, 'r') as f:
+        with open(prov_file, "r") as f:
             prov_data = json.load(f)
 
         # Metadata should be in activity
@@ -416,7 +394,7 @@ class TestToolExecutionTracking:
             tool_output_hash="def456",
             task_id="task-123",
             start_time="2025-01-01T00:00:00",
-            end_time="2025-01-01T00:01:00"
+            end_time="2025-01-01T00:01:00",
         )
 
         assert "entity" in prov_json
@@ -433,7 +411,7 @@ class TestToolExecutionTracking:
             tool_output_hash="def456",
             task_id="task-123",
             start_time="2025-01-01T00:00:00",
-            end_time="2025-01-01T00:01:00"
+            end_time="2025-01-01T00:01:00",
         )
 
         prov_file = temp_prov_dir / "prov-tool-calculator-task-123.json"
@@ -449,7 +427,7 @@ class TestToolExecutionTracking:
             tool_output_hash="def456",
             task_id="task-123",
             start_time="2025-01-01T00:00:00",
-            end_time="2025-01-01T00:01:00"
+            end_time="2025-01-01T00:01:00",
         )
 
         # Should have wasGeneratedBy, used, and wasDerivedFrom
@@ -485,9 +463,7 @@ class TestEdgeCases:
         tracker = ProvenanceTracker(storage_dir=str(temp_prov_dir))
 
         prov_id = tracker.track_generation(
-            conversation_id="conv-123",
-            input_message=None,
-            output_message="Response"
+            conversation_id="conv-123", input_message=None, output_message="Response"
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
@@ -498,9 +474,7 @@ class TestEdgeCases:
         tracker = ProvenanceTracker(storage_dir=str(temp_prov_dir))
 
         prov_id = tracker.track_generation(
-            conversation_id="conv-123",
-            input_message="Input",
-            output_message=None
+            conversation_id="conv-123", input_message="Input", output_message=None
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
@@ -511,9 +485,7 @@ class TestEdgeCases:
         tracker = ProvenanceTracker(storage_dir=str(temp_prov_dir))
 
         prov_id = tracker.track_generation(
-            conversation_id="conv-123",
-            input_message="",
-            output_message=""
+            conversation_id="conv-123", input_message="", output_message=""
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
@@ -526,13 +498,13 @@ class TestEdgeCases:
         prov_id = tracker.track_generation(
             conversation_id="conv-éàü-123",
             input_message="Message avec accents: éàü",
-            output_message="Réponse avec symboles: €£¥"
+            output_message="Réponse avec symboles: €£¥",
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
         assert prov_file.exists()
 
-        with open(prov_file, 'r', encoding='utf-8') as f:
+        with open(prov_file, "r", encoding="utf-8") as f:
             prov_data = json.load(f)
 
         assert prov_data is not None
@@ -590,15 +562,13 @@ class TestW3CProvCompliance:
         tracker = ProvenanceTracker(storage_dir=str(temp_prov_dir))
 
         prov_id = tracker.track_generation(
-            conversation_id="conv-123",
-            input_message="Test",
-            output_message="Response"
+            conversation_id="conv-123", input_message="Test", output_message="Response"
         )
 
         prov_file = temp_prov_dir / f"prov_{prov_id}.json"
 
         # Should be able to load as JSON
-        with open(prov_file, 'r') as f:
+        with open(prov_file, "r") as f:
             data = json.load(f)
 
         # Should be able to serialize back

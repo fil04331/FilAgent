@@ -11,7 +11,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 from pathlib import Path
 
-
 # Type aliases for strict typing
 ProvAttributeValue = Union[str, int, float, bool, None]
 ProvAttributes = Dict[str, ProvAttributeValue]
@@ -19,7 +18,10 @@ ProvEntity = Dict[str, Union[str, ProvAttributes]]
 ProvActivity = Dict[str, Union[str, ProvAttributes]]
 ProvAgent = Dict[str, Union[str, ProvAttributes]]
 ProvRelation = Dict[str, str]
-ProvJsonDocument = Dict[str, Union[Dict[str, ProvEntity], Dict[str, ProvActivity], Dict[str, ProvAgent], List[ProvRelation]]]
+ProvJsonDocument = Dict[
+    str,
+    Union[Dict[str, ProvEntity], Dict[str, ProvActivity], Dict[str, ProvAgent], List[ProvRelation]],
+]
 ToolCallDict = Dict[str, Union[str, int, float, bool, None, List[str], Dict[str, str]]]
 MetadataDict = Dict[str, Union[str, int, float, bool, None]]
 
@@ -40,7 +42,9 @@ class ProvBuilder:
         self.was_associated_with: List[ProvRelation] = []
         self.was_derived_from: List[ProvRelation] = []
 
-    def add_entity(self, entity_id: str, label: str, attributes: Optional[ProvAttributes] = None) -> None:
+    def add_entity(
+        self, entity_id: str, label: str, attributes: Optional[ProvAttributes] = None
+    ) -> None:
         """
         Ajouter une entite (artifact)
 
@@ -65,9 +69,15 @@ class ProvBuilder:
             start_time: Timestamp de debut (ISO8601)
             end_time: Timestamp de fin (ISO8601)
         """
-        self.activities[activity_id] = {"prov:type": "Activity", "prov:startTime": start_time, "prov:endTime": end_time}
+        self.activities[activity_id] = {
+            "prov:type": "Activity",
+            "prov:startTime": start_time,
+            "prov:endTime": end_time,
+        }
 
-    def add_agent(self, agent_id: str, agent_type: str = "softwareAgent", version: Optional[str] = None) -> None:
+    def add_agent(
+        self, agent_id: str, agent_type: str = "softwareAgent", version: Optional[str] = None
+    ) -> None:
         """
         Ajouter un agent
 
@@ -101,11 +111,17 @@ class ProvBuilder:
 
     def link_derived(self, entity_id: str, source_entity_id: str) -> None:
         """Lier une entite derivee a sa source"""
-        self.was_derived_from.append({"prov:generatedEntity": entity_id, "prov:usedEntity": source_entity_id})
+        self.was_derived_from.append(
+            {"prov:generatedEntity": entity_id, "prov:usedEntity": source_entity_id}
+        )
 
     def to_prov_json(self) -> ProvJsonDocument:
         """Convertir en format PROV-JSON"""
-        prov: ProvJsonDocument = {"entity": self.entities, "activity": self.activities, "agent": self.agents}
+        prov: ProvJsonDocument = {
+            "entity": self.entities,
+            "activity": self.activities,
+            "agent": self.agents,
+        }
 
         if self.was_generated_by:
             prov["wasGeneratedBy"] = self.was_generated_by
@@ -218,7 +234,11 @@ class ProvenanceTracker:
         builder.add_activity(activity_id, start_time, end_time)
         if metadata:
             # Store metadata in the activity dict
-            activity_dict = self.activities[activity_id] if hasattr(self, 'activities') else builder.activities[activity_id]
+            activity_dict = (
+                self.activities[activity_id]
+                if hasattr(self, "activities")
+                else builder.activities[activity_id]
+            )
             activity_dict["metadata"] = metadata  # type: ignore[assignment]
 
         # Agent
@@ -243,7 +263,13 @@ class ProvenanceTracker:
         return prov_id
 
     def track_tool_execution(
-        self, tool_name: str, tool_input_hash: str, tool_output_hash: str, task_id: str, start_time: str, end_time: str
+        self,
+        tool_name: str,
+        tool_input_hash: str,
+        tool_output_hash: str,
+        task_id: str,
+        start_time: str,
+        end_time: str,
     ) -> ProvJsonDocument:
         """
         Tracer l'execution d'un outil
@@ -259,8 +285,12 @@ class ProvenanceTracker:
         activity_id = f"tool_exec:{task_id}:{tool_name}"
 
         # Entites
-        builder.add_entity(input_id, f"Tool input: {tool_name}", {"hash": f"sha256:{tool_input_hash}"})
-        builder.add_entity(output_id, f"Tool output: {tool_name}", {"hash": f"sha256:{tool_output_hash}"})
+        builder.add_entity(
+            input_id, f"Tool input: {tool_name}", {"hash": f"sha256:{tool_input_hash}"}
+        )
+        builder.add_entity(
+            output_id, f"Tool output: {tool_name}", {"hash": f"sha256:{tool_output_hash}"}
+        )
 
         # Activite
         builder.add_activity(activity_id, start_time, end_time)

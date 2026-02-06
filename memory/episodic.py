@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 DB_PATH = Path("memory/episodic.sqlite")
 
 
@@ -21,7 +20,7 @@ def create_tables():
     """Créer les tables nécessaires si elles n'existent pas"""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,
@@ -32,7 +31,7 @@ def create_tables():
             metadata TEXT
         )
     """)
-    
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,45 +45,58 @@ def create_tables():
             FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
         )
     """)
-    
+
     # Index pour performance
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversation_id ON messages(conversation_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp)")
-    
+
     conn.commit()
     conn.close()
     print(f"Tables créées dans {DB_PATH}")
 
 
-def add_message(conversation_id: str, role: str, content: str, 
-                task_id: Optional[str] = None, 
-                message_type: str = "text",
-                metadata: Optional[Dict] = None):
+def add_message(
+    conversation_id: str,
+    role: str,
+    content: str,
+    task_id: Optional[str] = None,
+    message_type: str = "text",
+    metadata: Optional[Dict] = None,
+):
     """Ajouter un message à une conversation"""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     # Créer la conversation si elle n'existe pas
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT OR IGNORE INTO conversations (id, conversation_id, task_id, metadata)
         VALUES (?, ?, ?, NULL)
-    """, (conversation_id, conversation_id, task_id))
-    
+    """,
+        (conversation_id, conversation_id, task_id),
+    )
+
     # Ajouter le message
     metadata_json = json.dumps(metadata) if metadata else None
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO messages (conversation_id, task_id, role, content, message_type, metadata)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (conversation_id, task_id, role, content, message_type, metadata_json))
-    
+    """,
+        (conversation_id, task_id, role, content, message_type, metadata_json),
+    )
+
     # Mettre à jour le timestamp de la conversation
-    cursor.execute("""
+    cursor.execute(
+        """
         UPDATE conversations
         SET updated_at = CURRENT_TIMESTAMP,
             task_id = COALESCE(?, task_id)
         WHERE conversation_id = ?
-    """, (task_id, conversation_id))
-    
+    """,
+        (task_id, conversation_id),
+    )
+
     conn.commit()
     conn.close()
 
@@ -93,22 +105,25 @@ def get_messages(conversation_id: str, limit: int = 100) -> List[Dict]:
     """Récupérer les messages d'une conversation"""
     conn = get_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("""
+
+    cursor.execute(
+        """
         SELECT role, content, task_id, timestamp, message_type, metadata
         FROM messages
         WHERE conversation_id = ?
         ORDER BY timestamp ASC
         LIMIT ?
-    """, (conversation_id, limit))
-    
+    """,
+        (conversation_id, limit),
+    )
+
     messages = []
     for row in cursor.fetchall():
         msg = dict(row)
-        if msg['metadata']:
-            msg['metadata'] = json.loads(msg['metadata'])
+        if msg["metadata"]:
+            msg["metadata"] = json.loads(msg["metadata"])
         messages.append(msg)
-    
+
     conn.close()
     return messages
 
@@ -117,28 +132,34 @@ def cleanup_old_conversations(ttl_days: int = 30):
     """Supprimer les conversations plus anciennes que ttl_days"""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     cutoff_date = datetime.now() - timedelta(days=ttl_days)
-    
+
     # Supprimer les messages
-    cursor.execute("""
+    cursor.execute(
+        """
         DELETE FROM messages
         WHERE conversation_id IN (
             SELECT conversation_id FROM conversations
             WHERE updated_at < ?
         )
-    """, (cutoff_date,))
-    
+    """,
+        (cutoff_date,),
+    )
+
     # Supprimer les conversations
-    cursor.execute("""
+    cursor.execute(
+        """
         DELETE FROM conversations
         WHERE updated_at < ?
-    """, (cutoff_date,))
-    
+    """,
+        (cutoff_date,),
+    )
+
     deleted = cursor.rowcount
     conn.commit()
     conn.close()
-    
+
     return deleted
 
 

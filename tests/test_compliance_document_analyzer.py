@@ -8,6 +8,7 @@ Vérifie:
 - Pas de fuites d'information dans les messages d'erreur
 - Conformité aux réglementations de protection des données
 """
+
 import pytest
 from pathlib import Path
 import sys
@@ -32,6 +33,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # TESTS DE PII REDACTION
 # ============================================================================
 
+
 @pytest.mark.compliance
 class TestPIIRedactionInLogs:
     """Tests pour vérifier que les PII sont redactées dans les logs"""
@@ -44,10 +46,7 @@ class TestPIIRedactionInLogs:
         sensitive_path = "/Users/john.doe/Documents/confidential/secret_invoice.xlsx"
 
         with caplog.at_level(logging.ERROR):
-            result = tool.execute({
-                'file_path': sensitive_path,
-                'analysis_type': 'invoice'
-            })
+            result = tool.execute({"file_path": sensitive_path, "analysis_type": "invoice"})
 
         # Vérifier qu'on a une erreur
         assert result.status == ToolStatus.ERROR
@@ -56,32 +55,32 @@ class TestPIIRedactionInLogs:
         log_text = caplog.text.lower()
 
         # Ces éléments sensibles ne devraient PAS apparaître
-        assert 'john.doe' not in log_text, "Nom d'utilisateur exposé dans les logs"
-        assert 'confidential' not in log_text, "Nom de dossier sensible exposé"
-        assert 'secret' not in log_text, "Nom de fichier sensible exposé"
+        assert "john.doe" not in log_text, "Nom d'utilisateur exposé dans les logs"
+        assert "confidential" not in log_text, "Nom de dossier sensible exposé"
+        assert "secret" not in log_text, "Nom de fichier sensible exposé"
 
     def test_error_messages_no_pii_leaked(self):
         """Vérifier que les messages d'erreur ne contiennent pas de PII"""
         tool = DocumentAnalyzerPME()
 
         # Fichier avec nom sensible
-        result = tool.execute({
-            'file_path': '/path/to/SSN-123-45-6789.pdf',
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute(
+            {"file_path": "/path/to/SSN-123-45-6789.pdf", "analysis_type": "invoice"}
+        )
 
         # Le message d'erreur ne devrait pas exposer le nom complet du fichier
         assert result.status == ToolStatus.ERROR
 
         # Patterns PII à ne PAS trouver
         pii_patterns = [
-            r'\d{3}-\d{2}-\d{4}',  # SSN
-            r'SSN-\d+-\d+-\d+',     # SSN dans nom de fichier
+            r"\d{3}-\d{2}-\d{4}",  # SSN
+            r"SSN-\d+-\d+-\d+",  # SSN dans nom de fichier
         ]
 
         for pattern in pii_patterns:
-            assert not re.search(pattern, result.error), \
-                f"Pattern PII '{pattern}' trouvé dans message d'erreur"
+            assert not re.search(
+                pattern, result.error
+            ), f"Pattern PII '{pattern}' trouvé dans message d'erreur"
 
     def test_no_email_addresses_in_logs(self, caplog):
         """Vérifier qu'aucune adresse email n'apparaît dans les logs"""
@@ -91,14 +90,11 @@ class TestPIIRedactionInLogs:
         email_path = "/tmp/invoice_john.doe@company.com.pdf"
 
         with caplog.at_level(logging.INFO):
-            result = tool.execute({
-                'file_path': email_path,
-                'analysis_type': 'invoice'
-            })
+            result = tool.execute({"file_path": email_path, "analysis_type": "invoice"})
 
         # Vérifier qu'aucune adresse email n'apparaît
         log_text = caplog.text
-        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
 
         emails_found = re.findall(email_pattern, log_text)
         assert len(emails_found) == 0, f"Emails trouvés dans les logs: {emails_found}"
@@ -111,14 +107,11 @@ class TestPIIRedactionInLogs:
         phone_path = "/tmp/invoice_514-555-1234.pdf"
 
         with caplog.at_level(logging.INFO):
-            result = tool.execute({
-                'file_path': phone_path,
-                'analysis_type': 'invoice'
-            })
+            result = tool.execute({"file_path": phone_path, "analysis_type": "invoice"})
 
         # Pattern téléphone québécois
         log_text = caplog.text
-        phone_pattern = r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}'
+        phone_pattern = r"\d{3}[-.\s]?\d{3}[-.\s]?\d{4}"
 
         phones_found = re.findall(phone_pattern, log_text)
         assert len(phones_found) == 0, f"Numéros trouvés dans les logs: {phones_found}"
@@ -127,6 +120,7 @@ class TestPIIRedactionInLogs:
 # ============================================================================
 # TESTS DE DECISION RECORDS
 # ============================================================================
+
 
 @pytest.mark.compliance
 class TestDecisionRecords:
@@ -141,10 +135,7 @@ class TestDecisionRecords:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Vérifier que l'analyse réussit
         assert result.status == ToolStatus.SUCCESS
@@ -158,10 +149,9 @@ class TestDecisionRecords:
         tool = DocumentAnalyzerPME()
 
         with caplog.at_level(logging.ERROR):
-            result = tool.execute({
-                'file_path': str(FIXTURES_DIR / "corrupted_file.xlsx"),
-                'analysis_type': 'invoice'
-            })
+            result = tool.execute(
+                {"file_path": str(FIXTURES_DIR / "corrupted_file.xlsx"), "analysis_type": "invoice"}
+            )
 
         # Vérifier qu'on a une erreur
         assert result.status == ToolStatus.ERROR
@@ -178,6 +168,7 @@ class TestDecisionRecords:
 # TESTS DES MESSAGES D'ERREUR (Sécurité)
 # ============================================================================
 
+
 @pytest.mark.compliance
 class TestErrorMessageSecurity:
     """Tests pour vérifier que les messages d'erreur ne fuient pas d'info sensible"""
@@ -189,12 +180,14 @@ class TestErrorMessageSecurity:
         # Parcourir tous les messages d'erreur définis
         for key, message in ERROR_MESSAGES.items():
             # Ne devrait pas contenir de chemins absolus
-            assert not re.search(r'/usr/|/home/|/Users/|C:\\', message), \
-                f"Message '{key}' contient un chemin système"
+            assert not re.search(
+                r"/usr/|/home/|/Users/|C:\\", message
+            ), f"Message '{key}' contient un chemin système"
 
             # Ne devrait pas contenir de versions
-            assert not re.search(r'v?\d+\.\d+\.\d+', message), \
-                f"Message '{key}' contient une version"
+            assert not re.search(
+                r"v?\d+\.\d+\.\d+", message
+            ), f"Message '{key}' contient une version"
 
     def test_error_messages_no_technical_details(self):
         """Vérifier que les messages d'erreur sont user-friendly"""
@@ -202,29 +195,36 @@ class TestErrorMessageSecurity:
 
         # Mots techniques à éviter dans les messages utilisateur
         technical_words = [
-            'exception', 'traceback', 'stack', 'class', 'module',
-            'import', 'python', 'function', 'method'
+            "exception",
+            "traceback",
+            "stack",
+            "class",
+            "module",
+            "import",
+            "python",
+            "function",
+            "method",
         ]
 
         for key, message in ERROR_MESSAGES.items():
             message_lower = message.lower()
             for word in technical_words:
-                assert word not in message_lower, \
-                    f"Message '{key}' contient terme technique '{word}'"
+                assert (
+                    word not in message_lower
+                ), f"Message '{key}' contient terme technique '{word}'"
 
     def test_error_messages_have_solutions(self):
         """Vérifier que les messages d'erreur proposent des solutions"""
         from gradio_app_production import ERROR_MESSAGES
 
         # Les messages devraient contenir des solutions
-        solution_keywords = ['solution', 'essayez', 'vérifiez', 'utilisez']
+        solution_keywords = ["solution", "essayez", "vérifiez", "utilisez"]
 
         for key, message in ERROR_MESSAGES.items():
             message_lower = message.lower()
             has_solution = any(keyword in message_lower for keyword in solution_keywords)
 
-            assert has_solution, \
-                f"Message '{key}' ne propose pas de solution actionnable"
+            assert has_solution, f"Message '{key}' ne propose pas de solution actionnable"
 
     def test_validation_errors_safe(self):
         """Vérifier que les erreurs de validation sont sécurisées"""
@@ -235,13 +235,14 @@ class TestErrorMessageSecurity:
 
         # L'erreur ne devrait pas exposer le chemin complet
         assert not is_valid
-        assert '/home/admin/' not in error, "Chemin utilisateur exposé"
-        assert 'passwords' not in error, "Nom de fichier sensible exposé"
+        assert "/home/admin/" not in error, "Chemin utilisateur exposé"
+        assert "passwords" not in error, "Nom de fichier sensible exposé"
 
 
 # ============================================================================
 # TESTS DE CONFORMITÉ LOI 25 / PIPEDA
 # ============================================================================
+
 
 @pytest.mark.compliance
 class TestLoi25Compliance:
@@ -252,10 +253,7 @@ class TestLoi25Compliance:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Vérifier qu'on ne collecte que les données nécessaires
         assert result.status == ToolStatus.SUCCESS
@@ -265,13 +263,18 @@ class TestLoi25Compliance:
 
         # Ne devrait PAS contenir:
         unnecessary_fields = [
-            'user_ip', 'user_agent', 'session_id', 'cookies',
-            'device_id', 'browser_fingerprint'
+            "user_ip",
+            "user_agent",
+            "session_id",
+            "cookies",
+            "device_id",
+            "browser_fingerprint",
         ]
 
         for field in unnecessary_fields:
-            assert field not in metadata, \
-                f"Champ inutile '{field}' collecté (violation minimisation)"
+            assert (
+                field not in metadata
+            ), f"Champ inutile '{field}' collecté (violation minimisation)"
 
     def test_purpose_limitation(self):
         """Limitation de la finalité (Loi 25, Art. 5)"""
@@ -280,10 +283,9 @@ class TestLoi25Compliance:
         # L'outil ne devrait traiter que pour l'analyse de documents
         # Pas d'utilisation secondaire non déclarée
 
-        result = tool.execute({
-            'file_path': str(FIXTURES_DIR / "valid_invoice.xlsx"),
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute(
+            {"file_path": str(FIXTURES_DIR / "valid_invoice.xlsx"), "analysis_type": "invoice"}
+        )
 
         # Vérifier qu'il n'y a pas de tracking caché
         assert result.status == ToolStatus.SUCCESS
@@ -291,28 +293,24 @@ class TestLoi25Compliance:
         # Le résultat ne devrait pas contenir d'IDs de tracking
         result_str = str(result.metadata)
 
-        tracking_indicators = ['tracking_id', 'analytics_id', 'visitor_id']
+        tracking_indicators = ["tracking_id", "analytics_id", "visitor_id"]
         for indicator in tracking_indicators:
-            assert indicator not in result_str.lower(), \
-                f"Tracking non déclaré détecté: {indicator}"
+            assert indicator not in result_str.lower(), f"Tracking non déclaré détecté: {indicator}"
 
     def test_data_accuracy(self):
         """Exactitude des données (Loi 25, Art. 6)"""
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         assert result.status == ToolStatus.SUCCESS
 
         # Si des calculs sont faits, ils doivent être précis
-        if 'subtotal' in result.metadata:
-            subtotal = result.metadata['subtotal']
-            tps = result.metadata.get('tps', 0)
-            tvq = result.metadata.get('tvq', 0)
+        if "subtotal" in result.metadata:
+            subtotal = result.metadata["subtotal"]
+            tps = result.metadata.get("tps", 0)
+            tvq = result.metadata.get("tvq", 0)
 
             # Vérifier cohérence TPS = 5% du subtotal
             if tps > 0:
@@ -330,10 +328,7 @@ class TestLoi25Compliance:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Vérifier qu'aucune copie du fichier n'est créée
         # (sauf fichiers temporaires explicites pour export)
@@ -347,15 +342,16 @@ class TestLoi25Compliance:
 
         # Les métadonnées ne devraient pas dépasser 100 KB
         # (sinon ça indique qu'on stocke trop)
-        assert metadata_size < 100 * 1024, \
-            f"Métadonnées trop volumineuses ({metadata_size} bytes), possible sur-stockage"
+        assert (
+            metadata_size < 100 * 1024
+        ), f"Métadonnées trop volumineuses ({metadata_size} bytes), possible sur-stockage"
 
     def test_security_safeguards(self):
         """Mesures de sécurité (Loi 25, Art. 10)"""
         from gradio_app_production import (
             MAX_FILE_SIZE_BYTES,
             PROCESSING_TIMEOUT_SECONDS,
-            validate_file
+            validate_file,
         )
 
         # Vérifier que des limites de sécurité existent
@@ -374,6 +370,7 @@ class TestLoi25Compliance:
 # TESTS DE CONFORMITÉ RGPD (Bonus)
 # ============================================================================
 
+
 @pytest.mark.compliance
 class TestGDPRCompliance:
     """Tests de conformité RGPD (applicable au Québec via Loi 25)"""
@@ -386,10 +383,7 @@ class TestGDPRCompliance:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Après l'exécution, aucune donnée ne devrait persister
         # (sauf dans les Decision Records avec retention policy)
@@ -404,10 +398,7 @@ class TestGDPRCompliance:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Les résultats devraient être dans un format portable (JSON)
         assert result.status == ToolStatus.SUCCESS
@@ -426,6 +417,7 @@ class TestGDPRCompliance:
 # RÉSUMÉ DE CONFORMITÉ
 # ============================================================================
 
+
 @pytest.mark.compliance
 class TestComplianceSummary:
     """Test résumé pour générer un rapport de conformité"""
@@ -438,7 +430,7 @@ class TestComplianceSummary:
             "tool": "DocumentAnalyzerPME",
             "regulations": ["Loi 25 (Québec)", "PIPEDA", "RGPD"],
             "tests_passed": [],
-            "compliance_score": 0
+            "compliance_score": 0,
         }
 
         # Exécuter tous les tests de conformité
@@ -454,7 +446,7 @@ class TestComplianceSummary:
             "Conservation non excessive",
             "Mesures de sécurité",
             "Droit à l'effacement",
-            "Portabilité des données"
+            "Portabilité des données",
         ]
 
         report["tests_passed"] = checks
@@ -462,12 +454,11 @@ class TestComplianceSummary:
 
         # Sauvegarder le rapport
         report_path = tmp_path / "compliance_report.json"
-        with open(report_path, 'w') as f:
+        with open(report_path, "w") as f:
             json.dump(report, indent=2, fp=f)
 
         assert report_path.exists()
-        assert report["compliance_score"] >= 8, \
-            "Score de conformité insuffisant"
+        assert report["compliance_score"] >= 8, "Score de conformité insuffisant"
 
 
 if __name__ == "__main__":

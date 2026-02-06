@@ -175,7 +175,9 @@ class WormLogger:
                 }
 
                 # Sauvegarder un snapshot horodaté pour historisation
-                checkpoint_file = self.digest_dir / f"{log_file.stem}-{timestamp.strftime('%Y%m%d%H%M%S')}.json"
+                checkpoint_file = (
+                    self.digest_dir / f"{log_file.stem}-{timestamp.strftime('%Y%m%d%H%M%S')}.json"
+                )
                 with open(checkpoint_file, "w", encoding="utf-8") as f:
                     json.dump(checkpoint_data, f, indent=2)
 
@@ -192,7 +194,9 @@ class WormLogger:
             print(f"Error creating checkpoint: {e}")
             return None
 
-    def verify_integrity(self, log_file: Optional[Path] = None, expected_hash: Optional[str] = None) -> bool:
+    def verify_integrity(
+        self, log_file: Optional[Path] = None, expected_hash: Optional[str] = None
+    ) -> bool:
         """
         Vérifier l'intégrité d'un fichier de log
 
@@ -237,7 +241,9 @@ class WormLogger:
             print(f"Error verifying integrity: {e}")
             return False
 
-    def finalize_current_log(self, log_file: Optional[Path] = None, archive: bool = True) -> Optional[str]:
+    def finalize_current_log(
+        self, log_file: Optional[Path] = None, archive: bool = True
+    ) -> Optional[str]:
         """
         Finaliser et sceller le log WORM courant
 
@@ -295,7 +301,7 @@ class WormLogger:
 
                     # Generate ephemeral keypair for signing (in production, use HSM/vault)
                     private_key = ed25519.Ed25519PrivateKey.generate()
-                    public_key = private_key.public_key()
+                    private_key.public_key()
 
                     # Prepare data to sign
                     sign_data = {
@@ -336,7 +342,10 @@ class WormLogger:
                     }
 
                 # Step 3: Save finalization digest
-                digest_file = self.digest_dir / f"{log_file.stem}-finalization-{timestamp.strftime('%Y%m%d%H%M%S')}.json"
+                digest_file = (
+                    self.digest_dir
+                    / f"{log_file.stem}-finalization-{timestamp.strftime('%Y%m%d%H%M%S')}.json"
+                )
                 with open(digest_file, "w", encoding="utf-8") as f:
                     json.dump(finalization_record, f, indent=2)
 

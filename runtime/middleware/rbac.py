@@ -6,7 +6,7 @@ Gestion des rôles et permissions selon config/policies.yaml
 from __future__ import annotations
 
 import yaml  # type: ignore[import-untyped]
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -69,7 +69,9 @@ class RBACManager:
             # Enregistrer les permissions
             for perm in role.permissions:
                 if perm not in self.permissions:
-                    self.permissions[perm] = Permission(name=perm, description=f"Permission for {perm}")
+                    self.permissions[perm] = Permission(
+                        name=perm, description=f"Permission for {perm}"
+                    )
 
     def get_role(self, role_name: str) -> Optional[Role]:
         """Récupérer un rôle par nom"""

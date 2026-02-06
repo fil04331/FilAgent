@@ -22,13 +22,13 @@ from runtime.middleware.rbac import (
     Role,
     RBACManager,
     get_rbac_manager,
-    init_rbac_manager
+    init_rbac_manager,
 )
-
 
 # ============================================================================
 # FIXTURES: Test Configuration
 # ============================================================================
+
 
 @pytest.fixture
 def temp_policies_config(tmp_path) -> Path:
@@ -57,36 +57,30 @@ def temp_policies_config(tmp_path) -> Path:
                             "manage_config",
                             "execute_all_tools",
                             "view_audit",
-                            "delete_data"
-                        ]
+                            "delete_data",
+                        ],
                     },
                     {
                         "name": "user",
                         "description": "Regular user with limited access",
-                        "permissions": [
-                            "execute_safe_tools",
-                            "read_own_logs",
-                            "manage_own_data"
-                        ]
+                        "permissions": ["execute_safe_tools", "read_own_logs", "manage_own_data"],
                     },
                     {
                         "name": "viewer",
                         "description": "Read-only viewer",
-                        "permissions": [
-                            "read_own_logs"
-                        ]
+                        "permissions": ["read_own_logs"],
                     },
                     {
                         "name": "guest",
                         "description": "Guest with no permissions",
-                        "permissions": []
-                    }
+                        "permissions": [],
+                    },
                 ]
-            }
+            },
         }
     }
 
-    with open(policies_file, 'w') as f:
+    with open(policies_file, "w") as f:
         yaml.dump(test_config, f)
 
     return policies_file
@@ -117,16 +111,9 @@ def empty_policies_config(tmp_path) -> Path:
     policies_file = config_dir / "policies.yaml"
 
     # Configuration vide
-    empty_config = {
-        "policies": {
-            "version": "0.1.0",
-            "rbac": {
-                "roles": []
-            }
-        }
-    }
+    empty_config = {"policies": {"version": "0.1.0", "rbac": {"roles": []}}}
 
-    with open(policies_file, 'w') as f:
+    with open(policies_file, "w") as f:
         yaml.dump(empty_config, f)
 
     return policies_file
@@ -135,6 +122,7 @@ def empty_policies_config(tmp_path) -> Path:
 # ============================================================================
 # TESTS: Role and Permission Data Classes
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_permission_creation():
@@ -174,11 +162,7 @@ def test_role_creation():
     - Création correcte
     - Liste de permissions
     """
-    role = Role(
-        name="admin",
-        permissions=["read_all", "write_all"],
-        description="Administrator"
-    )
+    role = Role(name="admin", permissions=["read_all", "write_all"], description="Administrator")
 
     assert role.name == "admin"
     assert len(role.permissions) == 2
@@ -195,10 +179,7 @@ def test_role_has_permission():
     - Détection correcte des permissions présentes
     - Détection correcte des permissions absentes
     """
-    role = Role(
-        name="user",
-        permissions=["read_own_logs", "execute_safe_tools"]
-    )
+    role = Role(name="user", permissions=["read_own_logs", "execute_safe_tools"])
 
     # Permissions présentes
     assert role.has_permission("read_own_logs") is True
@@ -226,6 +207,7 @@ def test_role_empty_permissions():
 # ============================================================================
 # TESTS: RBACManager Initialization
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_rbac_manager_initialization(rbac_manager):
@@ -299,6 +281,7 @@ def test_rbac_manager_empty_config(empty_policies_config):
 # ============================================================================
 # TESTS: Role Permission Checks
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_get_role_success(rbac_manager):
@@ -418,6 +401,7 @@ def test_has_permission_nonexistent_permission(rbac_manager):
 # TESTS: Resource Access Control
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_require_permission_success(rbac_manager):
     """
@@ -522,6 +506,7 @@ def test_access_control_scenario_viewer(rbac_manager):
 # TESTS: List Operations
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_list_roles(rbac_manager):
     """
@@ -604,6 +589,7 @@ def test_list_permissions_nonexistent_role(rbac_manager):
 # TESTS: Singleton Pattern
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_get_rbac_manager_singleton():
     """
@@ -615,6 +601,7 @@ def test_get_rbac_manager_singleton():
     """
     # Reset singleton for test
     import runtime.middleware.rbac as rbac_module
+
     rbac_module._rbac_manager = None
 
     manager1 = get_rbac_manager()
@@ -634,6 +621,7 @@ def test_init_rbac_manager(temp_policies_config):
     """
     # Reset singleton
     import runtime.middleware.rbac as rbac_module
+
     rbac_module._rbac_manager = None
 
     manager = init_rbac_manager(config_path=str(temp_policies_config))
@@ -649,6 +637,7 @@ def test_init_rbac_manager(temp_policies_config):
 # ============================================================================
 # TESTS: Permission Inheritance (Future Enhancement)
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_permission_no_inheritance_by_default(rbac_manager):
@@ -674,6 +663,7 @@ def test_permission_no_inheritance_by_default(rbac_manager):
 # ============================================================================
 # TESTS: Denied Action Logging (Integration Test)
 # ============================================================================
+
 
 @pytest.mark.integration
 def test_denied_action_logging(rbac_manager, tmp_path, caplog):
@@ -720,18 +710,10 @@ def test_access_control_audit_trail(rbac_manager):
     def check_and_log(role: str, permission: str) -> bool:
         try:
             result = rbac_manager.require_permission(role, permission)
-            audit_log.append({
-                "role": role,
-                "permission": permission,
-                "granted": True
-            })
+            audit_log.append({"role": role, "permission": permission, "granted": True})
             return True
         except PermissionError:
-            audit_log.append({
-                "role": role,
-                "permission": permission,
-                "granted": False
-            })
+            audit_log.append({"role": role, "permission": permission, "granted": False})
             return False
 
     # Séquence d'accès
@@ -752,6 +734,7 @@ def test_access_control_audit_trail(rbac_manager):
 # TESTS: Edge Cases and Error Handling
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_rbac_manager_malformed_config(tmp_path):
     """
@@ -766,7 +749,7 @@ def test_rbac_manager_malformed_config(tmp_path):
     policies_file = config_dir / "policies.yaml"
 
     # Écrire du YAML invalide
-    with open(policies_file, 'w') as f:
+    with open(policies_file, "w") as f:
         f.write("invalid: yaml: [unclosed: bracket")
 
     # Le manager devrait gérer l'erreur gracieusement
@@ -854,17 +837,12 @@ def test_unicode_in_role_names(tmp_path):
     unicode_config = {
         "policies": {
             "rbac": {
-                "roles": [
-                    {
-                        "name": "administrateur",
-                        "permissions": ["lire_logs", "gérer_config"]
-                    }
-                ]
+                "roles": [{"name": "administrateur", "permissions": ["lire_logs", "gérer_config"]}]
             }
         }
     }
 
-    with open(policies_file, 'w', encoding='utf-8') as f:
+    with open(policies_file, "w", encoding="utf-8") as f:
         yaml.dump(unicode_config, f, allow_unicode=True)
 
     manager = RBACManager(config_path=str(policies_file))
@@ -895,14 +873,14 @@ def test_duplicate_permissions_in_role(tmp_path):
                 "roles": [
                     {
                         "name": "test_role",
-                        "permissions": ["read_logs", "write_logs", "read_logs"]  # Doublon
+                        "permissions": ["read_logs", "write_logs", "read_logs"],  # Doublon
                     }
                 ]
             }
         }
     }
 
-    with open(policies_file, 'w') as f:
+    with open(policies_file, "w") as f:
         yaml.dump(dup_config, f)
 
     manager = RBACManager(config_path=str(policies_file))
@@ -915,6 +893,7 @@ def test_duplicate_permissions_in_role(tmp_path):
 # ============================================================================
 # TESTS: Performance and Stress Testing
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_large_number_of_roles(tmp_path):
@@ -931,22 +910,13 @@ def test_large_number_of_roles(tmp_path):
 
     # Créer 100 rôles
     roles = [
-        {
-            "name": f"role_{i}",
-            "permissions": [f"perm_{i}_1", f"perm_{i}_2", f"perm_{i}_3"]
-        }
+        {"name": f"role_{i}", "permissions": [f"perm_{i}_1", f"perm_{i}_2", f"perm_{i}_3"]}
         for i in range(100)
     ]
 
-    config = {
-        "policies": {
-            "rbac": {
-                "roles": roles
-            }
-        }
-    }
+    config = {"policies": {"rbac": {"roles": roles}}}
 
-    with open(policies_file, 'w') as f:
+    with open(policies_file, "w") as f:
         yaml.dump(config, f)
 
     # Charger et vérifier
@@ -974,19 +944,10 @@ def test_large_number_of_permissions(tmp_path):
     permissions = [f"permission_{i}" for i in range(200)]
 
     config = {
-        "policies": {
-            "rbac": {
-                "roles": [
-                    {
-                        "name": "super_admin",
-                        "permissions": permissions
-                    }
-                ]
-            }
-        }
+        "policies": {"rbac": {"roles": [{"name": "super_admin", "permissions": permissions}]}}
     }
 
-    with open(policies_file, 'w') as f:
+    with open(policies_file, "w") as f:
         yaml.dump(config, f)
 
     # Charger et vérifier

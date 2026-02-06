@@ -52,7 +52,6 @@ class ExecutionStrategy(str, Enum):
 class ExecutionError(Exception):
     """Erreur lors de l'execution d'une tache"""
 
-    pass
 
 
 @dataclass
@@ -83,7 +82,10 @@ class ExecutionResult:
     def to_dict(self) -> Dict[str, object]:
         """Serialise pour logging"""
         # Log task results metadata for debugging
-        _logger.debug("ExecutionResult.to_dict() - Converting task_results with %d tasks", len(self.task_results))
+        _logger.debug(
+            "ExecutionResult.to_dict() - Converting task_results with %d tasks",
+            len(self.task_results),
+        )
         for k, v in self.task_results.items():
             _logger.debug("Task %s: type=%s, length=%d chars", k, type(v).__name__, len(str(v)))
 
@@ -456,7 +458,9 @@ class TaskExecutor:
             return result
         except Exception as e:
             # Preserve original exception type in error message for traceability
-            raise ExecutionError(f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}") from e
+            raise ExecutionError(
+                f"Action '{task.action}' failed: {type(e).__name__}: {str(e)}"
+            ) from e
 
     def _check_dependencies(self, task: Task, graph: TaskGraph) -> bool:
         """

@@ -14,12 +14,19 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 import logging
 
-from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
+from .base import (
+    BaseTool,
+    ToolResult,
+    ToolStatus,
+    ToolParamValue,
+    ToolSchemaDict,
+)
 
 # Import Docker SDK
 try:
     import docker
-    from docker.errors import DockerException, ContainerError, ImageNotFound, APIError
+    from docker.errors import DockerException, ContainerError, ImageNotFound
+
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
@@ -48,24 +55,26 @@ class PythonSandboxTool(BaseTool):
     - Double validation: AST parsing + Docker isolation
     """
 
-    def __init__(self, dangerous_patterns: Optional[List[str]] = None, docker_image: str = "python:3.12-slim") -> None:
+    def __init__(
+        self, dangerous_patterns: Optional[List[str]] = None, docker_image: str = "python:3.12-slim"
+    ) -> None:
         super().__init__(
             name="python_sandbox",
-            description="Exécuter du code Python de manière sécurisée dans un conteneur Docker isolé"
+            description="Exécuter du code Python de manière sécurisée dans un conteneur Docker isolé",
         )
-        
+
         # Configuration Docker
         self.docker_image = docker_image
         self.max_memory_mb = 512
         self.cpu_quota = 50000  # 0.5 CPU (50% d'un core)
         self.cpu_period = 100000  # Période standard
         self.timeout = 5  # secondes (réduit à 5s pour sécurité)
-        
+
         # Vérifier disponibilité Docker
         if not DOCKER_AVAILABLE:
             logger.error("Docker SDK not available. Install with: pip install docker")
             raise RuntimeError("Docker SDK is required for PythonSandboxTool")
-        
+
         # Initialiser le client Docker
         try:
             self.docker_client = docker.from_env()
@@ -74,7 +83,7 @@ class PythonSandboxTool(BaseTool):
         except DockerException as e:
             logger.error(f"Failed to connect to Docker daemon: {e}")
             raise RuntimeError(f"Docker daemon not accessible: {e}")
-        
+
         # Patterns dangereux configurables (pour double validation)
         if dangerous_patterns is None:
             patterns = [
@@ -94,7 +103,7 @@ class PythonSandboxTool(BaseTool):
         else:
             self.dangerous_patterns = dangerous_patterns
             self.dangerous_patterns_lower = [p.lower() for p in dangerous_patterns]
-        
+
         # Essayer de pull l'image si nécessaire
         self._ensure_docker_image()
 
@@ -129,7 +138,9 @@ class PythonSandboxTool(BaseTool):
         # Valider les arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
-            return ToolResult(status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}")
+            return ToolResult(
+                status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}"
+            )
 
         code = str(arguments["code"])
 
@@ -158,7 +169,7 @@ class PythonSandboxTool(BaseTool):
                 "volumes": {
                     temp_dir: {
                         "bind": "/workspace",
-                        "mode": "ro"  # Read-only pour éviter modifications
+                        "mode": "ro",  # Read-only pour éviter modifications
                     }
                 },
                 "working_dir": "/workspace",
@@ -168,15 +179,12 @@ class PythonSandboxTool(BaseTool):
                 "cpu_period": self.cpu_period,
                 "detach": True,  # Detached mode for manual wait control
                 "user": "65534:65534",  # User non-root (nobody:nogroup)
-                "environment": {
-                    "PYTHONDONTWRITEBYTECODE": "1",
-                    "PYTHONUNBUFFERED": "1"
-                },
+                "environment": {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"},
                 # Restrictions supplémentaires
                 "cap_drop": ["ALL"],  # Retirer toutes les capabilities
                 "security_opt": ["no-new-privileges"],  # Empêcher escalade de privilèges
                 "read_only": True,  # Filesystem read-only
-                "tmpfs": {"/tmp": "size=10m,mode=1777"}  # Petit tmpfs pour /tmp si besoin
+                "tmpfs": {"/tmp": "size=10m,mode=1777"},  # Petit tmpfs pour /tmp si besoin
             }
 
             try:
@@ -188,7 +196,7 @@ class PythonSandboxTool(BaseTool):
                     exit_code = container.wait(timeout=self.timeout)
 
                     # Récupérer les logs
-                    output = container.logs().decode('utf-8')
+                    output = container.logs().decode("utf-8")
 
                     elapsed_time = time.time() - start_time
 
@@ -200,7 +208,7 @@ class PythonSandboxTool(BaseTool):
 
                     # Extraire le code de sortie (Docker SDK retourne un dict avec 'StatusCode')
                     if isinstance(exit_code, dict):
-                        status_code = exit_code.get('StatusCode', 0)
+                        status_code = exit_code.get("StatusCode", 0)
                     elif isinstance(exit_code, int):
                         status_code = exit_code
                     else:
@@ -218,8 +226,8 @@ class PythonSandboxTool(BaseTool):
                                 "elapsed_time": elapsed_time,
                                 "timeout": False,
                                 "isolation": "docker",
-                                "memory_limit_mb": self.max_memory_mb
-                            }
+                                "memory_limit_mb": self.max_memory_mb,
+                            },
                         )
                     else:
                         # Erreur d'exécution
@@ -227,10 +235,7 @@ class PythonSandboxTool(BaseTool):
                             status=ToolStatus.ERROR,
                             output="",
                             error=f"Container execution failed: {output}",
-                            metadata={
-                                "exit_code": status_code,
-                                "elapsed_time": elapsed_time
-                            }
+                            metadata={"exit_code": status_code, "elapsed_time": elapsed_time},
                         )
 
                 except Exception as wait_error:
@@ -250,29 +255,26 @@ class PythonSandboxTool(BaseTool):
                             status=ToolStatus.TIMEOUT,
                             output="",
                             error=f"Execution timeout after {self.timeout}s",
-                            metadata={"timeout": True, "elapsed_time": elapsed_time}
+                            metadata={"timeout": True, "elapsed_time": elapsed_time},
                         )
                     else:
                         return ToolResult(
                             status=ToolStatus.ERROR,
                             output="",
                             error=f"Container wait error: {str(wait_error)}",
-                            metadata={"elapsed_time": elapsed_time}
+                            metadata={"elapsed_time": elapsed_time},
                         )
 
             except ContainerError as e:
                 # Erreur d'exécution dans le conteneur
                 elapsed_time = time.time() - start_time
-                stderr = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else str(e.stderr)
+                stderr = e.stderr.decode("utf-8") if isinstance(e.stderr, bytes) else str(e.stderr)
 
                 return ToolResult(
                     status=ToolStatus.ERROR,
                     output="",
                     error=f"Container execution failed: {stderr}",
-                    metadata={
-                        "exit_code": e.exit_status,
-                        "elapsed_time": elapsed_time
-                    }
+                    metadata={"exit_code": e.exit_status, "elapsed_time": elapsed_time},
                 )
 
             except Exception as e:
@@ -283,14 +285,12 @@ class PythonSandboxTool(BaseTool):
                     status=ToolStatus.ERROR,
                     output="",
                     error=f"Docker execution error: {str(e)}",
-                    metadata={"elapsed_time": elapsed_time}
+                    metadata={"elapsed_time": elapsed_time},
                 )
 
         except Exception as e:
             return ToolResult(
-                status=ToolStatus.ERROR,
-                output="",
-                error=f"Failed to execute Python code: {str(e)}"
+                status=ToolStatus.ERROR, output="", error=f"Failed to execute Python code: {str(e)}"
             )
 
         finally:
@@ -298,6 +298,7 @@ class PythonSandboxTool(BaseTool):
             if temp_dir and os.path.exists(temp_dir):
                 try:
                     import shutil
+
                     shutil.rmtree(temp_dir)
                 except Exception as e:
                     logger.warning(f"Failed to clean up temp directory {temp_dir}: {e}")
@@ -314,17 +315,49 @@ class PythonSandboxTool(BaseTool):
 
         # Liste des noms de fonctions/modules dangereux
         dangerous_names = {
-            'eval', 'exec', 'compile', '__import__', 'open', 'file',
-            'input', 'raw_input', 'execfile', 'reload', 'vars', 'globals',
-            'locals', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr',
-            '__builtins__', '__dict__', '__class__', '__bases__', '__subclasses__'
+            "eval",
+            "exec",
+            "compile",
+            "__import__",
+            "open",
+            "file",
+            "input",
+            "raw_input",
+            "execfile",
+            "reload",
+            "vars",
+            "globals",
+            "locals",
+            "dir",
+            "getattr",
+            "setattr",
+            "delattr",
+            "hasattr",
+            "__builtins__",
+            "__dict__",
+            "__class__",
+            "__bases__",
+            "__subclasses__",
         }
 
         # Modules dangereux
         dangerous_modules = {
-            'os', 'sys', 'subprocess', 'multiprocessing', 'threading',
-            'socket', 'urllib', 'requests', 'pickle', 'shelve', 'marshal',
-            'ctypes', 'imp', 'importlib', 'pty', 'commands'
+            "os",
+            "sys",
+            "subprocess",
+            "multiprocessing",
+            "threading",
+            "socket",
+            "urllib",
+            "requests",
+            "pickle",
+            "shelve",
+            "marshal",
+            "ctypes",
+            "imp",
+            "importlib",
+            "pty",
+            "commands",
         }
 
         # Parcourir l'AST
@@ -348,7 +381,10 @@ class PythonSandboxTool(BaseTool):
                 # Bloquer les accès via attributs (ex: __builtins__.eval)
                 if isinstance(node.func, ast.Attribute):
                     if node.func.attr in dangerous_names:
-                        return False, f"Attribute access to dangerous function blocked: {node.func.attr}"
+                        return (
+                            False,
+                            f"Attribute access to dangerous function blocked: {node.func.attr}",
+                        )
 
             # Bloquer l'accès aux attributs sensibles
             if isinstance(node, ast.Attribute):
@@ -362,7 +398,9 @@ class PythonSandboxTool(BaseTool):
 
         return True, None
 
-    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(
+        self, arguments: Dict[str, ToolParamValue]
+    ) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"

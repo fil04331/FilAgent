@@ -70,7 +70,12 @@ class VerificationResult:
         if "verified_at" not in self.metadata:
             self.metadata["verified_at"] = datetime.now(timezone.utc).isoformat()
 
-    def to_dict(self) -> Dict[str, Union[bool, str, float, Dict[str, bool], List[str], Dict[str, VerificationMetadataValue]]]:
+    def to_dict(
+        self,
+    ) -> Dict[
+        str,
+        Union[bool, str, float, Dict[str, bool], List[str], Dict[str, VerificationMetadataValue]],
+    ]:
         """Sérialise pour logging"""
         return {
             "passed": self.passed,
@@ -212,7 +217,6 @@ class TaskVerifier:
 
                 # Vérification 7: Cohérence avec dépendances
                 # (à implémenter si graph disponible)
-                pass
 
             # Calculer score de confiance
             passed_checks = sum(1 for v in checks.values() if v)
@@ -240,7 +244,7 @@ class TaskVerifier:
             except Exception:
                 # Les métriques ne doivent jamais casser la vérification
                 pass
-            
+
             # Construire résultat
             metadata["completed_at"] = datetime.now(timezone.utc).isoformat()
 
@@ -308,9 +312,9 @@ class TaskVerifier:
                     return False
 
                 expected_types = expected if isinstance(expected, tuple) else (expected,)
-                expected_types = tuple(
-                    t for t in expected_types if isinstance(t, type)
-                ) or (type(result[key]),)
+                expected_types = tuple(t for t in expected_types if isinstance(t, type)) or (
+                    type(result[key]),
+                )
 
                 if not isinstance(result[key], expected_types):
                     return False

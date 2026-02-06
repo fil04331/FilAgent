@@ -2,6 +2,7 @@
 Classe de base pour les benchmarks d'evaluation
 Interface commune pour tous les harness de tests
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -9,7 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Union
 import json
-
 
 # Type aliases for strict typing
 MetricValue = Union[str, int, float, bool]
@@ -20,6 +20,7 @@ TaskMetadata = Dict[str, Union[str, int, float, bool, List[str]]]
 @dataclass
 class BenchmarkTask:
     """Tache de benchmark"""
+
     id: str
     prompt: str
     ground_truth: str  # Reponse attendue
@@ -29,6 +30,7 @@ class BenchmarkTask:
 @dataclass
 class BenchmarkResult:
     """Resultat d'un benchmark"""
+
     task_id: str
     passed: bool
     response: str
@@ -81,7 +83,7 @@ class BenchmarkHarness(ABC):
         agent_callback: AgentCallback,
         num_tasks: Optional[int] = None,
         k: int = 1,
-        verbose: bool = False
+        verbose: bool = False,
     ) -> BenchmarkReport:
         """
         Executer le benchmark complet
@@ -162,10 +164,10 @@ class BenchmarkHarness(ABC):
                     "task_id": r.task_id,
                     "passed": r.passed,
                     "latency_ms": r.latency_ms if r.latency_ms is not None else 0.0,
-                    "error": r.error if r.error is not None else ""
+                    "error": r.error if r.error is not None else "",
                 }
                 for r in results
-            ]
+            ],
         }
 
         print(f"\n {self.name} complete:")
@@ -177,6 +179,7 @@ class BenchmarkHarness(ABC):
     def save_report(self, report: BenchmarkReport, output_dir: str = "eval/reports") -> None:
         """Sauvegarder le rapport d'evaluation"""
         from pathlib import Path
+
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -184,7 +187,7 @@ class BenchmarkHarness(ABC):
         filename = f"{self.name.lower()}_{timestamp}.json"
         filepath = output_path / filename
 
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(report, f, indent=2)
 
         print(f" Report saved: {filepath}")

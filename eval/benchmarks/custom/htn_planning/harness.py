@@ -216,9 +216,7 @@ class HTNPlanningHarness(BenchmarkHarness):
 
         return evaluator(task, response)
 
-    def _evaluate_sequential(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_sequential(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer execution sequentielle"""
         if task.metadata is None:
             return BenchmarkResult(
@@ -243,14 +241,10 @@ class HTNPlanningHarness(BenchmarkHarness):
             "second",
             "next",
         ]
-        found_indicators = sum(
-            1 for ind in sequential_indicators if ind in response.lower()
-        )
+        found_indicators = sum(1 for ind in sequential_indicators if ind in response.lower())
 
         expected_steps = task.metadata.get("expected_steps", 0)
-        expected_steps_val = (
-            int(expected_steps) if isinstance(expected_steps, (int, float)) else 0
-        )
+        expected_steps_val = int(expected_steps) if isinstance(expected_steps, (int, float)) else 0
 
         # Basic heuristic: response should mention steps
         passed = found_indicators >= 2 or str(expected_steps_val) in response
@@ -275,9 +269,7 @@ class HTNPlanningHarness(BenchmarkHarness):
             "en meme temps",
             "concurrent",
         ]
-        found_indicators = sum(
-            1 for ind in parallel_indicators if ind in response.lower()
-        )
+        found_indicators = sum(1 for ind in parallel_indicators if ind in response.lower())
 
         passed = found_indicators >= 1
 
@@ -322,9 +314,7 @@ class HTNPlanningHarness(BenchmarkHarness):
             metadata={"response_length": len(response.split())},
         )
 
-    def _evaluate_error_handling(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_error_handling(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer gestion d'erreur"""
         error_indicators = [
             "error",
@@ -346,9 +336,7 @@ class HTNPlanningHarness(BenchmarkHarness):
             metadata={"found_error_handling": found_error},
         )
 
-    def _evaluate_replanning(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_replanning(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer replanning dynamique"""
         conditional_indicators = [
             "if",
@@ -370,9 +358,7 @@ class HTNPlanningHarness(BenchmarkHarness):
             metadata={"conditional_indicators": found},
         )
 
-    def _evaluate_resource_aware(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_resource_aware(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer awareness des ressources"""
         resource_indicators = [
             "worker",
@@ -394,9 +380,7 @@ class HTNPlanningHarness(BenchmarkHarness):
             metadata={"resource_indicators": found},
         )
 
-    def _evaluate_long_running(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_long_running(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer tache longue avec checkpoints"""
         checkpoint_indicators = [
             "checkpoint",
@@ -416,9 +400,7 @@ class HTNPlanningHarness(BenchmarkHarness):
             ground_truth=task.ground_truth,
         )
 
-    def _evaluate_verification(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_verification(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer verification a chaque etape"""
         if task.metadata is None:
             return BenchmarkResult(

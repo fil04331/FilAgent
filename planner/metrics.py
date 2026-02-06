@@ -144,12 +144,16 @@ class HTNMetrics:
 
         # Compteur: Tâches complétées
         self.htn_tasks_completed_total = Counter(
-            "htn_tasks_completed_total", "Total number of completed HTN tasks", ["priority", "action", "status"]
+            "htn_tasks_completed_total",
+            "Total number of completed HTN tasks",
+            ["priority", "action", "status"],
         )
 
         # Compteur: Tâches échouées
         self.htn_tasks_failed_total = Counter(
-            "htn_tasks_failed_total", "Total number of failed HTN tasks", ["priority", "action", "error_type"]
+            "htn_tasks_failed_total",
+            "Total number of failed HTN tasks",
+            ["priority", "action", "error_type"],
         )
 
         # Compteur: Tâches en parallèle
@@ -185,7 +189,9 @@ class HTNMetrics:
         # Gauge: Métriques calculées (pour dashboards)
         self.htn_usage_rate = Gauge("htn_usage_rate", "Percentage of requests using HTN planning")
 
-        self.htn_success_rate = Gauge("htn_success_rate", "Success rate of HTN plans (completed/total)")
+        self.htn_success_rate = Gauge(
+            "htn_success_rate", "Success rate of HTN plans (completed/total)"
+        )
 
         self.htn_parallelization_factor = Gauge(
             "htn_parallelization_factor", "Percentage of tasks executed in parallel"
@@ -267,10 +273,14 @@ class HTNMetrics:
             return
 
         if status == "completed":
-            self.htn_tasks_completed_total.labels(priority=priority, action=action, status=status).inc()
+            self.htn_tasks_completed_total.labels(
+                priority=priority, action=action, status=status
+            ).inc()
         elif status == "failed":
             error_type = error_type or "unknown"
-            self.htn_tasks_failed_total.labels(priority=priority, action=action, error_type=error_type).inc()
+            self.htn_tasks_failed_total.labels(
+                priority=priority, action=action, error_type=error_type
+            ).inc()
 
     def record_verification(
         self,

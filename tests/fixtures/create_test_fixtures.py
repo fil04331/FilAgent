@@ -2,6 +2,7 @@
 Script pour créer les fixtures de test pour le Document Analyzer
 Phase 6.2.1: Création de fichiers de test pour tous les scénarios d'erreur
 """
+
 import pandas as pd
 from pathlib import Path
 import io
@@ -19,10 +20,10 @@ def create_valid_excel():
     fixtures_dir = create_fixtures_directory()
 
     data = {
-        'Description': ['Service A', 'Service B', 'Service C'],
-        'Quantité': [10, 20, 5],
-        'Prix unitaire': [100, 200, 150],
-        'Montant': [1000, 4000, 750]
+        "Description": ["Service A", "Service B", "Service C"],
+        "Quantité": [10, 20, 5],
+        "Prix unitaire": [100, 200, 150],
+        "Montant": [1000, 4000, 750],
     }
 
     df = pd.DataFrame(data)
@@ -50,7 +51,7 @@ def create_corrupted_excel():
     output_path = fixtures_dir / "corrupted_file.xlsx"
 
     # Écrire du contenu invalide (pas un vrai fichier Excel)
-    with open(output_path, 'wb') as f:
+    with open(output_path, "wb") as f:
         f.write(b"This is not a valid Excel file, just random text to simulate corruption.")
 
     print(f"✅ Créé: {output_path} (corrompu)")
@@ -66,10 +67,10 @@ def create_large_excel():
     num_rows = 500000  # 500k lignes
 
     data = {
-        'Column1': range(num_rows),
-        'Column2': ['Data' * 100] * num_rows,  # Texte répété pour augmenter la taille
-        'Column3': [i * 1.5 for i in range(num_rows)],
-        'Column4': [f"Long text field {i} with additional content" * 10 for i in range(num_rows)]
+        "Column1": range(num_rows),
+        "Column2": ["Data" * 100] * num_rows,  # Texte répété pour augmenter la taille
+        "Column3": [i * 1.5 for i in range(num_rows)],
+        "Column4": [f"Long text field {i} with additional content" * 10 for i in range(num_rows)],
     }
 
     df = pd.DataFrame(data)
@@ -157,7 +158,7 @@ startxref
 %%EOF
 """
 
-    with open(output_path, 'wb') as f:
+    with open(output_path, "wb") as f:
         f.write(pdf_content)
 
     print(f"✅ Créé: {output_path}")
@@ -171,7 +172,7 @@ def create_corrupted_pdf():
     output_path = fixtures_dir / "corrupted_document.pdf"
 
     # Écrire du contenu invalide (pas un vrai PDF)
-    with open(output_path, 'wb') as f:
+    with open(output_path, "wb") as f:
         f.write(b"Not a valid PDF file - corrupted content here")
 
     print(f"✅ Créé: {output_path} (corrompu)")
@@ -199,11 +200,11 @@ def create_valid_word():
         fixtures_dir = create_fixtures_directory()
 
         doc = docx.Document()
-        doc.add_heading('Rapport de Test', 0)
-        doc.add_paragraph('Ceci est un document de test.')
-        doc.add_paragraph('Il contient plusieurs paragraphes.')
-        doc.add_heading('Section 1', level=1)
-        doc.add_paragraph('Contenu de la section 1.')
+        doc.add_heading("Rapport de Test", 0)
+        doc.add_paragraph("Ceci est un document de test.")
+        doc.add_paragraph("Il contient plusieurs paragraphes.")
+        doc.add_heading("Section 1", level=1)
+        doc.add_paragraph("Contenu de la section 1.")
 
         output_path = fixtures_dir / "valid_report.docx"
         doc.save(str(output_path))
@@ -241,7 +242,7 @@ def create_corrupted_word():
     output_path = fixtures_dir / "corrupted_report.docx"
 
     # Écrire du contenu invalide (pas un vrai fichier Word/ZIP)
-    with open(output_path, 'wb') as f:
+    with open(output_path, "wb") as f:
         f.write(b"This is not a valid Word document - corrupted ZIP format")
 
     print(f"✅ Créé: {output_path} (corrompu)")
@@ -254,7 +255,7 @@ def create_unsupported_file():
 
     output_path = fixtures_dir / "unsupported_file.txt"
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write("Ceci est un fichier texte, format non supporté par l'analyseur")
 
     print(f"✅ Créé: {output_path} (extension non supportée)")
@@ -272,28 +273,28 @@ def create_all_fixtures():
 
     # Excel
     print("📊 Fichiers Excel:")
-    fixtures['valid_excel'] = create_valid_excel()
-    fixtures['empty_excel'] = create_empty_excel()
-    fixtures['corrupted_excel'] = create_corrupted_excel()
+    fixtures["valid_excel"] = create_valid_excel()
+    fixtures["empty_excel"] = create_empty_excel()
+    fixtures["corrupted_excel"] = create_corrupted_excel()
     print()
 
     # PDF
     print("📄 Fichiers PDF:")
-    fixtures['valid_pdf'] = create_valid_pdf()
-    fixtures['corrupted_pdf'] = create_corrupted_pdf()
-    fixtures['empty_pdf'] = create_empty_pdf()
+    fixtures["valid_pdf"] = create_valid_pdf()
+    fixtures["corrupted_pdf"] = create_corrupted_pdf()
+    fixtures["empty_pdf"] = create_empty_pdf()
     print()
 
     # Word
     print("📝 Fichiers Word:")
-    fixtures['valid_word'] = create_valid_word()
-    fixtures['empty_word'] = create_empty_word()
-    fixtures['corrupted_word'] = create_corrupted_word()
+    fixtures["valid_word"] = create_valid_word()
+    fixtures["empty_word"] = create_empty_word()
+    fixtures["corrupted_word"] = create_corrupted_word()
     print()
 
     # Autres
     print("📁 Autres fichiers:")
-    fixtures['unsupported_file'] = create_unsupported_file()
+    fixtures["unsupported_file"] = create_unsupported_file()
     print()
 
     # Fichier volumineux (optionnel, peut prendre du temps)

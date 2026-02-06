@@ -10,6 +10,7 @@ Coverage tests for memory/episodic.py including:
 - Database schema and migration
 - Edge cases and error handling
 """
+
 import pytest
 import os
 import tempfile
@@ -29,9 +30,8 @@ from memory.episodic import (
     add_message,
     get_messages,
     cleanup_old_conversations,
-    get_connection
+    get_connection,
 )
-
 
 # Note: temp_db fixture is now defined in conftest.py with proper DB_PATH patching
 
@@ -39,6 +39,7 @@ from memory.episodic import (
 # ============================================================================
 # BASIC TESTS (Existing)
 # ============================================================================
+
 
 def test_create_tables(temp_db):
     """Test que les tables sont créées"""
@@ -58,7 +59,9 @@ def test_create_tables(temp_db):
     assert cursor.fetchone() is not None
 
     # Check indexes exist
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_conversation_id'")
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_conversation_id'"
+    )
     assert cursor.fetchone() is not None
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_timestamp'")
@@ -72,18 +75,14 @@ def test_add_and_get_message(temp_db):
     conv_id = "test-conv-1"
 
     # Ajouter un message
-    add_message(
-        conversation_id=conv_id,
-        role="user",
-        content="Bonjour"
-    )
+    add_message(conversation_id=conv_id, role="user", content="Bonjour")
 
     # Récupérer les messages
     messages = get_messages(conv_id)
 
     assert len(messages) == 1
-    assert messages[0]['role'] == "user"
-    assert messages[0]['content'] == "Bonjour"
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Bonjour"
 
 
 def test_multiple_messages(temp_db):
@@ -98,9 +97,9 @@ def test_multiple_messages(temp_db):
     messages = get_messages(conv_id)
 
     assert len(messages) == 3
-    assert messages[0]['content'] == "Message 1"
-    assert messages[1]['content'] == "Réponse 1"
-    assert messages[2]['content'] == "Message 2"
+    assert messages[0]["content"] == "Message 1"
+    assert messages[1]["content"] == "Réponse 1"
+    assert messages[2]["content"] == "Message 2"
 
 
 def test_conversation_isolation(temp_db):
@@ -116,13 +115,14 @@ def test_conversation_isolation(temp_db):
 
     assert len(messages1) == 1
     assert len(messages2) == 1
-    assert messages1[0]['content'] == "Message pour conv1"
-    assert messages2[0]['content'] == "Message pour conv2"
+    assert messages1[0]["content"] == "Message pour conv1"
+    assert messages2[0]["content"] == "Message pour conv2"
 
 
 # ============================================================================
 # ADVANCED FEATURE TESTS
 # ============================================================================
+
 
 def test_message_with_task_id(temp_db):
     """Test l'ajout de messages avec task_id"""
@@ -133,7 +133,7 @@ def test_message_with_task_id(temp_db):
 
     messages = get_messages(conv_id)
     assert len(messages) == 1
-    assert messages[0]['task_id'] == task_id
+    assert messages[0]["task_id"] == task_id
 
 
 def test_message_with_metadata(temp_db):
@@ -145,9 +145,9 @@ def test_message_with_metadata(temp_db):
 
     messages = get_messages(conv_id)
     assert len(messages) == 1
-    assert messages[0]['metadata'] == metadata
-    assert messages[0]['metadata']['source'] == "api"
-    assert messages[0]['metadata']['priority'] == "high"
+    assert messages[0]["metadata"] == metadata
+    assert messages[0]["metadata"]["source"] == "api"
+    assert messages[0]["metadata"]["priority"] == "high"
 
 
 def test_message_with_message_type(temp_db):
@@ -160,9 +160,9 @@ def test_message_with_message_type(temp_db):
 
     messages = get_messages(conv_id)
     assert len(messages) == 3
-    assert messages[0]['message_type'] == "text"
-    assert messages[1]['message_type'] == "tool_call"
-    assert messages[2]['message_type'] == "system"
+    assert messages[0]["message_type"] == "text"
+    assert messages[1]["message_type"] == "tool_call"
+    assert messages[2]["message_type"] == "system"
 
 
 def test_empty_conversation(temp_db):
@@ -190,16 +190,17 @@ def test_message_ordering(temp_db):
     assert len(messages) == 5
     # Verify order is maintained
     for i in range(5):
-        assert messages[i]['content'] == f"Message {i}"
+        assert messages[i]["content"] == f"Message {i}"
 
     # Verify timestamps are ascending
-    timestamps = [datetime.fromisoformat(msg['timestamp']) for msg in messages]
+    timestamps = [datetime.fromisoformat(msg["timestamp"]) for msg in messages]
     assert timestamps == sorted(timestamps)
 
 
 # ============================================================================
 # PAGINATION TESTS
 # ============================================================================
+
 
 def test_pagination_basic(temp_db):
     """Test la pagination basique avec limit"""
@@ -219,8 +220,8 @@ def test_pagination_basic(temp_db):
     assert len(messages_all) == 50
 
     # Verify we get the first messages (oldest)
-    assert messages_10[0]['content'] == "Message 0"
-    assert messages_10[9]['content'] == "Message 9"
+    assert messages_10[0]["content"] == "Message 0"
+    assert messages_10[9]["content"] == "Message 9"
 
 
 def test_pagination_edge_cases(temp_db):
@@ -242,12 +243,13 @@ def test_pagination_edge_cases(temp_db):
     # Limit = 1 (devrait retourner 1 message)
     messages_one = get_messages(conv_id, limit=1)
     assert len(messages_one) == 1
-    assert messages_one[0]['content'] == "Message 0"
+    assert messages_one[0]["content"] == "Message 0"
 
 
 # ============================================================================
 # LARGE MESSAGE HISTORY TESTS
 # ============================================================================
+
 
 @pytest.mark.slow
 def test_large_message_history_100(temp_db):
@@ -262,8 +264,8 @@ def test_large_message_history_100(temp_db):
     messages = get_messages(conv_id, limit=200)
 
     assert len(messages) == 100
-    assert messages[0]['content'] == "Message 0"
-    assert messages[99]['content'] == "Message 99"
+    assert messages[0]["content"] == "Message 0"
+    assert messages[99]["content"] == "Message 99"
 
 
 @pytest.mark.slow
@@ -299,7 +301,7 @@ def test_large_message_with_metadata(temp_db):
             "index": i,
             "source": f"source-{i % 10}",
             "priority": "high" if i % 2 == 0 else "low",
-            "tags": [f"tag-{j}" for j in range(5)]
+            "tags": [f"tag-{j}" for j in range(5)],
         }
         add_message(conv_id, "user", f"Message {i}", metadata=metadata)
 
@@ -308,14 +310,15 @@ def test_large_message_with_metadata(temp_db):
     assert len(messages) == 500
 
     # Verify metadata integrity
-    assert messages[0]['metadata']['index'] == 0
-    assert messages[499]['metadata']['index'] == 499
-    assert len(messages[100]['metadata']['tags']) == 5
+    assert messages[0]["metadata"]["index"] == 0
+    assert messages[499]["metadata"]["index"] == 499
+    assert len(messages[100]["metadata"]["tags"]) == 5
 
 
 # ============================================================================
 # CONCURRENT ACCESS TESTS
 # ============================================================================
+
 
 def test_concurrent_writes(temp_db):
     """Test l'écriture concurrente de messages"""
@@ -332,7 +335,7 @@ def test_concurrent_writes(temp_db):
                     conv_id,
                     "user",
                     f"Thread {thread_id} - Message {i}",
-                    metadata={"thread_id": thread_id, "index": i}
+                    metadata={"thread_id": thread_id, "index": i},
                 )
         except Exception as e:
             errors.append(e)
@@ -415,7 +418,7 @@ def test_concurrent_read_write(temp_db):
                 add_message(conv_id, "user", f"Writer {thread_id} - {i}")
                 time.sleep(0.001)  # Small delay
         except Exception as e:
-            errors.append(('writer', e))
+            errors.append(("writer", e))
 
     def reader(thread_id):
         """Lecteur"""
@@ -425,7 +428,7 @@ def test_concurrent_read_write(temp_db):
                 read_counts.append(len(messages))
                 time.sleep(0.001)  # Small delay
         except Exception as e:
-            errors.append(('reader', e))
+            errors.append(("reader", e))
 
     # Démarrer tous les threads
     threads = []
@@ -459,6 +462,7 @@ def test_concurrent_read_write(temp_db):
 # CONVERSATION DELETION / CLEANUP TESTS
 # ============================================================================
 
+
 def test_cleanup_old_conversations_basic(temp_db):
     """Test le nettoyage basique des vieilles conversations"""
     # Créer une conversation récente
@@ -472,15 +476,21 @@ def test_cleanup_old_conversations_basic(temp_db):
 
     # Insérer une conversation avec une vieille date
     old_date = (datetime.now() - timedelta(days=60)).isoformat()
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO conversations (id, conversation_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-    """, (old_conv, old_conv, old_date, old_date))
+    """,
+        (old_conv, old_conv, old_date, old_date),
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO messages (conversation_id, role, content, timestamp)
         VALUES (?, ?, ?, ?)
-    """, (old_conv, "user", "Old message", old_date))
+    """,
+        (old_conv, "user", "Old message", old_date),
+    )
 
     conn.commit()
     conn.close()
@@ -513,15 +523,21 @@ def test_cleanup_multiple_old_conversations(temp_db):
     old_date = (datetime.now() - timedelta(days=90)).isoformat()
     for i in range(5):
         conv_id = f"old-conv-{i}"
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO conversations (id, conversation_id, created_at, updated_at)
             VALUES (?, ?, ?, ?)
-        """, (conv_id, conv_id, old_date, old_date))
+        """,
+            (conv_id, conv_id, old_date, old_date),
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO messages (conversation_id, role, content, timestamp)
             VALUES (?, ?, ?, ?)
-        """, (conv_id, "user", f"Old message {i}", old_date))
+        """,
+            (conv_id, "user", f"Old message {i}", old_date),
+        )
 
     conn.commit()
     conn.close()
@@ -551,26 +567,38 @@ def test_cleanup_with_different_ttl(temp_db):
     # Conversation vieille de 10 jours
     conv_10_days = "conv-10-days"
     date_10_days = (datetime.now() - timedelta(days=10)).isoformat()
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO conversations (id, conversation_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-    """, (conv_10_days, conv_10_days, date_10_days, date_10_days))
-    cursor.execute("""
+    """,
+        (conv_10_days, conv_10_days, date_10_days, date_10_days),
+    )
+    cursor.execute(
+        """
         INSERT INTO messages (conversation_id, role, content, timestamp)
         VALUES (?, ?, ?, ?)
-    """, (conv_10_days, "user", "10 days old", date_10_days))
+    """,
+        (conv_10_days, "user", "10 days old", date_10_days),
+    )
 
     # Conversation vieille de 45 jours
     conv_45_days = "conv-45-days"
     date_45_days = (datetime.now() - timedelta(days=45)).isoformat()
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO conversations (id, conversation_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-    """, (conv_45_days, conv_45_days, date_45_days, date_45_days))
-    cursor.execute("""
+    """,
+        (conv_45_days, conv_45_days, date_45_days, date_45_days),
+    )
+    cursor.execute(
+        """
         INSERT INTO messages (conversation_id, role, content, timestamp)
         VALUES (?, ?, ?, ?)
-    """, (conv_45_days, "user", "45 days old", date_45_days))
+    """,
+        (conv_45_days, "user", "45 days old", date_45_days),
+    )
 
     conn.commit()
     conn.close()
@@ -608,6 +636,7 @@ def test_cleanup_no_old_conversations(temp_db):
 # DATABASE SCHEMA AND MIGRATION TESTS
 # ============================================================================
 
+
 def test_database_schema_conversations(temp_db):
     """Test le schéma de la table conversations"""
     conn = sqlite3.connect(str(temp_db))
@@ -618,18 +647,18 @@ def test_database_schema_conversations(temp_db):
     columns = {row[1]: row[2] for row in cursor.fetchall()}
 
     # Verify expected columns
-    assert 'id' in columns
-    assert 'conversation_id' in columns
-    assert 'task_id' in columns
-    assert 'created_at' in columns
-    assert 'updated_at' in columns
-    assert 'metadata' in columns
+    assert "id" in columns
+    assert "conversation_id" in columns
+    assert "task_id" in columns
+    assert "created_at" in columns
+    assert "updated_at" in columns
+    assert "metadata" in columns
 
     # Verify types (TEXT for SQLite)
-    assert columns['id'] == 'TEXT'
-    assert columns['conversation_id'] == 'TEXT'
-    assert columns['task_id'] == 'TEXT'
-    assert columns['metadata'] == 'TEXT'
+    assert columns["id"] == "TEXT"
+    assert columns["conversation_id"] == "TEXT"
+    assert columns["task_id"] == "TEXT"
+    assert columns["metadata"] == "TEXT"
 
     conn.close()
 
@@ -644,20 +673,20 @@ def test_database_schema_messages(temp_db):
     columns = {row[1]: row[2] for row in cursor.fetchall()}
 
     # Verify expected columns
-    assert 'id' in columns
-    assert 'conversation_id' in columns
-    assert 'task_id' in columns
-    assert 'role' in columns
-    assert 'content' in columns
-    assert 'timestamp' in columns
-    assert 'message_type' in columns
-    assert 'metadata' in columns
+    assert "id" in columns
+    assert "conversation_id" in columns
+    assert "task_id" in columns
+    assert "role" in columns
+    assert "content" in columns
+    assert "timestamp" in columns
+    assert "message_type" in columns
+    assert "metadata" in columns
 
     # Verify types
-    assert columns['id'] == 'INTEGER'
-    assert columns['conversation_id'] == 'TEXT'
-    assert columns['role'] == 'TEXT'
-    assert columns['content'] == 'TEXT'
+    assert columns["id"] == "INTEGER"
+    assert columns["conversation_id"] == "TEXT"
+    assert columns["role"] == "TEXT"
+    assert columns["content"] == "TEXT"
 
     conn.close()
 
@@ -674,7 +703,7 @@ def test_database_foreign_key(temp_db):
     # Should have foreign key to conversations
     assert len(fks) > 0
     # fk structure: (id, seq, table, from, to, on_update, on_delete, match)
-    assert fks[0][2] == 'conversations'  # references conversations table
+    assert fks[0][2] == "conversations"  # references conversations table
 
     conn.close()
 
@@ -689,8 +718,8 @@ def test_database_indexes(temp_db):
     indexes = [row[0] for row in cursor.fetchall()]
 
     # Verify our custom indexes exist
-    assert 'idx_conversation_id' in indexes
-    assert 'idx_timestamp' in indexes
+    assert "idx_conversation_id" in indexes
+    assert "idx_timestamp" in indexes
 
     conn.close()
 
@@ -762,6 +791,7 @@ def test_conversation_updated_at_timestamp(temp_db):
 # EDGE CASES AND ERROR HANDLING
 # ============================================================================
 
+
 def test_special_characters_in_content(temp_db):
     """Test les caractères spéciaux dans le contenu"""
     conv_id = "test-special-chars"
@@ -780,7 +810,7 @@ def test_special_characters_in_content(temp_db):
     messages = get_messages(conv_id)
 
     assert len(messages) == 1
-    assert messages[0]['content'] == special_content
+    assert messages[0]["content"] == special_content
 
 
 def test_very_long_message(temp_db):
@@ -794,7 +824,7 @@ def test_very_long_message(temp_db):
     messages = get_messages(conv_id)
 
     assert len(messages) == 1
-    assert len(messages[0]['content']) == len(long_content)
+    assert len(messages[0]["content"]) == len(long_content)
 
 
 def test_empty_content(temp_db):
@@ -805,7 +835,7 @@ def test_empty_content(temp_db):
     messages = get_messages(conv_id)
 
     assert len(messages) == 1
-    assert messages[0]['content'] == ""
+    assert messages[0]["content"] == ""
 
 
 def test_null_metadata(temp_db):
@@ -817,7 +847,7 @@ def test_null_metadata(temp_db):
 
     assert len(messages) == 1
     # metadata should be None or not present
-    assert messages[0]['metadata'] is None
+    assert messages[0]["metadata"] is None
 
 
 def test_complex_metadata_structure(temp_db):
@@ -825,35 +855,29 @@ def test_complex_metadata_structure(temp_db):
     conv_id = "test-complex-meta"
 
     complex_metadata = {
-        "nested": {
-            "level1": {
-                "level2": {
-                    "value": "deep"
-                }
-            }
-        },
+        "nested": {"level1": {"level2": {"value": "deep"}}},
         "array": [1, 2, 3, {"nested": "in array"}],
         "unicode": "émojis 🚀",
         "numbers": 42,
         "floats": 3.14,
         "booleans": True,
-        "nulls": None
+        "nulls": None,
     }
 
     add_message(conv_id, "user", "Complex metadata", metadata=complex_metadata)
     messages = get_messages(conv_id)
 
     assert len(messages) == 1
-    retrieved_meta = messages[0]['metadata']
+    retrieved_meta = messages[0]["metadata"]
 
     # Verify structure is preserved
-    assert retrieved_meta['nested']['level1']['level2']['value'] == "deep"
-    assert retrieved_meta['array'][3]['nested'] == "in array"
-    assert retrieved_meta['unicode'] == "émojis 🚀"
-    assert retrieved_meta['numbers'] == 42
-    assert retrieved_meta['floats'] == 3.14
-    assert retrieved_meta['booleans'] is True
-    assert retrieved_meta['nulls'] is None
+    assert retrieved_meta["nested"]["level1"]["level2"]["value"] == "deep"
+    assert retrieved_meta["array"][3]["nested"] == "in array"
+    assert retrieved_meta["unicode"] == "émojis 🚀"
+    assert retrieved_meta["numbers"] == 42
+    assert retrieved_meta["floats"] == 3.14
+    assert retrieved_meta["booleans"] is True
+    assert retrieved_meta["nulls"] is None
 
 
 def test_get_connection_returns_valid_connection(temp_db):
@@ -884,15 +908,16 @@ def test_multiple_task_ids_same_conversation(temp_db):
     messages = get_messages(conv_id)
 
     assert len(messages) == 4
-    assert messages[0]['task_id'] == "task-1"
-    assert messages[1]['task_id'] == "task-1"
-    assert messages[2]['task_id'] == "task-2"
-    assert messages[3]['task_id'] == "task-2"
+    assert messages[0]["task_id"] == "task-1"
+    assert messages[1]["task_id"] == "task-1"
+    assert messages[2]["task_id"] == "task-2"
+    assert messages[3]["task_id"] == "task-2"
 
 
 # ============================================================================
 # INTEGRATION / REAL-WORLD SCENARIO TESTS
 # ============================================================================
+
 
 def test_realistic_conversation_flow(temp_db):
     """Test un flux de conversation réaliste"""
@@ -907,7 +932,7 @@ def test_realistic_conversation_flow(temp_db):
         "assistant",
         "I'll use the calculator",
         message_type="tool_call",
-        metadata={"tool": "calculator"}
+        metadata={"tool": "calculator"},
     )
 
     # Tool result
@@ -916,7 +941,7 @@ def test_realistic_conversation_flow(temp_db):
         "tool",
         "4",
         message_type="tool_result",
-        metadata={"tool": "calculator", "result": 4}
+        metadata={"tool": "calculator", "result": 4},
     )
 
     # Assistant responds
@@ -925,11 +950,11 @@ def test_realistic_conversation_flow(temp_db):
     # Verify flow
     messages = get_messages(conv_id)
     assert len(messages) == 4
-    assert messages[0]['role'] == "user"
-    assert messages[1]['role'] == "assistant"
-    assert messages[1]['message_type'] == "tool_call"
-    assert messages[2]['role'] == "tool"
-    assert messages[3]['role'] == "assistant"
+    assert messages[0]["role"] == "user"
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["message_type"] == "tool_call"
+    assert messages[2]["role"] == "tool"
+    assert messages[3]["role"] == "assistant"
 
 
 def test_multi_turn_conversation(temp_db):
@@ -952,5 +977,5 @@ def test_multi_turn_conversation(temp_db):
     assert len(messages) == 6
 
     for i, (expected_role, expected_content) in enumerate(turns):
-        assert messages[i]['role'] == expected_role
-        assert messages[i]['content'] == expected_content
+        assert messages[i]["role"] == expected_role
+        assert messages[i]["content"] == expected_content

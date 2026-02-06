@@ -31,10 +31,9 @@ from tests.utils.test_data_generators import (
     generate_batch_task_graphs,
     generate_batch_decision_records,
     # Integration helpers
-    generate_complete_test_scenario
+    generate_complete_test_scenario,
 )
 from planner.task_graph import TaskGraph, TaskStatus, TaskPriority
-
 
 # ============================================================================
 # Tests: Conversation Generators
@@ -46,7 +45,7 @@ def test_generate_conversation_id():
     """Test génération d'ID de conversation"""
     conv_id = generate_conversation_id()
 
-    assert conv_id.startswith('conv-')
+    assert conv_id.startswith("conv-")
     assert len(conv_id) > 5
 
     # Verify uniqueness
@@ -59,7 +58,7 @@ def test_generate_task_id():
     """Test génération d'ID de tâche"""
     task_id = generate_task_id()
 
-    assert task_id.startswith('task-')
+    assert task_id.startswith("task-")
     assert len(task_id) > 5
 
 
@@ -68,23 +67,23 @@ def test_generate_message():
     """Test génération de message individuel"""
     msg = generate_message(role="user", content="Test message")
 
-    assert msg['role'] == 'user'
-    assert msg['content'] == 'Test message'
-    assert msg['message_type'] == 'text'
-    assert 'timestamp' in msg
+    assert msg["role"] == "user"
+    assert msg["content"] == "Test message"
+    assert msg["message_type"] == "text"
+    assert "timestamp" in msg
 
     # Validate timestamp format
-    datetime.fromisoformat(msg['timestamp'])
+    datetime.fromisoformat(msg["timestamp"])
 
 
 @pytest.mark.unit
 def test_generate_message_with_metadata():
     """Test génération de message avec métadonnées"""
-    metadata = {'user_id': 'user123', 'session': 'abc'}
+    metadata = {"user_id": "user123", "session": "abc"}
     msg = generate_message(role="assistant", metadata=metadata)
 
-    assert 'metadata' in msg
-    assert msg['metadata']['user_id'] == 'user123'
+    assert "metadata" in msg
+    assert msg["metadata"]["user_id"] == "user123"
 
 
 @pytest.mark.unit
@@ -92,16 +91,16 @@ def test_generate_conversation():
     """Test génération de conversation complète"""
     conv = generate_conversation(num_turns=3, include_system=True)
 
-    assert conv.conversation_id.startswith('conv-')
+    assert conv.conversation_id.startswith("conv-")
     assert len(conv.messages) >= 3 * 2  # 3 turns * (user + assistant)
 
     # First message should be system if include_system=True
-    assert conv.messages[0]['role'] == 'system'
+    assert conv.messages[0]["role"] == "system"
 
     # Verify alternating user/assistant pattern (after system message)
-    roles = [msg['role'] for msg in conv.messages[1:]]
-    assert roles[0] == 'user'
-    assert roles[1] == 'assistant'
+    roles = [msg["role"] for msg in conv.messages[1:]]
+    assert roles[0] == "user"
+    assert roles[1] == "assistant"
 
 
 @pytest.mark.unit
@@ -110,11 +109,11 @@ def test_generate_conversation_with_tool_calls():
     conv = generate_conversation(num_turns=2, include_tool_calls=True)
 
     # Check for tool call messages
-    tool_messages = [msg for msg in conv.messages if msg.get('message_type') == 'tool_call']
+    tool_messages = [msg for msg in conv.messages if msg.get("message_type") == "tool_call"]
     assert len(tool_messages) > 0
 
     # Check for tool result messages
-    result_messages = [msg for msg in conv.messages if msg.get('message_type') == 'tool_result']
+    result_messages = [msg for msg in conv.messages if msg.get("message_type") == "tool_result"]
     assert len(result_messages) > 0
 
 
@@ -124,11 +123,11 @@ def test_generate_multi_user_conversation():
     conv = generate_multi_user_conversation(num_participants=3, num_turns=6)
 
     assert len(conv.messages) == 6 * 2  # 6 turns * 2 messages per turn
-    assert conv.metadata['num_participants'] == 3
+    assert conv.metadata["num_participants"] == 3
 
     # Check metadata for user identification
-    user_messages = [msg for msg in conv.messages if msg['role'] == 'user']
-    assert all('metadata' in msg and 'user_id' in msg['metadata'] for msg in user_messages)
+    user_messages = [msg for msg in conv.messages if msg["role"] == "user"]
+    assert all("metadata" in msg and "user_id" in msg["metadata"] for msg in user_messages)
 
 
 # ============================================================================
@@ -236,22 +235,22 @@ def test_generate_decision_record():
     dr = generate_decision_record(decision_type="tool_invocation")
 
     # Verify required fields
-    assert 'dr_id' in dr
-    assert dr['dr_id'].startswith('DR-')
-    assert 'ts' in dr
-    assert dr['actor'] == 'agent.core'
-    assert 'task_id' in dr
-    assert dr['task_id'].startswith('task-')
+    assert "dr_id" in dr
+    assert dr["dr_id"].startswith("DR-")
+    assert "ts" in dr
+    assert dr["actor"] == "agent.core"
+    assert "task_id" in dr
+    assert dr["task_id"].startswith("task-")
 
     # Verify hash fields
-    assert 'prompt_hash' in dr
-    assert dr['prompt_hash'].startswith('sha256:')
+    assert "prompt_hash" in dr
+    assert dr["prompt_hash"].startswith("sha256:")
 
     # Verify decision content
-    assert 'decision' in dr
-    assert 'reasoning_markers' in dr
-    assert 'tools_used' in dr
-    assert 'alternatives_considered' in dr
+    assert "decision" in dr
+    assert "reasoning_markers" in dr
+    assert "tools_used" in dr
+    assert "alternatives_considered" in dr
 
 
 @pytest.mark.unit
@@ -259,8 +258,8 @@ def test_generate_decision_record_with_signature():
     """Test DR avec signature"""
     dr = generate_decision_record(include_signature=True)
 
-    assert 'signature' in dr
-    assert dr['signature'].startswith('ed25519:')
+    assert "signature" in dr
+    assert dr["signature"].startswith("ed25519:")
 
 
 @pytest.mark.unit
@@ -270,8 +269,8 @@ def test_generate_decision_record_types():
 
     for decision_type in types:
         dr = generate_decision_record(decision_type=decision_type)
-        assert 'decision' in dr
-        assert len(dr['tools_used']) > 0
+        assert "decision" in dr
+        assert len(dr["tools_used"]) > 0
 
 
 @pytest.mark.unit
@@ -280,22 +279,22 @@ def test_generate_prov_graph():
     prov = generate_prov_graph(include_tool_calls=True)
 
     # Verify W3C PROV structure
-    assert 'entity' in prov
-    assert 'activity' in prov
-    assert 'agent' in prov
-    assert 'wasGeneratedBy' in prov
-    assert 'used' in prov
-    assert 'wasAssociatedWith' in prov
-    assert 'wasAttributedTo' in prov
+    assert "entity" in prov
+    assert "activity" in prov
+    assert "agent" in prov
+    assert "wasGeneratedBy" in prov
+    assert "used" in prov
+    assert "wasAssociatedWith" in prov
+    assert "wasAttributedTo" in prov
 
     # Verify entities
-    assert len(prov['entity']) >= 2  # At least input and output
+    assert len(prov["entity"]) >= 2  # At least input and output
 
     # Verify activities
-    assert len(prov['activity']) >= 1
+    assert len(prov["activity"]) >= 1
 
     # Verify agents
-    assert len(prov['agent']) >= 1
+    assert len(prov["agent"]) >= 1
 
 
 @pytest.mark.unit
@@ -304,19 +303,19 @@ def test_generate_prov_graph_with_tool_calls():
     prov = generate_prov_graph(include_tool_calls=True)
 
     # Should have tool-related entities and activities
-    entities = prov['entity']
-    activities = prov['activity']
+    entities = prov["entity"]
+    activities = prov["activity"]
 
     # Check for tool output entity
-    tool_entities = [e for e in entities.keys() if 'tool_output' in e]
+    tool_entities = [e for e in entities.keys() if "tool_output" in e]
     assert len(tool_entities) > 0
 
     # Check for tool execution activity
-    tool_activities = [a for a in activities.keys() if 'tool_exec' in a]
+    tool_activities = [a for a in activities.keys() if "tool_exec" in a]
     assert len(tool_activities) > 0
 
     # Check for derivation relation
-    assert 'wasDerivedFrom' in prov
+    assert "wasDerivedFrom" in prov
 
 
 @pytest.mark.unit
@@ -325,18 +324,18 @@ def test_generate_compliance_event():
     event = generate_compliance_event(event_type="tool.call")
 
     # Verify structured log format
-    assert 'ts' in event
-    assert 'trace_id' in event
-    assert 'span_id' in event
-    assert 'level' in event
-    assert event['level'] == 'INFO'
-    assert 'actor' in event
-    assert event['event'] == 'tool.call'
-    assert 'pii_redacted' in event
+    assert "ts" in event
+    assert "trace_id" in event
+    assert "span_id" in event
+    assert "level" in event
+    assert event["level"] == "INFO"
+    assert "actor" in event
+    assert event["event"] == "tool.call"
+    assert "pii_redacted" in event
 
     # Verify OpenTelemetry-compatible IDs
-    assert len(event['trace_id']) == 16
-    assert len(event['span_id']) == 8
+    assert len(event["trace_id"]) == 16
+    assert len(event["span_id"]) == 8
 
 
 @pytest.mark.unit
@@ -346,46 +345,41 @@ def test_generate_compliance_event_types():
 
     for event_type in event_types:
         event = generate_compliance_event(event_type=event_type)
-        assert event['event'] == event_type
+        assert event["event"] == event_type
 
         # Verify event-specific fields
         if event_type == "tool.call":
-            assert 'tool_name' in event
+            assert "tool_name" in event
         elif event_type == "pii.detected":
-            assert 'pii_types' in event
+            assert "pii_types" in event
 
 
 @pytest.mark.unit
 def test_generate_pii_scenario():
     """Test génération de scénario PII"""
-    text, pii_map = generate_pii_scenario(
-        include_email=True,
-        include_phone=True
-    )
+    text, pii_map = generate_pii_scenario(include_email=True, include_phone=True)
 
     # Verify text contains PII
-    assert '@' in text  # Email
-    assert '(' in text or '+' in text  # Phone
+    assert "@" in text  # Email
+    assert "(" in text or "+" in text  # Phone
 
     # Verify PII map
-    assert 'email' in pii_map
-    assert 'phone' in pii_map
-    assert len(pii_map['email']) > 0
-    assert len(pii_map['phone']) > 0
+    assert "email" in pii_map
+    assert "phone" in pii_map
+    assert len(pii_map["email"]) > 0
+    assert len(pii_map["phone"]) > 0
 
 
 @pytest.mark.unit
 def test_generate_pii_scenario_selective():
     """Test PII avec sélection"""
     text, pii_map = generate_pii_scenario(
-        include_email=True,
-        include_phone=False,
-        include_ssn=False
+        include_email=True, include_phone=False, include_ssn=False
     )
 
-    assert 'email' in pii_map
-    assert 'phone' not in pii_map
-    assert 'ssn' not in pii_map
+    assert "email" in pii_map
+    assert "phone" not in pii_map
+    assert "ssn" not in pii_map
 
 
 # ============================================================================
@@ -401,7 +395,7 @@ def test_generate_batch_conversations():
     assert len(conversations) == 5
 
     for conv in conversations:
-        assert conv.conversation_id.startswith('conv-')
+        assert conv.conversation_id.startswith("conv-")
         assert len(conv.messages) >= 4  # min 2 turns * 2 messages
 
 
@@ -425,8 +419,8 @@ def test_generate_batch_decision_records():
     assert len(records) == 10
 
     for dr in records:
-        assert 'dr_id' in dr
-        assert dr['dr_id'].startswith('DR-')
+        assert "dr_id" in dr
+        assert dr["dr_id"].startswith("DR-")
 
 
 # ============================================================================
@@ -440,38 +434,38 @@ def test_generate_complete_test_scenario():
     scenario = generate_complete_test_scenario()
 
     # Verify all components present
-    assert 'conversation_id' in scenario
-    assert 'task_id' in scenario
-    assert 'conversation' in scenario
-    assert 'task_graph' in scenario
-    assert 'decision_records' in scenario
-    assert 'provenance' in scenario
-    assert 'compliance_events' in scenario
-    assert 'metadata' in scenario
+    assert "conversation_id" in scenario
+    assert "task_id" in scenario
+    assert "conversation" in scenario
+    assert "task_graph" in scenario
+    assert "decision_records" in scenario
+    assert "provenance" in scenario
+    assert "compliance_events" in scenario
+    assert "metadata" in scenario
 
     # Verify conversation
-    conv = scenario['conversation']
+    conv = scenario["conversation"]
     assert len(conv.messages) > 0
 
     # Verify task graph
-    graph = scenario['task_graph']
+    graph = scenario["task_graph"]
     assert isinstance(graph, TaskGraph)
     assert len(graph.tasks) > 0
 
     # Verify decision records
-    drs = scenario['decision_records']
+    drs = scenario["decision_records"]
     assert len(drs) > 0
-    assert all('dr_id' in dr for dr in drs)
+    assert all("dr_id" in dr for dr in drs)
 
     # Verify provenance
-    prov = scenario['provenance']
-    assert 'entity' in prov
-    assert 'activity' in prov
+    prov = scenario["provenance"]
+    assert "entity" in prov
+    assert "activity" in prov
 
     # Verify compliance events
-    events = scenario['compliance_events']
+    events = scenario["compliance_events"]
     assert len(events) > 0
-    assert all('event' in e for e in events)
+    assert all("event" in e for e in events)
 
 
 @pytest.mark.unit
@@ -480,20 +474,20 @@ def test_scenario_id_consistency():
     scenario = generate_complete_test_scenario()
 
     # All components should use the same conversation_id and task_id
-    conv_id = scenario['conversation_id']
-    task_id = scenario['task_id']
+    conv_id = scenario["conversation_id"]
+    task_id = scenario["task_id"]
 
-    assert scenario['conversation'].conversation_id == conv_id
-    assert scenario['conversation'].task_id == task_id
+    assert scenario["conversation"].conversation_id == conv_id
+    assert scenario["conversation"].task_id == task_id
 
     # Decision records should use the same task_id
-    for dr in scenario['decision_records']:
-        assert dr['task_id'] == task_id
+    for dr in scenario["decision_records"]:
+        assert dr["task_id"] == task_id
 
     # Compliance events should use the same IDs
-    for event in scenario['compliance_events']:
-        assert event['conversation_id'] == conv_id
-        assert event['task_id'] == task_id
+    for event in scenario["compliance_events"]:
+        assert event["conversation_id"] == conv_id
+        assert event["task_id"] == task_id
 
 
 # ============================================================================
@@ -513,11 +507,11 @@ def test_integration_with_temp_db(temp_db):
     for msg in conv.messages:
         add_message(
             conversation_id=conv.conversation_id,
-            role=msg['role'],
-            content=msg['content'],
+            role=msg["role"],
+            content=msg["content"],
             task_id=conv.task_id,
-            message_type=msg.get('message_type', 'text'),
-            metadata=msg.get('metadata')
+            message_type=msg.get("message_type", "text"),
+            metadata=msg.get("metadata"),
         )
 
     # Retrieve and verify
@@ -534,9 +528,9 @@ def test_task_graph_serialization():
     graph_dict = graph.to_dict()
 
     # Verify structure
-    assert 'tasks' in graph_dict
-    assert 'adjacency_list' in graph_dict
-    assert 'metadata' in graph_dict
+    assert "tasks" in graph_dict
+    assert "adjacency_list" in graph_dict
+    assert "metadata" in graph_dict
 
     # Verify serialization is JSON-compatible
     json_str = json.dumps(graph_dict)
@@ -554,7 +548,7 @@ def test_decision_record_json_serialization():
 
     # Deserialize and verify
     dr_loaded = json.loads(json_str)
-    assert dr_loaded['dr_id'] == dr['dr_id']
+    assert dr_loaded["dr_id"] == dr["dr_id"]
 
 
 @pytest.mark.unit
@@ -568,5 +562,5 @@ def test_prov_graph_json_serialization():
 
     # Deserialize and verify
     prov_loaded = json.loads(json_str)
-    assert 'entity' in prov_loaded
-    assert 'activity' in prov_loaded
+    assert "entity" in prov_loaded
+    assert "activity" in prov_loaded

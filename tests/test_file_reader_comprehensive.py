@@ -9,6 +9,7 @@ Tests cover:
 - Error handling
 - Edge cases
 """
+
 import pytest
 from pathlib import Path
 from tools.file_reader import FileReaderTool
@@ -226,7 +227,9 @@ class TestFileSizeLimit:
 class TestSymlinkProtection:
     """Test symlink protection"""
 
-    @pytest.mark.skipif(not hasattr(Path, 'symlink_to'), reason="Symlinks not supported on this platform")
+    @pytest.mark.skipif(
+        not hasattr(Path, "symlink_to"), reason="Symlinks not supported on this platform"
+    )
     def test_symlink_within_allowlist(self, file_reader_with_temp, temp_allowed_dir):
         """Test that symlinks within allowlist are handled"""
         target_file = temp_allowed_dir / "target.txt"
@@ -253,7 +256,7 @@ class TestErrorHandling:
         """Test handling of binary files that can't be decoded as UTF-8"""
         # Create a binary file with invalid UTF-8
         test_file = temp_allowed_dir / "binary.bin"
-        test_file.write_bytes(b'\x80\x81\x82\x83')  # Invalid UTF-8
+        test_file.write_bytes(b"\x80\x81\x82\x83")  # Invalid UTF-8
 
         result = file_reader_with_temp.execute({"file_path": str(test_file)})
 

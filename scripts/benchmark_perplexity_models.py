@@ -52,7 +52,7 @@ TEST_QUERIES = {
             "Quelle est la capitale du Québec?",
             "Combien font 15% de 1000$?",
             "Quel est le taux de TPS au Canada?",
-        ]
+        ],
     },
     "moyen": {
         "description": "Analyse et raisonnement",
@@ -60,7 +60,7 @@ TEST_QUERIES = {
             "Explique les différences entre la Loi 25 du Québec et le RGPD européen en matière de protection des données.",
             "Calcule le montant total TTC (avec TPS 5% et TVQ 9.975%) pour une facture de 2450$ HT, puis détermine combien l'entreprise doit remettre au gouvernement.",
             "Quels sont les trois principaux risques juridiques pour une PME québécoise qui utilise l'IA sans conformité à la Loi 25?",
-        ]
+        ],
     },
     "eleve": {
         "description": "Raisonnement complexe multi-étapes",
@@ -68,13 +68,14 @@ TEST_QUERIES = {
             "Une PME québécoise veut implémenter un système d'IA pour analyser les CV de candidats. Décris le processus complet de mise en conformité avec la Loi 25, incluant: 1) l'analyse d'impact, 2) les mesures de sécurité requises, 3) les droits des personnes concernées, et 4) les obligations de transparence.",
             "Compare l'utilisation de 3 modèles LLM différents (petit 8B, moyen 70B, grand 400B+) pour une PME avec les critères suivants: coût mensuel estimé (1000 requêtes/jour), latence acceptable (<2s), qualité de réponse pour des questions légales québécoises, et conformité Loi 25. Recommande le meilleur choix.",
             "Un agent IA génère une décision automatisée qui refuse un crédit à un client. Détaille toutes les étapes de traçabilité et de conformité requises selon la Loi 25 pour ce type de décision, incluant la génération d'un Decision Record signé, la justification explicable, et les droits de contestation du client.",
-        ]
-    }
+        ],
+    },
 }
 
 # ============================================================================
 # FONCTIONS DE BENCHMARK
 # ============================================================================
+
 
 def test_model_on_query(model_name: str, query: str, config: GenerationConfig) -> Dict:
     """
@@ -89,19 +90,12 @@ def test_model_on_query(model_name: str, query: str, config: GenerationConfig) -
     try:
         # Initialiser le modèle
         start_time = time.time()
-        model = init_model(
-            backend="perplexity",
-            model_path=model_name,
-            config={}
-        )
+        model = init_model(backend="perplexity", model_path=model_name, config={})
         init_time = time.time() - start_time
 
         # Générer la réponse
         start_gen = time.time()
-        result = model.generate(
-            prompt=query,
-            config=config
-        )
+        result = model.generate(prompt=query, config=config)
         gen_time = time.time() - start_gen
 
         total_time = time.time() - start_time
@@ -145,34 +139,29 @@ def run_difficulty_level(difficulty: str, queries: List[str], models: List[str])
     print(f"Description: {TEST_QUERIES[difficulty]['description']}")
     print(f"{'='*80}")
 
-    config = GenerationConfig(
-        temperature=0.7,
-        max_tokens=2048,
-        seed=42
-    )
+    config = GenerationConfig(temperature=0.7, max_tokens=2048, seed=42)
 
     results = {
         "difficulty": difficulty,
         "description": TEST_QUERIES[difficulty]["description"],
         "timestamp": datetime.now().isoformat(),
-        "queries": []
+        "queries": [],
     }
 
     for idx, query in enumerate(queries, 1):
         print(f"\n📝 Query {idx}/{len(queries)}:")
-        print(f"   \"{query}\"")
+        print(f'   "{query}"')
 
-        query_results = {
-            "query": query,
-            "models": []
-        }
+        query_results = {"query": query, "models": []}
 
         for model_name in models:
             result = test_model_on_query(model_name, query, config)
             query_results["models"].append(result)
 
             if result["success"]:
-                print(f"  ✅ {model_name}: {result['generation_time_ms']:.0f}ms, {result['total_tokens']} tokens")
+                print(
+                    f"  ✅ {model_name}: {result['generation_time_ms']:.0f}ms, {result['total_tokens']} tokens"
+                )
             else:
                 print(f"  ❌ {model_name}: FAILED")
 
@@ -217,8 +206,8 @@ def format_results_markdown(all_results: Dict) -> str:
                 if model_result["success"]:
                     model_name = model_result["model"].replace("llama-3.1-", "")
                     time_ms = f"{model_result['generation_time_ms']:.0f}"
-                    tokens = model_result['total_tokens']
-                    response_preview = model_result['response'][:100].replace('\n', ' ')
+                    tokens = model_result["total_tokens"]
+                    response_preview = model_result["response"][:100].replace("\n", " ")
                     md += f"| {model_name} | {time_ms} | {tokens} | {response_preview}... |\n"
                 else:
                     model_name = model_result["model"].replace("llama-3.1-", "")
@@ -306,9 +295,9 @@ model:
 
 def main():
     """Fonction principale du benchmark"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🚀 BENCHMARK MODÈLES PERPLEXITY - FILAGENT")
-    print("="*80)
+    print("=" * 80)
 
     # Vérifier la clé API
     if not os.getenv("PERPLEXITY_API_KEY"):
@@ -340,7 +329,7 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     json_path = output_dir / f"benchmark_{timestamp}.json"
 
-    with open(json_path, 'w', encoding='utf-8') as f:
+    with open(json_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2, ensure_ascii=False)
 
     print(f"\n✅ Résultats JSON sauvegardés: {json_path}")
@@ -350,15 +339,15 @@ def main():
     markdown_report += "\n" + generate_recommendations(all_results)
 
     md_path = output_dir / f"benchmark_{timestamp}.md"
-    with open(md_path, 'w', encoding='utf-8') as f:
+    with open(md_path, "w", encoding="utf-8") as f:
         f.write(markdown_report)
 
     print(f"✅ Rapport Markdown généré: {md_path}")
 
     # Afficher un résumé
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("📊 RÉSUMÉ DU BENCHMARK")
-    print("="*80)
+    print("=" * 80)
 
     for difficulty, results in all_results.items():
         print(f"\n{difficulty.upper()}:")

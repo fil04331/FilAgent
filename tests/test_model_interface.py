@@ -36,13 +36,14 @@ _LLAMA_CPP_AVAILABLE = importlib.util.find_spec("llama_cpp") is not None
 # Reusable skip decorator for tests requiring llama-cpp-python
 skip_if_no_llama_cpp = pytest.mark.skipif(
     not _LLAMA_CPP_AVAILABLE,
-    reason="llama-cpp-python not installed (optional ml dependency). Install with: pdm install --with ml"
+    reason="llama-cpp-python not installed (optional ml dependency). Install with: pdm install --with ml",
 )
 
 
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def temp_model_path(tmp_path):
@@ -55,6 +56,7 @@ def temp_model_path(tmp_path):
 @pytest.fixture
 def mock_llama_class():
     """Mock the Llama class from llama_cpp"""
+
     class MockLlama:
         def __init__(self, model_path, n_ctx, n_gpu_layers, use_mmap, use_mlock, verbose):
             self.model_path = model_path
@@ -64,14 +66,8 @@ def mock_llama_class():
         def __call__(self, prompt, **kwargs):
             """Simulate model generation"""
             return {
-                "choices": [{
-                    "text": "This is a test response.",
-                    "finish_reason": "stop"
-                }],
-                "usage": {
-                    "completion_tokens": 5,
-                    "total_tokens": 15
-                }
+                "choices": [{"text": "This is a test response.", "finish_reason": "stop"}],
+                "usage": {"completion_tokens": 5, "total_tokens": 15},
             }
 
     return MockLlama
@@ -80,22 +76,14 @@ def mock_llama_class():
 @pytest.fixture
 def model_config() -> Dict[str, Any]:
     """Standard model configuration for tests"""
-    return {
-        "context_size": 4096,
-        "n_gpu_layers": 35
-    }
+    return {"context_size": 4096, "n_gpu_layers": 35}
 
 
 @pytest.fixture
 def generation_config() -> GenerationConfig:
     """Standard generation configuration for tests"""
     return GenerationConfig(
-        temperature=0.2,
-        top_p=0.95,
-        max_tokens=800,
-        seed=42,
-        top_k=40,
-        repetition_penalty=1.1
+        temperature=0.2, top_p=0.95, max_tokens=800, seed=42, top_k=40, repetition_penalty=1.1
     )
 
 
@@ -103,6 +91,7 @@ def generation_config() -> GenerationConfig:
 def reset_model_singleton():
     """Reset the global model singleton before each test"""
     import runtime.model_interface as mi
+
     mi._model_instance = None
     yield
     mi._model_instance = None
@@ -111,6 +100,7 @@ def reset_model_singleton():
 # ============================================================================
 # TESTS: GenerationConfig
 # ============================================================================
+
 
 class TestGenerationConfig:
     """Tests for GenerationConfig dataclass"""
@@ -129,12 +119,7 @@ class TestGenerationConfig:
     def test_custom_values(self):
         """Test creating GenerationConfig with custom values"""
         config = GenerationConfig(
-            temperature=0.8,
-            top_p=0.9,
-            max_tokens=1000,
-            seed=123,
-            top_k=50,
-            repetition_penalty=1.2
+            temperature=0.8, top_p=0.9, max_tokens=1000, seed=123, top_k=50, repetition_penalty=1.2
         )
 
         assert config.temperature == 0.8
@@ -159,6 +144,7 @@ class TestGenerationConfig:
 # TESTS: GenerationResult
 # ============================================================================
 
+
 class TestGenerationResult:
     """Tests for GenerationResult dataclass"""
 
@@ -169,7 +155,7 @@ class TestGenerationResult:
             finish_reason="stop",
             tokens_generated=10,
             prompt_tokens=5,
-            total_tokens=15
+            total_tokens=15,
         )
 
         assert result.text == "Test response"
@@ -183,7 +169,7 @@ class TestGenerationResult:
         """Test GenerationResult with tool calls"""
         tool_calls = [
             {"name": "calculator", "arguments": {"expression": "2+2"}},
-            {"name": "search", "arguments": {"query": "test"}}
+            {"name": "search", "arguments": {"query": "test"}},
         ]
 
         result = GenerationResult(
@@ -192,7 +178,7 @@ class TestGenerationResult:
             tokens_generated=10,
             prompt_tokens=5,
             total_tokens=15,
-            tool_calls=tool_calls
+            tool_calls=tool_calls,
         )
 
         assert result.tool_calls == tool_calls
@@ -207,7 +193,7 @@ class TestGenerationResult:
                 finish_reason=reason,
                 tokens_generated=5,
                 prompt_tokens=5,
-                total_tokens=10
+                total_tokens=10,
             )
             assert result.finish_reason == reason
 
@@ -215,6 +201,7 @@ class TestGenerationResult:
 # ============================================================================
 # TESTS: LlamaCppInterface - Initialization and Loading
 # ============================================================================
+
 
 class TestLlamaCppInterface:
     """Tests for LlamaCppInterface class"""
@@ -233,7 +220,7 @@ class TestLlamaCppInterface:
         """Test successful model loading with mock"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', mock_llama_class):
+        with patch("llama_cpp.Llama", mock_llama_class):
             success = interface.load(str(temp_model_path), model_config)
 
             assert success is True
@@ -265,7 +252,7 @@ class TestLlamaCppInterface:
         fallback_path.write_text("fallback model")
 
         try:
-            with patch('llama_cpp.Llama') as mock_llama:
+            with patch("llama_cpp.Llama") as mock_llama:
                 mock_llama.return_value = MagicMock()
                 success = interface.load(non_existent, model_config)
 
@@ -281,7 +268,7 @@ class TestLlamaCppInterface:
         interface = LlamaCppInterface()
 
         # Simulate ImportError
-        with patch('builtins.__import__', side_effect=ImportError("llama_cpp not found")):
+        with patch("builtins.__import__", side_effect=ImportError("llama_cpp not found")):
             success = interface.load(str(temp_model_path), model_config)
 
             assert success is True  # Fallback to mock
@@ -293,12 +280,9 @@ class TestLlamaCppInterface:
     def test_load_with_custom_config(self, temp_model_path, mock_llama_class):
         """Test loading with custom configuration parameters"""
         interface = LlamaCppInterface()
-        custom_config = {
-            "context_size": 8192,
-            "n_gpu_layers": 50
-        }
+        custom_config = {"context_size": 8192, "n_gpu_layers": 50}
 
-        with patch('llama_cpp.Llama', mock_llama_class) as mock_llama:
+        with patch("llama_cpp.Llama", mock_llama_class) as mock_llama:
             success = interface.load(str(temp_model_path), custom_config)
 
             assert success is True
@@ -312,7 +296,7 @@ class TestLlamaCppInterface:
         """Test unloading a loaded model"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', mock_llama_class):
+        with patch("llama_cpp.Llama", mock_llama_class):
             interface.load(str(temp_model_path), model_config)
             assert interface.is_loaded() is True
 
@@ -335,16 +319,19 @@ class TestLlamaCppInterface:
 # TESTS: LlamaCppInterface - Generation
 # ============================================================================
 
+
 class TestLlamaCppGeneration:
     """Tests for text generation with LlamaCppInterface"""
 
     @pytest.mark.requires_llama_cpp
     @skip_if_no_llama_cpp
-    def test_generate_basic(self, temp_model_path, model_config, generation_config, mock_llama_class):
+    def test_generate_basic(
+        self, temp_model_path, model_config, generation_config, mock_llama_class
+    ):
         """Test basic text generation"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', mock_llama_class):
+        with patch("llama_cpp.Llama", mock_llama_class):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate("Hello, how are you?", generation_config)
@@ -359,17 +346,17 @@ class TestLlamaCppGeneration:
 
     @pytest.mark.requires_llama_cpp
     @skip_if_no_llama_cpp
-    def test_generate_with_system_prompt(self, temp_model_path, model_config, generation_config, mock_llama_class):
+    def test_generate_with_system_prompt(
+        self, temp_model_path, model_config, generation_config, mock_llama_class
+    ):
         """Test generation with system prompt"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', mock_llama_class):
+        with patch("llama_cpp.Llama", mock_llama_class):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate(
-                "What is 2+2?",
-                generation_config,
-                system_prompt="You are a helpful math assistant."
+                "What is 2+2?", generation_config, system_prompt="You are a helpful math assistant."
             )
 
             assert isinstance(result, GenerationResult)
@@ -394,7 +381,7 @@ class TestLlamaCppGeneration:
             GenerationConfig(temperature=0.5, top_p=0.8, top_k=50),
         ]
 
-        with patch('llama_cpp.Llama', mock_llama_class):
+        with patch("llama_cpp.Llama", mock_llama_class):
             interface.load(str(temp_model_path), model_config)
 
             for config in configs:
@@ -411,17 +398,13 @@ class TestLlamaCppGeneration:
         # Create mock that returns specific token counts
         mock_llama_instance = MagicMock()
         mock_llama_instance.return_value = {
-            "choices": [{
-                "text": "This is a response with ten words in it.",
-                "finish_reason": "stop"
-            }],
-            "usage": {
-                "completion_tokens": 10,
-                "total_tokens": 20
-            }
+            "choices": [
+                {"text": "This is a response with ten words in it.", "finish_reason": "stop"}
+            ],
+            "usage": {"completion_tokens": 10, "total_tokens": 20},
         }
 
-        with patch('llama_cpp.Llama', return_value=mock_llama_instance):
+        with patch("llama_cpp.Llama", return_value=mock_llama_instance):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate("Count tokens", generation_config)
@@ -440,7 +423,7 @@ class TestLlamaCppGeneration:
         mock_llama_instance = MagicMock()
         mock_llama_instance.side_effect = Exception("Generation failed")
 
-        with patch('llama_cpp.Llama', return_value=mock_llama_instance):
+        with patch("llama_cpp.Llama", return_value=mock_llama_instance):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate("Test prompt", generation_config)
@@ -459,17 +442,11 @@ class TestLlamaCppGeneration:
 
         mock_llama_instance = MagicMock()
         mock_llama_instance.return_value = {
-            "choices": [{
-                "text": "Response that hit max tokens",
-                "finish_reason": "length"
-            }],
-            "usage": {
-                "completion_tokens": 800,
-                "total_tokens": 850
-            }
+            "choices": [{"text": "Response that hit max tokens", "finish_reason": "length"}],
+            "usage": {"completion_tokens": 800, "total_tokens": 850},
         }
 
-        with patch('llama_cpp.Llama', return_value=mock_llama_instance):
+        with patch("llama_cpp.Llama", return_value=mock_llama_instance):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate("Long prompt", generation_config)
@@ -484,17 +461,11 @@ class TestLlamaCppGeneration:
 
         mock_llama_instance = MagicMock()
         mock_llama_instance.return_value = {
-            "choices": [{
-                "text": "  \n  Response with whitespace  \n  ",
-                "finish_reason": "stop"
-            }],
-            "usage": {
-                "completion_tokens": 5,
-                "total_tokens": 15
-            }
+            "choices": [{"text": "  \n  Response with whitespace  \n  ", "finish_reason": "stop"}],
+            "usage": {"completion_tokens": 5, "total_tokens": 15},
         }
 
-        with patch('llama_cpp.Llama', return_value=mock_llama_instance):
+        with patch("llama_cpp.Llama", return_value=mock_llama_instance):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate("Test", generation_config)
@@ -505,6 +476,7 @@ class TestLlamaCppGeneration:
 # ============================================================================
 # TESTS: Mock Model (Fallback)
 # ============================================================================
+
 
 class TestMockModel:
     """Tests for the mock model fallback mechanism"""
@@ -545,6 +517,7 @@ class TestMockModel:
 # TESTS: ModelFactory
 # ============================================================================
 
+
 class TestModelFactory:
     """Tests for ModelFactory class"""
 
@@ -570,15 +543,16 @@ class TestModelFactory:
         model = ModelFactory.create("llama.cpp")
 
         # Should have all required methods
-        assert hasattr(model, 'load')
-        assert hasattr(model, 'generate')
-        assert hasattr(model, 'unload')
-        assert hasattr(model, 'is_loaded')
+        assert hasattr(model, "load")
+        assert hasattr(model, "generate")
+        assert hasattr(model, "unload")
+        assert hasattr(model, "is_loaded")
 
 
 # ============================================================================
 # TESTS: Global Singleton Functions
 # ============================================================================
+
 
 class TestGlobalSingleton:
     """Tests for global model singleton functions"""
@@ -592,7 +566,7 @@ class TestGlobalSingleton:
     @skip_if_no_llama_cpp
     def test_init_model_creates_singleton(self, temp_model_path, model_config):
         """Test that init_model creates the global singleton"""
-        with patch('llama_cpp.Llama', return_value=MagicMock()):
+        with patch("llama_cpp.Llama", return_value=MagicMock()):
             model = init_model("llama.cpp", str(temp_model_path), model_config)
 
             assert model is not None
@@ -602,7 +576,7 @@ class TestGlobalSingleton:
     @skip_if_no_llama_cpp
     def test_get_model_after_init_returns_same_instance(self, temp_model_path, model_config):
         """Test that get_model returns the same instance after init"""
-        with patch('llama_cpp.Llama', return_value=MagicMock()):
+        with patch("llama_cpp.Llama", return_value=MagicMock()):
             model1 = init_model("llama.cpp", str(temp_model_path), model_config)
             model2 = get_model()
 
@@ -612,7 +586,7 @@ class TestGlobalSingleton:
     @skip_if_no_llama_cpp
     def test_init_model_multiple_times_replaces_instance(self, temp_model_path, model_config):
         """Test that calling init_model multiple times replaces the singleton"""
-        with patch('llama_cpp.Llama', return_value=MagicMock()):
+        with patch("llama_cpp.Llama", return_value=MagicMock()):
             model1 = init_model("llama.cpp", str(temp_model_path), model_config)
             model2 = init_model("llama.cpp", str(temp_model_path), model_config)
 
@@ -638,19 +612,27 @@ class TestGlobalSingleton:
 # TESTS: Advanced Scenarios
 # ============================================================================
 
+
 class TestAdvancedScenarios:
     """Tests for advanced usage scenarios"""
 
     @pytest.mark.requires_llama_cpp
     @skip_if_no_llama_cpp
-    def test_multiple_generations_same_model(self, temp_model_path, model_config, generation_config):
+    def test_multiple_generations_same_model(
+        self, temp_model_path, model_config, generation_config
+    ):
         """Test multiple generations using the same model instance"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 15}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 15},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             results = []
@@ -667,7 +649,7 @@ class TestAdvancedScenarios:
         """Test loading, unloading, and reloading a model"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', return_value=MagicMock()):
+        with patch("llama_cpp.Llama", return_value=MagicMock()):
             # Load
             success1 = interface.load(str(temp_model_path), model_config)
             assert success1 is True
@@ -684,20 +666,27 @@ class TestAdvancedScenarios:
 
     @pytest.mark.requires_llama_cpp
     @skip_if_no_llama_cpp
-    def test_generation_with_varying_prompt_lengths(self, temp_model_path, model_config, generation_config):
+    def test_generation_with_varying_prompt_lengths(
+        self, temp_model_path, model_config, generation_config
+    ):
         """Test generation with prompts of different lengths"""
         interface = LlamaCppInterface()
 
         prompts = [
             "Short",
             "This is a medium length prompt with more words.",
-            "This is a very long prompt " * 50  # Very long prompt
+            "This is a very long prompt " * 50,  # Very long prompt
         ]
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 15}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 15},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             for prompt in prompts:
@@ -709,14 +698,21 @@ class TestAdvancedScenarios:
 
     @pytest.mark.requires_llama_cpp
     @skip_if_no_llama_cpp
-    def test_concurrent_safety_same_instance(self, temp_model_path, model_config, generation_config):
+    def test_concurrent_safety_same_instance(
+        self, temp_model_path, model_config, generation_config
+    ):
         """Test that the same model instance can handle sequential calls"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 15}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 15},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             # Simulate rapid sequential calls
@@ -730,7 +726,9 @@ class TestAdvancedScenarios:
 
     @pytest.mark.requires_llama_cpp
     @skip_if_no_llama_cpp
-    def test_error_recovery_after_failed_generation(self, temp_model_path, model_config, generation_config):
+    def test_error_recovery_after_failed_generation(
+        self, temp_model_path, model_config, generation_config
+    ):
         """Test that model can recover after a failed generation"""
         interface = LlamaCppInterface()
 
@@ -743,12 +741,12 @@ class TestAdvancedScenarios:
                 raise Exception("First call fails")
             return {
                 "choices": [{"text": "Success", "finish_reason": "stop"}],
-                "usage": {"completion_tokens": 5, "total_tokens": 15}
+                "usage": {"completion_tokens": 5, "total_tokens": 15},
             }
 
         mock_llama_instance = MagicMock(side_effect=mock_generate)
 
-        with patch('llama_cpp.Llama', return_value=mock_llama_instance):
+        with patch("llama_cpp.Llama", return_value=mock_llama_instance):
             interface.load(str(temp_model_path), model_config)
 
             # First call should return error result
@@ -765,6 +763,7 @@ class TestAdvancedScenarios:
 # TESTS: Edge Cases
 # ============================================================================
 
+
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions"""
 
@@ -774,10 +773,15 @@ class TestEdgeCases:
         """Test generation with empty prompt"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response to empty prompt", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 5}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response to empty prompt", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 5},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate("", generation_config)
@@ -792,17 +796,18 @@ class TestEdgeCases:
         interface = LlamaCppInterface()
         long_system_prompt = "You are a helpful assistant. " * 1000
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 1005}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 1005},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
-            result = interface.generate(
-                "Test",
-                generation_config,
-                system_prompt=long_system_prompt
-            )
+            result = interface.generate("Test", generation_config, system_prompt=long_system_prompt)
 
             assert isinstance(result, GenerationResult)
 
@@ -813,10 +818,15 @@ class TestEdgeCases:
         interface = LlamaCppInterface()
         config = GenerationConfig(max_tokens=0)
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "", "finish_reason": "length"}],
-            "usage": {"completion_tokens": 0, "total_tokens": 5}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "", "finish_reason": "length"}],
+                    "usage": {"completion_tokens": 0, "total_tokens": 5},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             # Should still work, just return empty text
@@ -830,14 +840,19 @@ class TestEdgeCases:
         interface = LlamaCppInterface()
 
         configs = [
-            GenerationConfig(temperature=0.0),   # Deterministic
-            GenerationConfig(temperature=2.0),   # Very random
+            GenerationConfig(temperature=0.0),  # Deterministic
+            GenerationConfig(temperature=2.0),  # Very random
         ]
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 15}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 15},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             for config in configs:
@@ -851,10 +866,15 @@ class TestEdgeCases:
         interface = LlamaCppInterface()
         special_prompt = "Test with émojis 🎉 and symbols @#$%^&*()"
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 15}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 15},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             result = interface.generate(special_prompt, generation_config)
@@ -865,6 +885,7 @@ class TestEdgeCases:
 # ============================================================================
 # TESTS: Integration with Compliance
 # ============================================================================
+
 
 @pytest.mark.compliance
 class TestComplianceIntegration:
@@ -880,10 +901,15 @@ class TestComplianceIntegration:
         config1 = GenerationConfig(seed=42)
         config2 = GenerationConfig(seed=42)
 
-        with patch('llama_cpp.Llama', return_value=MagicMock(return_value={
-            "choices": [{"text": "Deterministic response", "finish_reason": "stop"}],
-            "usage": {"completion_tokens": 5, "total_tokens": 15}
-        })):
+        with patch(
+            "llama_cpp.Llama",
+            return_value=MagicMock(
+                return_value={
+                    "choices": [{"text": "Deterministic response", "finish_reason": "stop"}],
+                    "usage": {"completion_tokens": 5, "total_tokens": 15},
+                }
+            ),
+        ):
             interface.load(str(temp_model_path), model_config)
 
             result1 = interface.generate("Test", config1)
@@ -898,13 +924,13 @@ class TestComplianceIntegration:
         """Test that model path is stored for audit purposes"""
         interface = LlamaCppInterface()
 
-        with patch('llama_cpp.Llama', mock_llama_class) as mock_llama:
+        with patch("llama_cpp.Llama", mock_llama_class) as mock_llama:
             interface.load(str(temp_model_path), model_config)
 
             # Verify model was loaded with correct path
             call_args = mock_llama.call_args
             assert call_args is not None
-            assert 'model_path' in call_args.kwargs or len(call_args.args) > 0
+            assert "model_path" in call_args.kwargs or len(call_args.args) > 0
 
 
 if __name__ == "__main__":

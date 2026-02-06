@@ -62,9 +62,7 @@ class TestAPIKeyProtection:
 
                 # Try to generate
                 result = interface.generate(
-                    prompt="test",
-                    config=GenerationConfig(),
-                    system_prompt=None
+                    prompt="test", config=GenerationConfig(), system_prompt=None
                 )
 
         # Check that the error is sanitized
@@ -94,7 +92,9 @@ class TestAPIKeyProtection:
                 except Exception as e:
                     # This mimics the error handling in the actual load method
                     error_str = str(e).lower()
-                    if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret']):
+                    if any(
+                        sensitive in error_str for sensitive in ["api", "key", "token", "secret"]
+                    ):
                         print("✗ Failed to initialize Perplexity client: Authentication error")
                     else:
                         print("✗ Failed to initialize Perplexity client: Configuration error")
@@ -103,10 +103,7 @@ class TestAPIKeyProtection:
             interface.load = mock_load_with_error
 
             # Try to load
-            result = interface.load(
-                model_path="test-model",
-                config={"api_key": "pplx-secret-123"}
-            )
+            result = interface.load(model_path="test-model", config={"api_key": "pplx-secret-123"})
 
         # Should return False
         assert result is False
@@ -114,7 +111,9 @@ class TestAPIKeyProtection:
         # Check printed messages are sanitized
         printed_messages = " ".join(str(call) for call in mock_print.call_args_list)
         assert "pplx-secret" not in printed_messages
-        assert "Authentication error" in printed_messages or "Configuration error" in printed_messages
+        assert (
+            "Authentication error" in printed_messages or "Configuration error" in printed_messages
+        )
 
 
 class TestRateLimiting:
@@ -128,7 +127,7 @@ class TestRateLimiting:
         interface = PerplexityInterface()
 
         # We'll check that rate limiter attribute exists
-        assert hasattr(interface, '_rate_limiter')
+        assert hasattr(interface, "_rate_limiter")
         assert interface._rate_limiter is None  # Initially None
 
         # After a successful load (mocked), rate limiter should be set
@@ -138,9 +137,7 @@ class TestRateLimiting:
         """Test that rate limiter enforces request limits"""
         # Create rate limiter with very low limits for testing
         limiter = RateLimiter(
-            requests_per_minute=2,  # Very low for testing
-            requests_per_hour=100,
-            max_retries=3
+            requests_per_minute=2, requests_per_hour=100, max_retries=3  # Very low for testing
         )
 
         call_count = 0
@@ -182,9 +179,7 @@ class TestRateLimiting:
 
         # Generate text
         result = interface.generate(
-            prompt="test prompt",
-            config=GenerationConfig(),
-            system_prompt=None
+            prompt="test prompt", config=GenerationConfig(), system_prompt=None
         )
 
         # Verify rate limiter was called
@@ -197,7 +192,7 @@ class TestRateLimiting:
             requests_per_minute=10,
             initial_backoff=0.1,  # Short for testing
             max_backoff=1.0,
-            backoff_multiplier=2.0
+            backoff_multiplier=2.0,
         )
 
         attempts = []
@@ -240,9 +235,7 @@ class TestErrorSanitization:
 
             # Call generate
             result = interface.generate(
-                prompt="test",
-                config=GenerationConfig(),
-                system_prompt=None
+                prompt="test", config=GenerationConfig(), system_prompt=None
             )
 
             # Verify sensitive info is not in result
@@ -272,7 +265,9 @@ class TestErrorSanitization:
                 except Exception as e:
                     # This mimics the sanitization in actual code
                     error_str = str(e).lower()
-                    if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret']):
+                    if any(
+                        sensitive in error_str for sensitive in ["api", "key", "token", "secret"]
+                    ):
                         print("✗ Failed to initialize Perplexity client: Authentication error")
                     else:
                         print("✗ Failed to initialize Perplexity client: Configuration error")
@@ -324,6 +319,7 @@ class TestComplianceIntegration:
 
         # Can import it
         from runtime.utils.rate_limiter import RateLimiter, get_rate_limiter
+
         assert RateLimiter is not None
         assert get_rate_limiter is not None
 
@@ -334,24 +330,21 @@ class TestEndToEndSecurity:
 
     @pytest.mark.skipif(
         not os.getenv("PERPLEXITY_API_KEY"),
-        reason="Requires PERPLEXITY_API_KEY for integration test"
+        reason="Requires PERPLEXITY_API_KEY for integration test",
     )
     def test_real_api_with_security(self):
         """Test actual API calls with all security measures in place"""
         interface = PerplexityInterface()
 
         # Load with real API key
-        success = interface.load(
-            "llama-3.1-sonar-small-128k-online",
-            {}
-        )
+        success = interface.load("llama-3.1-sonar-small-128k-online", {})
 
         if success:
             # Make a real API call
             result = interface.generate(
                 prompt="Say 'test successful' and nothing else",
                 config=GenerationConfig(max_tokens=10),
-                system_prompt=None
+                system_prompt=None,
             )
 
             # Should succeed without exposing any keys

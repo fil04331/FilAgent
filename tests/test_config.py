@@ -1,6 +1,7 @@
 """
 Tests for configuration management and persistence
 """
+
 import pytest
 import yaml
 import tempfile
@@ -70,8 +71,13 @@ class TestConfigPersistence:
             assert loaded_config.timeouts.generation == original_config.timeouts.generation
             assert loaded_config.timeouts.tool_execution == original_config.timeouts.tool_execution
             assert loaded_config.timeouts.total_request == original_config.timeouts.total_request
-            assert loaded_config.runtime_settings.max_iterations == original_config.runtime_settings.max_iterations
-            assert loaded_config.runtime_settings.timeout == original_config.runtime_settings.timeout
+            assert (
+                loaded_config.runtime_settings.max_iterations
+                == original_config.runtime_settings.max_iterations
+            )
+            assert (
+                loaded_config.runtime_settings.timeout == original_config.runtime_settings.timeout
+            )
 
     def test_save_and_load_with_htn_configs(self):
         """Test that config with HTN settings can be saved and loaded"""
@@ -105,17 +111,38 @@ class TestConfigPersistence:
             # Verify HTN configs
             assert loaded_config.htn_planning is not None
             assert loaded_config.htn_planning.enabled == original_config.htn_planning.enabled
-            assert loaded_config.htn_planning.default_strategy == original_config.htn_planning.default_strategy
-            assert loaded_config.htn_planning.max_decomposition_depth == original_config.htn_planning.max_decomposition_depth
+            assert (
+                loaded_config.htn_planning.default_strategy
+                == original_config.htn_planning.default_strategy
+            )
+            assert (
+                loaded_config.htn_planning.max_decomposition_depth
+                == original_config.htn_planning.max_decomposition_depth
+            )
 
             assert loaded_config.htn_execution is not None
-            assert loaded_config.htn_execution.default_strategy == original_config.htn_execution.default_strategy
-            assert loaded_config.htn_execution.max_parallel_workers == original_config.htn_execution.max_parallel_workers
-            assert loaded_config.htn_execution.task_timeout_sec == original_config.htn_execution.task_timeout_sec
+            assert (
+                loaded_config.htn_execution.default_strategy
+                == original_config.htn_execution.default_strategy
+            )
+            assert (
+                loaded_config.htn_execution.max_parallel_workers
+                == original_config.htn_execution.max_parallel_workers
+            )
+            assert (
+                loaded_config.htn_execution.task_timeout_sec
+                == original_config.htn_execution.task_timeout_sec
+            )
 
             assert loaded_config.htn_verification is not None
-            assert loaded_config.htn_verification.default_level == original_config.htn_verification.default_level
-            assert loaded_config.htn_verification.custom_verifiers == original_config.htn_verification.custom_verifiers
+            assert (
+                loaded_config.htn_verification.default_level
+                == original_config.htn_verification.default_level
+            )
+            assert (
+                loaded_config.htn_verification.custom_verifiers
+                == original_config.htn_verification.custom_verifiers
+            )
 
     def test_save_and_load_memory_config(self):
         """Test that memory configuration persists correctly"""
@@ -228,27 +255,27 @@ class TestConfigPersistence:
             config.save(str(config_path))
 
             # Load the raw YAML and verify structure
-            with open(config_path, 'r') as f:
+            with open(config_path, "r") as f:
                 yaml_data = yaml.safe_load(f)
 
             # Verify top-level keys exist
-            assert 'agent' in yaml_data
-            assert 'generation' in yaml_data
-            assert 'timeouts' in yaml_data
-            assert 'model' in yaml_data
-            assert 'memory' in yaml_data
-            assert 'logging' in yaml_data
-            assert 'compliance' in yaml_data
-            assert 'htn_planning' in yaml_data
+            assert "agent" in yaml_data
+            assert "generation" in yaml_data
+            assert "timeouts" in yaml_data
+            assert "model" in yaml_data
+            assert "memory" in yaml_data
+            assert "logging" in yaml_data
+            assert "compliance" in yaml_data
+            assert "htn_planning" in yaml_data
 
             # Verify memory has nested structure
-            assert 'episodic' in yaml_data['memory']
-            assert 'semantic' in yaml_data['memory']
-            assert 'ttl_days' in yaml_data['memory']['episodic']
-            assert 'max_conversations' in yaml_data['memory']['episodic']
-            assert 'rebuild_days' in yaml_data['memory']['semantic']
-            assert 'max_items' in yaml_data['memory']['semantic']
-            assert 'similarity_threshold' in yaml_data['memory']['semantic']
+            assert "episodic" in yaml_data["memory"]
+            assert "semantic" in yaml_data["memory"]
+            assert "ttl_days" in yaml_data["memory"]["episodic"]
+            assert "max_conversations" in yaml_data["memory"]["episodic"]
+            assert "rebuild_days" in yaml_data["memory"]["semantic"]
+            assert "max_items" in yaml_data["memory"]["semantic"]
+            assert "similarity_threshold" in yaml_data["memory"]["semantic"]
 
     def test_config_without_optional_htn_configs(self):
         """Test that configs without HTN settings save and load correctly"""
@@ -268,12 +295,12 @@ class TestConfigPersistence:
             original_config.save(str(config_path))
 
             # Load the raw YAML and verify HTN keys are not present
-            with open(config_path, 'r') as f:
+            with open(config_path, "r") as f:
                 yaml_data = yaml.safe_load(f)
 
-            assert 'htn_planning' not in yaml_data
-            assert 'htn_execution' not in yaml_data
-            assert 'htn_verification' not in yaml_data
+            assert "htn_planning" not in yaml_data
+            assert "htn_execution" not in yaml_data
+            assert "htn_verification" not in yaml_data
 
             # Load and verify
             loaded_config = AgentConfig.load(str(tmpdir))

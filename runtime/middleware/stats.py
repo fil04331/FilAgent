@@ -11,6 +11,7 @@ Standards Applied:
 - Audit-first corrupt file recovery
 - Pydantic V2 with field_validator
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
-
 
 __all__ = [
     "DailyMiddlewareStats",
@@ -45,6 +45,7 @@ class DailyMiddlewareStats(BaseModel):
     Métriques agrégées pour une journée spécifique.
     Strictly typed pour éviter les dérives de données.
     """
+
     date_ref: str = Field(..., description="Date de référence au format ISO YYYY-MM-DD")
     total_operations: StrictInt = Field(default=0, ge=0)
     total_errors: StrictInt = Field(default=0, ge=0)
@@ -67,6 +68,7 @@ class SessionStats(BaseModel):
     Métriques volatiles de la session en cours.
     Réinitialisées à chaque redémarrage.
     """
+
     start_time: datetime = Field(default_factory=datetime.now)
     uptime_seconds: float = Field(default=0.0)
     active_middleware: StrictInt = Field(default=0)
@@ -77,11 +79,12 @@ class GlobalMiddlewareMetrics(BaseModel):
     Agrégat racine pour la persistance.
     Contient l'historique et l'état actuel.
     """
+
     last_updated: datetime = Field(default_factory=datetime.now)
     version: str = Field(default="1.0.0")
     history: Dict[str, DailyMiddlewareStats] = Field(default_factory=dict)
 
-    @field_validator('history')
+    @field_validator("history")
     @classmethod
     def validate_history_keys(
         cls, v: Dict[str, DailyMiddlewareStats]
@@ -130,7 +133,7 @@ class MiddlewareStatsManager:
             return GlobalMiddlewareMetrics()
 
         try:
-            with open(self.storage_path, 'r', encoding='utf-8') as f:
+            with open(self.storage_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
             return GlobalMiddlewareMetrics(**raw_data)
         except (json.JSONDecodeError, ValueError) as e:
@@ -144,10 +147,7 @@ class MiddlewareStatsManager:
             return GlobalMiddlewareMetrics()
 
     def record_operation(
-        self,
-        component: str,
-        is_error: bool = False,
-        persist: bool = True
+        self, component: str, is_error: bool = False, persist: bool = True
     ) -> None:
         """
         Enregistre une opération pour un composant middleware.
@@ -172,14 +172,14 @@ class MiddlewareStatsManager:
 
         # Mise à jour du compteur spécifique au composant
         component_attr_map = {
-            'logging': 'logging_ops',
-            'audit': 'audit_ops',
-            'provenance': 'provenance_ops',
-            'retention': 'retention_ops',
-            'rbac': 'rbac_checks',
-            'pii': 'pii_scans',
-            'worm': 'worm_writes',
-            'constraints': 'constraints_checks',
+            "logging": "logging_ops",
+            "audit": "audit_ops",
+            "provenance": "provenance_ops",
+            "retention": "retention_ops",
+            "rbac": "rbac_checks",
+            "pii": "pii_scans",
+            "worm": "worm_writes",
+            "constraints": "constraints_checks",
         }
 
         attr = component_attr_map.get(component)
@@ -204,11 +204,7 @@ class MiddlewareStatsManager:
 
         # Création d'un fichier temporaire dans le même dossier
         temp_file = tempfile.NamedTemporaryFile(
-            mode='w',
-            dir=self.storage_path.parent,
-            delete=False,
-            encoding='utf-8',
-            suffix='.tmp'
+            mode="w", dir=self.storage_path.parent, delete=False, encoding="utf-8", suffix=".tmp"
         )
 
         try:
@@ -257,17 +253,17 @@ class MiddlewareStatsManager:
         today_stats = self.data.history.get(today, DailyMiddlewareStats(date_ref=today))
 
         component_attr_map = {
-            'logging': 'logging_ops',
-            'audit': 'audit_ops',
-            'provenance': 'provenance_ops',
-            'retention': 'retention_ops',
-            'rbac': 'rbac_checks',
-            'pii': 'pii_scans',
-            'worm': 'worm_writes',
-            'constraints': 'constraints_checks',
+            "logging": "logging_ops",
+            "audit": "audit_ops",
+            "provenance": "provenance_ops",
+            "retention": "retention_ops",
+            "rbac": "rbac_checks",
+            "pii": "pii_scans",
+            "worm": "worm_writes",
+            "constraints": "constraints_checks",
         }
 
-        attr = component_attr_map.get(component, f'{component}_ops')
+        attr = component_attr_map.get(component, f"{component}_ops")
         ops_count = getattr(today_stats, attr, 0) if hasattr(today_stats, attr) else 0
 
         return {

@@ -21,16 +21,14 @@ import threading
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-from planner.plan_cache import (
-    PlanCache, CacheEntry, get_plan_cache, reset_plan_cache
-)
+from planner.plan_cache import PlanCache, CacheEntry, get_plan_cache, reset_plan_cache
 from planner.planner import PlanningResult, PlanningStrategy
 from planner.task_graph import TaskGraph, Task
-
 
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def mock_task_graph():
@@ -49,7 +47,7 @@ def mock_planning_result(mock_task_graph):
         strategy_used=PlanningStrategy.HYBRID,
         confidence=0.9,
         reasoning="Test reasoning",
-        metadata={"test": "data"}
+        metadata={"test": "data"},
     )
 
 
@@ -61,9 +59,7 @@ def cache_instance():
 
     # Create isolated cache instance
     cache = PlanCache(
-        max_size=5,
-        ttl_seconds=None,
-        enable_metrics=False  # Disable metrics for simpler tests
+        max_size=5, ttl_seconds=None, enable_metrics=False  # Disable metrics for simpler tests
     )
 
     yield cache
@@ -78,9 +74,7 @@ def cache_with_ttl():
     reset_plan_cache()
 
     cache = PlanCache(
-        max_size=5,
-        ttl_seconds=2,  # 2 seconds TTL for quick testing
-        enable_metrics=False
+        max_size=5, ttl_seconds=2, enable_metrics=False  # 2 seconds TTL for quick testing
     )
 
     yield cache
@@ -92,15 +86,13 @@ def cache_with_ttl():
 # TESTS: CacheEntry
 # ============================================================================
 
+
 class TestCacheEntry:
     """Tests pour la classe CacheEntry"""
 
     def test_cache_entry_creation(self, mock_planning_result):
         """Test création d'une CacheEntry"""
-        entry = CacheEntry(
-            plan_result=mock_planning_result,
-            cached_at=datetime.now()
-        )
+        entry = CacheEntry(plan_result=mock_planning_result, cached_at=datetime.now())
 
         assert entry.plan_result == mock_planning_result
         assert entry.access_count == 0
@@ -109,8 +101,7 @@ class TestCacheEntry:
     def test_cache_entry_not_expired_no_ttl(self, mock_planning_result):
         """Test qu'une entrée n'expire jamais sans TTL"""
         entry = CacheEntry(
-            plan_result=mock_planning_result,
-            cached_at=datetime.now() - timedelta(hours=24)
+            plan_result=mock_planning_result, cached_at=datetime.now() - timedelta(hours=24)
         )
 
         # Sans TTL, jamais expiré
@@ -118,10 +109,7 @@ class TestCacheEntry:
 
     def test_cache_entry_not_expired_within_ttl(self, mock_planning_result):
         """Test qu'une entrée récente n'est pas expirée"""
-        entry = CacheEntry(
-            plan_result=mock_planning_result,
-            cached_at=datetime.now()
-        )
+        entry = CacheEntry(plan_result=mock_planning_result, cached_at=datetime.now())
 
         # Créée à l'instant, pas expirée avec TTL de 60s
         assert not entry.is_expired(ttl_seconds=60)
@@ -130,8 +118,7 @@ class TestCacheEntry:
         """Test qu'une entrée ancienne est expirée"""
         # Créer une entrée ancienne (3 secondes dans le passé)
         entry = CacheEntry(
-            plan_result=mock_planning_result,
-            cached_at=datetime.now() - timedelta(seconds=3)
+            plan_result=mock_planning_result, cached_at=datetime.now() - timedelta(seconds=3)
         )
 
         # Avec TTL de 2 secondes, devrait être expirée
@@ -142,15 +129,14 @@ class TestCacheEntry:
 # TESTS: Cache Key Generation
 # ============================================================================
 
+
 class TestCacheKeyGeneration:
     """Tests pour la génération de clés de cache"""
 
     def test_get_key_basic(self, cache_instance):
         """Test génération de clé basique"""
         key = cache_instance.get_key(
-            query="test query",
-            strategy=PlanningStrategy.HYBRID,
-            context=None
+            query="test query", strategy=PlanningStrategy.HYBRID, context=None
         )
 
         assert isinstance(key, str)
@@ -159,15 +145,11 @@ class TestCacheKeyGeneration:
     def test_get_key_same_inputs_same_key(self, cache_instance):
         """Test que les mêmes inputs produisent la même clé"""
         key1 = cache_instance.get_key(
-            query="test query",
-            strategy=PlanningStrategy.HYBRID,
-            context={"max_depth": 3}
+            query="test query", strategy=PlanningStrategy.HYBRID, context={"max_depth": 3}
         )
 
         key2 = cache_instance.get_key(
-            query="test query",
-            strategy=PlanningStrategy.HYBRID,
-            context={"max_depth": 3}
+            query="test query", strategy=PlanningStrategy.HYBRID, context={"max_depth": 3}
         )
 
         assert key1 == key2
@@ -175,15 +157,11 @@ class TestCacheKeyGeneration:
     def test_get_key_different_queries_different_keys(self, cache_instance):
         """Test que différentes requêtes produisent des clés différentes"""
         key1 = cache_instance.get_key(
-            query="query 1",
-            strategy=PlanningStrategy.HYBRID,
-            context=None
+            query="query 1", strategy=PlanningStrategy.HYBRID, context=None
         )
 
         key2 = cache_instance.get_key(
-            query="query 2",
-            strategy=PlanningStrategy.HYBRID,
-            context=None
+            query="query 2", strategy=PlanningStrategy.HYBRID, context=None
         )
 
         assert key1 != key2
@@ -191,15 +169,11 @@ class TestCacheKeyGeneration:
     def test_get_key_different_strategies_different_keys(self, cache_instance):
         """Test que différentes stratégies produisent des clés différentes"""
         key1 = cache_instance.get_key(
-            query="test query",
-            strategy=PlanningStrategy.HYBRID,
-            context=None
+            query="test query", strategy=PlanningStrategy.HYBRID, context=None
         )
 
         key2 = cache_instance.get_key(
-            query="test query",
-            strategy=PlanningStrategy.LLM_BASED,
-            context=None
+            query="test query", strategy=PlanningStrategy.LLM_BASED, context=None
         )
 
         assert key1 != key2
@@ -207,15 +181,11 @@ class TestCacheKeyGeneration:
     def test_get_key_query_normalization(self, cache_instance):
         """Test que les requêtes sont normalisées (lowercase, strip)"""
         key1 = cache_instance.get_key(
-            query="  Test Query  ",
-            strategy=PlanningStrategy.HYBRID,
-            context=None
+            query="  Test Query  ", strategy=PlanningStrategy.HYBRID, context=None
         )
 
         key2 = cache_instance.get_key(
-            query="test query",
-            strategy=PlanningStrategy.HYBRID,
-            context=None
+            query="test query", strategy=PlanningStrategy.HYBRID, context=None
         )
 
         # Après normalisation, devrait être identique
@@ -227,10 +197,7 @@ class TestCacheKeyGeneration:
         key1 = cache_instance.get_key(
             query="test",
             strategy=PlanningStrategy.HYBRID,
-            context={
-                "conversation_id": "conv-123",
-                "task_id": "task-456"
-            }
+            context={"conversation_id": "conv-123", "task_id": "task-456"},
         )
 
         key2 = cache_instance.get_key(
@@ -238,8 +205,8 @@ class TestCacheKeyGeneration:
             strategy=PlanningStrategy.HYBRID,
             context={
                 "conversation_id": "conv-999",  # Différent, mais ignoré
-                "task_id": "task-888"  # Différent, mais ignoré
-            }
+                "task_id": "task-888",  # Différent, mais ignoré
+            },
         )
 
         # Devrait produire la même clé
@@ -250,19 +217,13 @@ class TestCacheKeyGeneration:
         key1 = cache_instance.get_key(
             query="test",
             strategy=PlanningStrategy.HYBRID,
-            context={
-                "max_depth": 3,
-                "conversation_id": "conv-123"  # Ignoré
-            }
+            context={"max_depth": 3, "conversation_id": "conv-123"},  # Ignoré
         )
 
         key2 = cache_instance.get_key(
             query="test",
             strategy=PlanningStrategy.HYBRID,
-            context={
-                "max_depth": 5,  # Différent et pertinent
-                "conversation_id": "conv-123"
-            }
+            context={"max_depth": 5, "conversation_id": "conv-123"},  # Différent et pertinent
         )
 
         # Devrait produire des clés différentes
@@ -272,6 +233,7 @@ class TestCacheKeyGeneration:
 # ============================================================================
 # TESTS: Cache Hit/Miss
 # ============================================================================
+
 
 class TestCacheHitMiss:
     """Tests pour cache hit/miss"""
@@ -286,10 +248,7 @@ class TestCacheHitMiss:
 
     def test_cache_hit_after_put(self, cache_instance, mock_planning_result):
         """Test cache hit après insertion"""
-        key = cache_instance.get_key(
-            query="test",
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query="test", strategy=PlanningStrategy.HYBRID)
 
         # Put
         cache_instance.put(key, mock_planning_result)
@@ -304,10 +263,7 @@ class TestCacheHitMiss:
 
     def test_cache_multiple_hits(self, cache_instance, mock_planning_result):
         """Test plusieurs cache hits"""
-        key = cache_instance.get_key(
-            query="test",
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query="test", strategy=PlanningStrategy.HYBRID)
 
         cache_instance.put(key, mock_planning_result)
 
@@ -321,10 +277,7 @@ class TestCacheHitMiss:
 
     def test_cache_access_count_increment(self, cache_instance, mock_planning_result):
         """Test que access_count est incrémenté à chaque hit"""
-        key = cache_instance.get_key(
-            query="test",
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query="test", strategy=PlanningStrategy.HYBRID)
 
         cache_instance.put(key, mock_planning_result)
 
@@ -339,10 +292,7 @@ class TestCacheHitMiss:
 
     def test_cache_hit_rate_calculation(self, cache_instance, mock_planning_result):
         """Test calcul du hit rate"""
-        key = cache_instance.get_key(
-            query="test",
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query="test", strategy=PlanningStrategy.HYBRID)
 
         cache_instance.put(key, mock_planning_result)
 
@@ -363,6 +313,7 @@ class TestCacheHitMiss:
 # ============================================================================
 # TESTS: Cache Invalidation
 # ============================================================================
+
 
 class TestCacheInvalidation:
     """Tests pour l'invalidation du cache"""
@@ -412,6 +363,7 @@ class TestCacheInvalidation:
 # ============================================================================
 # TESTS: TTL Expiration
 # ============================================================================
+
 
 class TestTTLExpiration:
     """Tests pour l'expiration TTL"""
@@ -511,6 +463,7 @@ class TestTTLExpiration:
 # TESTS: Memory Limits (LRU Eviction)
 # ============================================================================
 
+
 class TestMemoryLimits:
     """Tests pour les limites de mémoire et éviction LRU"""
 
@@ -591,6 +544,7 @@ class TestMemoryLimits:
 # TESTS: Statistics
 # ============================================================================
 
+
 class TestStatistics:
     """Tests pour les statistiques du cache"""
 
@@ -640,6 +594,7 @@ class TestStatistics:
 # ============================================================================
 # TESTS: Thread Safety
 # ============================================================================
+
 
 class TestThreadSafety:
     """Tests pour la sécurité thread"""
@@ -744,6 +699,7 @@ class TestThreadSafety:
 # TESTS: Singleton Pattern
 # ============================================================================
 
+
 class TestSingletonPattern:
     """Tests pour le pattern singleton"""
 
@@ -807,6 +763,7 @@ class TestSingletonPattern:
 # TESTS: Edge Cases
 # ============================================================================
 
+
 class TestEdgeCases:
     """Tests pour les cas limites"""
 
@@ -816,13 +773,11 @@ class TestEdgeCases:
 
         # Ne devrait pas crasher
         from planner.task_graph import TaskGraph, Task
+
         graph = TaskGraph()
         graph.add_task(Task(name="test", action="test"))
         result = PlanningResult(
-            graph=graph,
-            strategy_used=PlanningStrategy.HYBRID,
-            confidence=0.9,
-            reasoning="test"
+            graph=graph, strategy_used=PlanningStrategy.HYBRID, confidence=0.9, reasoning="test"
         )
 
         # Cache avec max_size=0 will raise KeyError when trying to evict from empty cache
@@ -849,10 +804,7 @@ class TestEdgeCases:
 
     def test_empty_query(self, cache_instance):
         """Test clé avec requête vide"""
-        key = cache_instance.get_key(
-            query="",
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query="", strategy=PlanningStrategy.HYBRID)
 
         # Devrait générer une clé valide
         assert isinstance(key, str)
@@ -862,10 +814,7 @@ class TestEdgeCases:
         """Test requête avec caractères spéciaux"""
         query = "Requête avec accents: éàù, emoji: 🚀, symbols: @#$%"
 
-        key = cache_instance.get_key(
-            query=query,
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query=query, strategy=PlanningStrategy.HYBRID)
 
         # Devrait générer une clé valide (UTF-8 supporté)
         assert isinstance(key, str)
@@ -875,10 +824,7 @@ class TestEdgeCases:
         """Test requête très longue"""
         query = "x" * 10000
 
-        key = cache_instance.get_key(
-            query=query,
-            strategy=PlanningStrategy.HYBRID
-        )
+        key = cache_instance.get_key(query=query, strategy=PlanningStrategy.HYBRID)
 
         # Devrait générer une clé valide (hash gère toute longueur)
         assert isinstance(key, str)
@@ -889,13 +835,14 @@ class TestEdgeCases:
 # TESTS: Integration with Metrics
 # ============================================================================
 
+
 class TestMetricsIntegration:
     """Tests pour l'intégration avec les métriques"""
 
     def test_cache_with_metrics_enabled(self, mock_planning_result):
         """Test que le cache fonctionne avec métriques activées"""
         # Mock metrics
-        with patch('planner.plan_cache.get_metrics') as mock_get_metrics:
+        with patch("planner.plan_cache.get_metrics") as mock_get_metrics:
             mock_metrics = MagicMock()
             mock_get_metrics.return_value = mock_metrics
 
@@ -923,7 +870,7 @@ class TestMetricsIntegration:
 
     def test_cache_metrics_error_handling(self, mock_planning_result):
         """Test que les erreurs de métriques ne cassent pas le cache"""
-        with patch('planner.plan_cache.get_metrics') as mock_get_metrics:
+        with patch("planner.plan_cache.get_metrics") as mock_get_metrics:
             mock_metrics = MagicMock()
             # Simuler une erreur dans record_plan_cache
             mock_metrics.record_plan_cache.side_effect = Exception("Metrics error")

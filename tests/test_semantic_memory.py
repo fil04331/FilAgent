@@ -41,9 +41,7 @@ def _create_mock_sentence_transformers():
     mock_st_module = MagicMock()
     mock_embedder = MagicMock()
     mock_embedder.get_sentence_embedding_dimension.return_value = 384
-    mock_embedder.encode.side_effect = lambda text, **kwargs: np.random.rand(
-        384
-    ).astype(np.float32)
+    mock_embedder.encode.side_effect = lambda text, **kwargs: np.random.rand(384).astype(np.float32)
     mock_st_module.SentenceTransformer.return_value = mock_embedder
     return mock_st_module
 
@@ -69,9 +67,7 @@ def mock_faiss_index():
     """Create a mock FAISS index"""
     index = MagicMock()
     index.ntotal = 0
-    index.add = MagicMock(
-        side_effect=lambda x: setattr(index, "ntotal", index.ntotal + 1)
-    )
+    index.add = MagicMock(side_effect=lambda x: setattr(index, "ntotal", index.ntotal + 1))
     index.search = MagicMock(
         return_value=(
             np.array([[0.5, 1.0, 1.5]]),  # distances
@@ -179,9 +175,7 @@ def test_semantic_memory_missing_dependencies():
         # After reload with faiss=None, FAISS_AVAILABLE should be False
         # But our mock is still in place, so we patch the flag directly
         with patch.object(sem_module, "FAISS_AVAILABLE", False):
-            with pytest.raises(
-                ImportError, match="FAISS or sentence-transformers not installed"
-            ):
+            with pytest.raises(ImportError, match="FAISS or sentence-transformers not installed"):
                 sem_module.SemanticMemory()
 
 
@@ -315,14 +309,10 @@ def test_search_with_similarity_threshold(semantic_memory_instance):
     semantic_memory_instance.add_passage("Test passage 2")
 
     # Search with high threshold (should filter out low-similarity results)
-    results_high = semantic_memory_instance.search(
-        "test query", top_k=5, similarity_threshold=0.9
-    )
+    results_high = semantic_memory_instance.search("test query", top_k=5, similarity_threshold=0.9)
 
     # Search with low threshold (should include more results)
-    results_low = semantic_memory_instance.search(
-        "test query", top_k=5, similarity_threshold=0.1
-    )
+    results_low = semantic_memory_instance.search("test query", top_k=5, similarity_threshold=0.1)
 
     # Low threshold should return same or more results
     assert len(results_low) >= len(results_high)
@@ -362,9 +352,7 @@ def test_search_ranking(semantic_memory_instance):
     semantic_memory_instance.add_passage("Second passage")
     semantic_memory_instance.add_passage("Third passage")
 
-    results = semantic_memory_instance.search(
-        "passage", top_k=3, similarity_threshold=0.0
-    )
+    results = semantic_memory_instance.search("passage", top_k=3, similarity_threshold=0.0)
 
     # Verify ranks are sequential
     for i, result in enumerate(results):
@@ -803,9 +791,7 @@ def test_passage_lifecycle(semantic_memory_instance):
     )
 
     # Add new passage
-    semantic_memory_instance.add_passage(
-        "Recent passage to keep", conversation_id="conv-new"
-    )
+    semantic_memory_instance.add_passage("Recent passage to keep", conversation_id="conv-new")
 
     # Cleanup old passages
     mock_new_index = MagicMock()

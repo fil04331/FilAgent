@@ -46,7 +46,7 @@ class TestPerplexityInterfaceLoad:
             import openai  # noqa: F401
         except ImportError:
             # Mock openai module globally for these tests
-            sys.modules['openai'] = Mock()
+            sys.modules["openai"] = Mock()
 
     @patch.dict("os.environ", {"PERPLEXITY_API_KEY": "test-key"})
     @patch("openai.OpenAI")
@@ -56,17 +56,13 @@ class TestPerplexityInterfaceLoad:
         mock_openai_class.return_value = mock_client
 
         interface = PerplexityInterface()
-        success = interface.load(
-            model_path="llama-3.1-sonar-large-128k-online",
-            config={}
-        )
+        success = interface.load(model_path="llama-3.1-sonar-large-128k-online", config={})
 
         assert success
         assert interface.is_loaded()
         assert interface.model_name == "llama-3.1-sonar-large-128k-online"
         mock_openai_class.assert_called_once_with(
-            api_key="test-key",
-            base_url="https://api.perplexity.ai"
+            api_key="test-key", base_url="https://api.perplexity.ai"
         )
 
     @patch("openai.OpenAI")
@@ -77,25 +73,20 @@ class TestPerplexityInterfaceLoad:
 
         interface = PerplexityInterface()
         success = interface.load(
-            model_path="llama-3.1-8b-instruct",
-            config={"api_key": "config-key"}
+            model_path="llama-3.1-8b-instruct", config={"api_key": "config-key"}
         )
 
         assert success
         assert interface.is_loaded()
         mock_openai_class.assert_called_once_with(
-            api_key="config-key",
-            base_url="https://api.perplexity.ai"
+            api_key="config-key", base_url="https://api.perplexity.ai"
         )
 
     @patch.dict("os.environ", {}, clear=True)
     def test_load_fails_without_api_key(self):
         """Test that load fails when no API key is provided"""
         interface = PerplexityInterface()
-        success = interface.load(
-            model_path="llama-3.1-sonar-large-128k-online",
-            config={}
-        )
+        success = interface.load(model_path="llama-3.1-sonar-large-128k-online", config={})
 
         assert not success
         assert not interface.is_loaded()
@@ -105,10 +96,7 @@ class TestPerplexityInterfaceLoad:
         """Test that load fails gracefully when openai package is not installed"""
         with patch("openai.OpenAI", side_effect=ImportError):
             interface = PerplexityInterface()
-            success = interface.load(
-                model_path="llama-3.1-sonar-large-128k-online",
-                config={}
-            )
+            success = interface.load(model_path="llama-3.1-sonar-large-128k-online", config={})
 
             assert not success
             assert not interface.is_loaded()
@@ -131,15 +119,10 @@ class TestPerplexityInterfaceGenerate:
         """Test basic text generation"""
         # Mock response
         mock_response = Mock()
-        mock_response.choices = [Mock(
-            message=Mock(content="This is a test response"),
-            finish_reason="stop"
-        )]
-        mock_response.usage = Mock(
-            prompt_tokens=10,
-            completion_tokens=5,
-            total_tokens=15
-        )
+        mock_response.choices = [
+            Mock(message=Mock(content="This is a test response"), finish_reason="stop")
+        ]
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
 
         self.mock_client.chat.completions.create.return_value = mock_response
 
@@ -156,23 +139,16 @@ class TestPerplexityInterfaceGenerate:
     def test_generate_with_system_prompt(self):
         """Test generation with system prompt"""
         mock_response = Mock()
-        mock_response.choices = [Mock(
-            message=Mock(content="Expert response"),
-            finish_reason="stop"
-        )]
-        mock_response.usage = Mock(
-            prompt_tokens=20,
-            completion_tokens=10,
-            total_tokens=30
-        )
+        mock_response.choices = [
+            Mock(message=Mock(content="Expert response"), finish_reason="stop")
+        ]
+        mock_response.usage = Mock(prompt_tokens=20, completion_tokens=10, total_tokens=30)
 
         self.mock_client.chat.completions.create.return_value = mock_response
 
         config = GenerationConfig()
         result = self.interface.generate(
-            prompt="User question",
-            config=config,
-            system_prompt="You are an expert"
+            prompt="User question", config=config, system_prompt="You are an expert"
         )
 
         # Verify that both system and user messages were sent
@@ -218,7 +194,7 @@ class TestPerplexityInterfaceLifecycle:
             import openai  # noqa: F401
         except ImportError:
             # Mock openai module globally for these tests
-            sys.modules['openai'] = Mock()
+            sys.modules["openai"] = Mock()
 
     @patch.dict("os.environ", {"PERPLEXITY_API_KEY": "test-key"})
     @patch("openai.OpenAI")
@@ -265,17 +241,14 @@ class TestPerplexityIntegration:
 
         interface = PerplexityInterface()
         success = interface.load(
-            model_path="llama-3.1-sonar-small-128k-online",
-            config={"api_key": api_key}
+            model_path="llama-3.1-sonar-small-128k-online", config={"api_key": api_key}
         )
 
         assert success
 
         config = GenerationConfig(temperature=0.1, max_tokens=50)
         result = interface.generate(
-            prompt="What is 2+2?",
-            config=config,
-            system_prompt="You are a helpful math tutor."
+            prompt="What is 2+2?", config=config, system_prompt="You are a helpful math tutor."
         )
 
         assert result.finish_reason in ["stop", "length"]
