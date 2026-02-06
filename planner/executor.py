@@ -83,11 +83,10 @@ class ExecutionResult:
 
     def to_dict(self) -> Dict[str, object]:
         """Serialise pour logging"""
-        # DEBUG: Log avant conversion str()
-        print(f"\n[HTN-DEBUG] ExecutionResult.to_dict() - Converting task_results:")
+        # Log task results metadata for debugging
+        _logger.debug("ExecutionResult.to_dict() - Converting task_results with %d tasks", len(self.task_results))
         for k, v in self.task_results.items():
-            print(f"  - Task {k}: type={type(v)}, length={len(str(v))} chars")
-            print(f"    Preview: {str(v)[:200] if len(str(v)) > 200 else str(v)}...")
+            _logger.debug("Task %s: type=%s, length=%d chars", k, type(v).__name__, len(str(v)))
 
         return {
             "success": self.success,
@@ -326,12 +325,11 @@ class TaskExecutor:
             try:
                 result = self._execute_task(task)
 
-                # DEBUG: Log du resultat de la tache
-                print(f"\n[HTN-DEBUG] Task executed: {task.task_id}")
-                print(f"  - Task name: {task.name}")
-                print(f"  - Result type: {type(result)}")
-                print(f"  - Result length: {len(str(result))} chars")
-                print(f"  - Result preview: {str(result)[:300] if len(str(result)) > 300 else str(result)}...")
+                # Log task execution result
+                _logger.debug(
+                    "Task executed: %s (name=%s, result_type=%s, result_length=%d chars)",
+                    task.task_id, task.name, type(result).__name__, len(str(result))
+                )
 
                 task.set_result(result)
                 task.update_status(TaskStatus.COMPLETED)

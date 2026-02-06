@@ -23,7 +23,8 @@ class RetentionPolicy:
             ts = datetime.fromisoformat(timestamp)
             cutoff = datetime.now() - timedelta(days=self.ttl_days)
             return ts < cutoff
-        except:
+        except (ValueError, TypeError):
+            # Invalid timestamp format or type
             return False
 
 
@@ -97,7 +98,8 @@ class RetentionManager:
                     log_file.unlink()
                     deleted += 1
                     print(f"  Deleted old log file: {log_file.name}")
-            except:
+            except (ValueError, OSError) as e:
+                # Skip files with invalid date format or permission issues
                 continue
         
         if deleted > 0:
@@ -127,7 +129,8 @@ class RetentionManager:
                             dr_file.unlink()
                             deleted += 1
                             print(f"  Deleted old DR: {dr_file.name}")
-            except:
+            except (json.JSONDecodeError, ValueError, OSError, KeyError):
+                # Skip files with invalid JSON, timestamp format, or permission issues
                 continue
         
         if deleted > 0:
@@ -153,7 +156,8 @@ class RetentionManager:
                 if file_mtime < cutoff_date:
                     prov_file.unlink()
                     deleted += 1
-            except:
+            except (OSError, ValueError):
+                # Skip files with permission issues or invalid timestamps
                 continue
         
         if deleted > 0:

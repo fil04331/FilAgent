@@ -189,7 +189,8 @@ class TestDocumentAnalyzerSecurity:
                 try:
                     blocked_file.unlink()
                     blocked_file.parent.rmdir()
-                except:
+                except (OSError, PermissionError):
+                    # Cleanup failed, not critical for test
                     pass
 
     def test_path_traversal_attack_blocked(self, analyzer, sample_pdf_allowed):
@@ -301,7 +302,8 @@ class TestDocumentAnalyzerSecurity:
                 try:
                     blocked_file.unlink()
                     blocked_file.parent.rmdir()
-                except:
+                except (OSError, PermissionError):
+                    # Cleanup failed, not critical for test
                     pass
 
     def test_absolute_path_outside_allowlist(self, analyzer):
