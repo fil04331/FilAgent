@@ -58,8 +58,15 @@ class Guardrail:
 
         # Verifier allowedlist
         if self.allowedlist:
-            # TODO: Implementation plus sophistiquee selon le cas d'usage
-            pass
+            # Check if text contains at least one allowed value
+            text_lower = text.lower().strip()
+            found_allowed = False
+            for allowed_value in self.allowedlist:
+                if allowed_value.lower() == text_lower or allowed_value.lower() in text_lower:
+                    found_allowed = True
+                    break
+            if not found_allowed:
+                return False, f"Value not in allowedlist. Allowed values: {', '.join(self.allowedlist)}"
 
         # Verifier regex
         if self.pattern:

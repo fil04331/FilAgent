@@ -445,12 +445,9 @@ def test_guardrail_blocklist_empty():
 # ============================================================================
 
 @pytest.mark.unit
-@pytest.mark.skip(reason="Allowedlist not fully implemented in constraints.py")
 def test_guardrail_allowedlist():
     """
     Test de allowedlist: validation de valeurs autorisées
-
-    Note: Cette fonctionnalité est marquée TODO dans constraints.py
 
     Vérifie:
     - Validation de valeurs dans allowedlist
@@ -459,8 +456,31 @@ def test_guardrail_allowedlist():
     allowedlist = ["approved", "verified", "trusted"]
     guardrail = Guardrail(name="allowedlist_test", allowedlist=allowedlist)
 
-    # À implémenter selon le cas d'usage
-    pass
+    # Valeur autorisée - exact match
+    is_valid, error = guardrail.validate("approved")
+    assert is_valid is True
+    assert error is None
+
+    # Valeur autorisée - with whitespace
+    is_valid, error = guardrail.validate("  verified  ")
+    assert is_valid is True
+    assert error is None
+
+    # Valeur autorisée - case insensitive
+    is_valid, error = guardrail.validate("TRUSTED")
+    assert is_valid is True
+    assert error is None
+
+    # Valeur NON autorisée
+    is_valid, error = guardrail.validate("unauthorized")
+    assert is_valid is False
+    assert error is not None
+    assert "not in allowedlist" in error
+
+    # Valeur partielle autorisée (contient un mot de l'allowedlist)
+    is_valid, error = guardrail.validate("This is approved by admin")
+    assert is_valid is True
+    assert error is None
 
 
 # ============================================================================
