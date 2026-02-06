@@ -163,6 +163,7 @@ class TestRunWithHTN:
         mock_graph = Mock()
         mock_graph.get_root_tasks.return_value = []
         mock_graph.get_all_tasks.return_value = []
+        mock_graph.topological_sort.return_value = []  # Required for _format_htn_response
         mock_graph.to_dict.return_value = {"tasks": []}
         
         mock_plan_result = Mock()
@@ -178,20 +179,17 @@ class TestRunWithHTN:
         mock_exec_result.results = {}
         agent_with_htn.executor.execute.return_value = mock_exec_result
         
-        # Mock verifier
-        mock_verif_result = Mock()
-        mock_verif_result.all_passed = True
-        mock_verif_result.failed_tasks = []
-        agent_with_htn.verifier.verify.return_value = mock_verif_result
-        
+        # Mock verifier - verify_graph_results returns a dict of task_id -> VerificationResult
+        agent_with_htn.verifier.verify_graph_results.return_value = {}
+
         # Execute
         result = agent_with_htn._run_with_htn("Test query", "conv-123", "task-456")
-        
+
         # Verify
         assert result is not None
         assert agent_with_htn.planner.plan.called
         assert agent_with_htn.executor.execute.called
-        assert agent_with_htn.verifier.verify.called
+        assert agent_with_htn.verifier.verify_graph_results.called
     
     def test_run_with_htn_planning_failure(self, agent_with_htn):
         """Test HTN execution with planning failure"""

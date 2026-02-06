@@ -37,9 +37,9 @@ class TestComplianceGuardian:
         query = "Quelle est la météo aujourd'hui?"
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
         
-        assert result['valid'] is True
-        assert 'query_hash' in result['metadata']
-        assert len(result['errors']) == 0
+        assert result.valid is True
+        assert result.metadata.query_hash is not None
+        assert len(result.errors) == 0
     
     def test_validate_query_too_long(self):
         """Test: Requête trop longue doit échouer"""
@@ -64,10 +64,10 @@ class TestComplianceGuardian:
         query = "Mon email est test@example.com"
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
         
-        assert result['valid'] is True  # Toujours valide, mais warning
-        assert len(result['warnings']) > 0
-        assert 'pii_detected' in result['metadata']
-        assert result['metadata']['pii_detected'] is True
+        assert result.valid is True  # Toujours valide, mais warning
+        assert len(result.warnings) > 0
+        assert result.metadata.pii_detected is not None
+        assert result.metadata.pii_detected is True
     
     def test_validate_execution_plan_success(self):
         """Test: Validation réussie d'un plan simple"""
@@ -79,10 +79,10 @@ class TestComplianceGuardian:
         }
         
         result = self.guardian.validate_execution_plan(plan, {'task_id': 'task123'})
-        
-        assert result['valid'] is True
-        assert 'plan_hash' in result['metadata']
-        assert len(result['errors']) == 0
+
+        assert result.valid is True
+        assert result.metadata.plan_hash is not None
+        assert len(result.errors) == 0
     
     def test_validate_execution_plan_too_deep(self):
         """Test: Plan trop profond doit échouer"""
@@ -140,10 +140,10 @@ class TestComplianceGuardian:
         }
         
         result = self.guardian.validate_execution_plan(plan)
-        
-        assert result['valid'] is True
-        assert len(result['warnings']) > 0
-        assert result['metadata'].get('requires_approval') is True
+
+        assert result.valid is True
+        assert len(result.warnings) > 0
+        assert result.metadata.requires_approval is True
     
     def test_audit_execution_success(self):
         """Test: Audit d'une exécution réussie"""
@@ -155,10 +155,10 @@ class TestComplianceGuardian:
         
         audit = self.guardian.audit_execution(execution_result, {'task_id': 'task123'})
         
-        assert audit['audited'] is True
-        assert 'execution_hash' in audit
-        assert audit['compliance_check']['passed'] is True
-        assert len(audit['compliance_check']['issues']) == 0
+        assert audit.audited is True
+        assert audit.execution_hash is not None
+        assert audit.compliance_check.passed is True
+        assert len(audit.compliance_check.issues) == 0
     
     def test_audit_execution_failed(self):
         """Test: Audit d'une exécution échouée"""
@@ -170,9 +170,9 @@ class TestComplianceGuardian:
         
         audit = self.guardian.audit_execution(execution_result)
         
-        assert audit['audited'] is True
-        assert len(audit['compliance_check']['issues']) > 0
-    
+        assert audit.audited is True
+        assert len(audit.compliance_check.issues) > 0
+
     def test_generate_decision_record(self):
         """Test: Génération d'un Decision Record"""
         query = "Test query"
@@ -191,17 +191,17 @@ class TestComplianceGuardian:
             context=context
         )
         
-        assert 'dr_id' in dr
-        assert dr['dr_id'].startswith('DR-')
-        assert dr['decision_type'] == 'automated_execution'
-        assert dr['actor'] == 'agent'
-        assert dr['task_id'] == 'task123'
-        assert 'query_hash' in dr
-        assert 'plan_hash' in dr
-        assert 'execution_hash' in dr
-        assert dr['success'] is True
-        assert 'loi25' in dr['compliance_frameworks']
-        assert 'gdpr' in dr['compliance_frameworks']
+        assert dr.dr_id is not None
+        assert dr.dr_id.startswith('DR-')
+        assert dr.decision_type == 'automated_execution'
+        assert dr.actor == 'agent'
+        assert dr.task_id == 'task123'
+        assert dr.query_hash is not None
+        assert dr.plan_hash is not None
+        assert dr.execution_hash is not None
+        assert dr.success is True
+        assert 'loi25' in dr.compliance_frameworks
+        assert 'gdpr' in dr.compliance_frameworks
     
     def test_audit_log_recording(self):
         """Test: Les événements sont enregistrés dans l'audit log"""
@@ -302,7 +302,7 @@ class TestQueryValidationEdgeCases:
         query = "a" * max_length
 
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
-        assert result['valid'] is True
+        assert result.valid is True
 
     def test_validate_query_one_over_limit(self):
         """Test: Requête dépassant la limite d'un caractère"""
@@ -319,8 +319,8 @@ class TestQueryValidationEdgeCases:
         query = ""
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
 
-        assert result['valid'] is True
-        assert len(result['errors']) == 0
+        assert result.valid is True
+        assert len(result.errors) == 0
 
     def test_validate_query_multiple_forbidden_patterns(self):
         """Test: Requête avec plusieurs patterns interdits"""
@@ -336,26 +336,26 @@ class TestQueryValidationEdgeCases:
         query = "Contact me at test@example.com or 123-45-6789"
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
 
-        assert result['valid'] is True
-        assert len(result['warnings']) > 0
-        assert result['metadata']['pii_detected'] is True
-        assert result['metadata']['pii_count'] >= 2
+        assert result.valid is True
+        assert len(result.warnings) > 0
+        assert result.metadata.pii_detected is True
+        assert result.metadata.pii_count >= 2
 
     def test_validate_query_pii_ssn(self):
         """Test: Détection de SSN (numéro de sécurité sociale)"""
         query = "My SSN is 123-45-6789"
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
 
-        assert result['valid'] is True
-        assert result['metadata']['pii_detected'] is True
+        assert result.valid is True
+        assert result.metadata.pii_detected is True
 
     def test_validate_query_pii_quebec_health(self):
         """Test: Détection de numéro d'assurance maladie Québec"""
         query = "My health card is AB123456"
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
 
-        assert result['valid'] is True
-        assert result['metadata']['pii_detected'] is True
+        assert result.valid is True
+        assert result.metadata.pii_detected is True
 
     def test_validate_query_pii_and_forbidden_pattern(self):
         """Test: Requête avec PII ET pattern interdit"""
@@ -372,9 +372,9 @@ class TestQueryValidationEdgeCases:
         # Context missing user_id (which is in required_fields)
         result = self.guardian.validate_query(query, {'query': query})
 
-        assert result['valid'] is True
+        assert result.valid is True
         # Warning only generated if 'query' is not in missing_fields
-        assert len(result['warnings']) > 0
+        assert len(result.warnings) > 0
 
     def test_validate_query_with_all_context_fields(self):
         """Test: Contexte avec tous les champs requis"""
@@ -382,7 +382,7 @@ class TestQueryValidationEdgeCases:
         context = {'query': query, 'user_id': 'user123'}
         result = self.guardian.validate_query(query, context)
 
-        assert result['valid'] is True
+        assert result.valid is True
 
     def test_validate_query_case_insensitive_patterns(self):
         """Test: Patterns interdits sont case-insensitive"""
@@ -429,8 +429,8 @@ class TestQueryValidationEdgeCases:
         result = self.guardian.validate_query(query, {'user_id': 'user123'})
 
         # Email détecté mais pas bloqué (juste warning)
-        assert result['valid'] is True
-        assert result['metadata']['pii_detected'] is True
+        assert result.valid is True
+        assert result.metadata.pii_detected is True
 
     def test_validate_query_audit_logged(self):
         """Test: Validation de requête est loguée si audit activé"""
@@ -466,8 +466,8 @@ class TestPlanValidationEdgeCases:
         plan = {}
         result = self.guardian.validate_execution_plan(plan)
 
-        assert result['valid'] is True
-        assert len(result['errors']) == 0
+        assert result.valid is True
+        assert len(result.errors) == 0
 
     def test_validate_plan_with_only_tools_used(self):
         """Test: Plan avec seulement tools_used"""
@@ -476,7 +476,7 @@ class TestPlanValidationEdgeCases:
         }
         result = self.guardian.validate_execution_plan(plan)
 
-        assert result['valid'] is True
+        assert result.valid is True
 
     def test_validate_plan_tools_used_forbidden(self):
         """Test: Plan avec outil interdit dans tools_used"""
@@ -500,7 +500,7 @@ class TestPlanValidationEdgeCases:
         }
 
         result = self.guardian.validate_execution_plan(plan)
-        assert result['valid'] is True
+        assert result.valid is True
 
     def test_validate_plan_exactly_at_max_tools(self):
         """Test: Plan exactement au nombre maximal d'outils"""
@@ -512,7 +512,7 @@ class TestPlanValidationEdgeCases:
         }
 
         result = self.guardian.validate_execution_plan(plan)
-        assert result['valid'] is True
+        assert result.valid is True
 
     def test_validate_plan_multiple_forbidden_tools(self):
         """Test: Plan avec plusieurs outils interdits"""
@@ -544,9 +544,9 @@ class TestPlanValidationEdgeCases:
 
         result = self.guardian.validate_execution_plan(plan)
 
-        assert result['valid'] is True
-        assert result['metadata']['requires_approval'] is True
-        assert len(result['metadata']['approval_tools']) == 2
+        assert result.valid is True
+        assert result.metadata.requires_approval is True
+        assert len(result.metadata.approval_tools) == 2
 
     def test_validate_plan_approval_and_forbidden_mixed(self):
         """Test: Plan avec outils d'approbation ET interdits"""
@@ -577,7 +577,7 @@ class TestPlanValidationEdgeCases:
         plan = {'graph': mock_graph}
 
         result = self.guardian.validate_execution_plan(plan)
-        assert result['valid'] is True
+        assert result.valid is True
 
     def test_validate_plan_htn_graph_too_deep(self):
         """Test: Plan HTN trop profond"""
@@ -612,7 +612,7 @@ class TestPlanValidationEdgeCases:
 
         result = self.guardian.validate_execution_plan(plan, context)
 
-        assert result['valid'] is True
+        assert result.valid is True
         # Check that context was logged
         last_log = self.guardian.audit_log[-1]
         assert last_log['data']['context'] == context
@@ -636,8 +636,8 @@ class TestExecutionAudit:
 
         audit = self.guardian.audit_execution(execution_result, context)
 
-        assert audit['audited'] is True
-        assert audit['compliance_check']['passed'] is True
+        assert audit.audited is True
+        assert audit.compliance_check.passed is True
 
     def test_audit_execution_with_warnings(self):
         """Test: Audit d'exécution avec warnings (pas d'erreurs)"""
@@ -650,8 +650,8 @@ class TestExecutionAudit:
 
         audit = self.guardian.audit_execution(execution_result)
 
-        assert audit['audited'] is True
-        assert audit['compliance_check']['passed'] is True
+        assert audit.audited is True
+        assert audit.compliance_check.passed is True
 
     def test_audit_execution_partial_success(self):
         """Test: Audit d'exécution partiellement réussie"""
@@ -663,8 +663,8 @@ class TestExecutionAudit:
 
         audit = self.guardian.audit_execution(execution_result)
 
-        assert audit['audited'] is True
-        assert len(audit['compliance_check']['issues']) > 0
+        assert audit.audited is True
+        assert len(audit.compliance_check.issues) > 0
 
     def test_audit_execution_multiple_errors(self):
         """Test: Audit d'exécution avec plusieurs erreurs"""
@@ -676,8 +676,8 @@ class TestExecutionAudit:
 
         audit = self.guardian.audit_execution(execution_result)
 
-        assert audit['audited'] is True
-        issues = audit['compliance_check']['issues']
+        assert audit.audited is True
+        issues = audit.compliance_check.issues
         assert any('error' in issue.lower() for issue in issues)
 
     def test_audit_execution_empty_result(self):
@@ -686,9 +686,9 @@ class TestExecutionAudit:
 
         audit = self.guardian.audit_execution(execution_result)
 
-        assert audit['audited'] is True
+        assert audit.audited is True
         # Missing 'success' defaults to False
-        assert len(audit['compliance_check']['issues']) > 0
+        assert len(audit.compliance_check.issues) > 0
 
     def test_audit_execution_logged(self):
         """Test: Audit d'exécution est loggué"""
@@ -718,9 +718,9 @@ class TestDecisionRecords:
             execution_result={}
         )
 
-        assert 'dr_id' in dr
-        assert dr['decision_type'] == 'test'
-        assert dr['actor'] == 'system'  # Default actor
+        assert dr.dr_id is not None
+        assert dr.decision_type == 'test'
+        assert dr.actor == 'system'  # Default actor
 
     def test_generate_decision_record_full_context(self):
         """Test: DR avec contexte complet"""
@@ -739,8 +739,8 @@ class TestDecisionRecords:
             context=context
         )
 
-        assert dr['actor'] == 'user'
-        assert dr['task_id'] == 'task-123'
+        assert dr.actor == 'user'
+        assert dr.task_id == 'task-123'
 
     def test_generate_decision_record_with_tools(self):
         """Test: DR avec extraction d'outils du plan"""
@@ -758,8 +758,8 @@ class TestDecisionRecords:
             execution_result={'success': True}
         )
 
-        assert 'tool_a' in dr['tools_used']
-        assert 'tool_b' in dr['tools_used']
+        assert 'tool_a' in dr.tools_used
+        assert 'tool_b' in dr.tools_used
 
     def test_generate_decision_record_failure(self):
         """Test: DR pour exécution échouée"""
@@ -770,7 +770,7 @@ class TestDecisionRecords:
             execution_result={'success': False, 'error': 'Test error'}
         )
 
-        assert dr['success'] is False
+        assert dr.success is False
 
     def test_generate_decision_record_compliance_frameworks(self):
         """Test: DR contient les frameworks de conformité"""
@@ -781,7 +781,7 @@ class TestDecisionRecords:
             execution_result={'success': True}
         )
 
-        frameworks = dr['compliance_frameworks']
+        frameworks = dr.compliance_frameworks
         assert 'loi25' in frameworks
         assert 'gdpr' in frameworks
         assert 'ai_act' in frameworks
@@ -797,7 +797,7 @@ class TestDecisionRecords:
                 plan={},
                 execution_result={'success': True}
             )
-            drs.append(dr['dr_id'])
+            drs.append(dr.dr_id)
 
         # All IDs should be unique
         assert len(set(drs)) == 5
@@ -826,7 +826,7 @@ class TestDecisionRecords:
             execution_result={'success': True}
         )
 
-        dr_id = dr['dr_id']
+        dr_id = dr.dr_id
         assert dr_id.startswith('DR-')
         parts = dr_id.split('-')
         assert len(parts) == 3
@@ -1015,7 +1015,7 @@ class TestComplexScenarios:
             query,
             {'user_id': 'user123', 'session_id': 'session456'}
         )
-        assert query_validation['valid'] is True
+        assert query_validation.valid is True
 
         # 2. Validate plan
         plan = {
@@ -1028,7 +1028,7 @@ class TestComplexScenarios:
             plan,
             {'task_id': 'task789'}
         )
-        assert plan_validation['valid'] is True
+        assert plan_validation.valid is True
 
         # 3. Audit execution
         execution_result = {
@@ -1037,7 +1037,7 @@ class TestComplexScenarios:
             'errors': []
         }
         audit = self.guardian.audit_execution(execution_result)
-        assert audit['audited'] is True
+        assert audit.audited is True
 
         # 4. Generate Decision Record
         dr = self.guardian.generate_decision_record(
@@ -1047,15 +1047,15 @@ class TestComplexScenarios:
             execution_result=execution_result,
             context={'actor': 'agent', 'task_id': 'task789'}
         )
-        assert dr['success'] is True
-        assert 'data_analyzer' in dr['tools_used']
+        assert dr.success is True
+        assert 'data_analyzer' in dr.tools_used
 
     def test_full_workflow_with_approval(self):
         """Test: Workflow nécessitant approbation"""
         query = "Delete old files"
 
         query_validation = self.guardian.validate_query(query, {'user_id': 'user123'})
-        assert query_validation['valid'] is True
+        assert query_validation.valid is True
 
         plan = {
             'actions': [
@@ -1064,9 +1064,9 @@ class TestComplexScenarios:
         }
 
         plan_validation = self.guardian.validate_execution_plan(plan)
-        assert plan_validation['valid'] is True
-        assert plan_validation['metadata']['requires_approval'] is True
-        assert 'file_delete' in plan_validation['metadata']['approval_tools']
+        assert plan_validation.valid is True
+        assert plan_validation.metadata.requires_approval is True
+        assert 'file_delete' in plan_validation.metadata.approval_tools
 
     def test_full_workflow_with_policy_violation(self):
         """Test: Workflow avec violation de politique"""
@@ -1086,7 +1086,7 @@ class TestComplexScenarios:
 
         for i, query in enumerate(queries):
             result = self.guardian.validate_query(query, {'user_id': f'user{i}'})
-            assert result['valid'] is True
+            assert result.valid is True
 
         # Check audit log has all validations
         query_validations = [
@@ -1108,7 +1108,7 @@ class TestComplexScenarios:
             result = self.guardian.validate_execution_plan(plan)
             results.append(result)
 
-        assert all(r['valid'] for r in results)
+        assert all(r.valid for r in results)
 
     def test_audit_log_retention(self):
         """Test: Vérification de la politique de rétention"""
