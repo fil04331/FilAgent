@@ -6,6 +6,7 @@ Uses SWE-bench Lite (300 instances) for faster evaluation.
 
 Reference: https://www.swebench.com/
 """
+
 from __future__ import annotations
 
 import os
@@ -19,7 +20,6 @@ from datasets import load_dataset, load_from_disk, DatasetDict
 from filelock import FileLock
 
 from eval.base import BenchmarkHarness, BenchmarkTask, BenchmarkResult
-
 
 # Type aliases for strict typing
 MetricValue = Union[str, int, float, bool]
@@ -84,24 +84,24 @@ class SWEBenchHarness(BenchmarkHarness):
             return self._create_mock_tasks()
 
         tasks: List[BenchmarkTask] = []
-        for item in self.dataset['test']:
+        for item in self.dataset["test"]:
             # Extract relevant fields safely
-            instance_id = str(item.get('instance_id', ''))
-            patch = str(item.get('patch', ''))
-            repo = str(item.get('repo', ''))
-            base_commit = str(item.get('base_commit', ''))
-            problem_statement = str(item.get('problem_statement', ''))
-            hints_text = str(item.get('hints_text', '')) if item.get('hints_text') else ''
-            test_patch = str(item.get('test_patch', '')) if item.get('test_patch') else ''
+            instance_id = str(item.get("instance_id", ""))
+            patch = str(item.get("patch", ""))
+            repo = str(item.get("repo", ""))
+            base_commit = str(item.get("base_commit", ""))
+            problem_statement = str(item.get("problem_statement", ""))
+            hints_text = str(item.get("hints_text", "")) if item.get("hints_text") else ""
+            test_patch = str(item.get("test_patch", "")) if item.get("test_patch") else ""
 
             item_dict: DatasetItem = {
-                'instance_id': instance_id,
-                'repo': repo,
-                'base_commit': base_commit,
-                'problem_statement': problem_statement,
-                'hints_text': hints_text,
-                'test_patch': test_patch,
-                'patch': patch,
+                "instance_id": instance_id,
+                "repo": repo,
+                "base_commit": base_commit,
+                "problem_statement": problem_statement,
+                "hints_text": hints_text,
+                "test_patch": test_patch,
+                "patch": patch,
             }
 
             tasks.append(
@@ -110,11 +110,11 @@ class SWEBenchHarness(BenchmarkHarness):
                     prompt=self._format_prompt(item_dict),
                     ground_truth=patch,
                     metadata={
-                        'repo': repo,
-                        'base_commit': base_commit,
-                        'problem_statement': problem_statement,
-                        'hints_text': hints_text,
-                        'test_patch': test_patch,
+                        "repo": repo,
+                        "base_commit": base_commit,
+                        "problem_statement": problem_statement,
+                        "hints_text": hints_text,
+                        "test_patch": test_patch,
                     },
                 )
             )
@@ -126,9 +126,9 @@ class SWEBenchHarness(BenchmarkHarness):
 
         Format standard pour presenter l'issue a l'agent
         """
-        repo = item.get('repo', '')
-        problem_statement = item.get('problem_statement', '')
-        hints_text = item.get('hints_text', '')
+        repo = item.get("repo", "")
+        problem_statement = item.get("problem_statement", "")
+        hints_text = item.get("hints_text", "")
 
         prompt = f"""You are tasked with solving a real-world GitHub issue from the repository: {repo}
 
@@ -200,10 +200,10 @@ Your response should contain the patch in unified diff format.
 +    return abs(sum(numbers))
 """,
                 metadata={
-                    'repo': 'mock/simple-repo',
-                    'base_commit': 'abc123',
-                    'problem_statement': 'Fix negative number handling',
-                }
+                    "repo": "mock/simple-repo",
+                    "base_commit": "abc123",
+                    "problem_statement": "Fix negative number handling",
+                },
             )
         ]
         return mock_tasks
@@ -234,7 +234,7 @@ Your response should contain the patch in unified diff format.
                 response=response,
                 ground_truth=task.ground_truth,
                 error="No patch found in response",
-                metadata={'evaluation_type': 'format_check'}
+                metadata={"evaluation_type": "format_check"},
             )
 
         # Simple validation: check if patch looks valid
@@ -247,7 +247,7 @@ Your response should contain the patch in unified diff format.
                 response=response,
                 ground_truth=task.ground_truth,
                 error=error_msg,
-                metadata={'evaluation_type': 'format_validation'}
+                metadata={"evaluation_type": "format_validation"},
             )
 
         # For full evaluation, we would:
@@ -259,7 +259,7 @@ Your response should contain the patch in unified diff format.
         similarity = self._compute_patch_similarity(patch, task.ground_truth)
         passed = similarity > 0.5  # Threshold for acceptance
 
-        patch_preview = patch[:200] + '...' if len(patch) > 200 else patch
+        patch_preview = patch[:200] + "..." if len(patch) > 200 else patch
 
         return BenchmarkResult(
             task_id=task.id,
@@ -268,36 +268,36 @@ Your response should contain the patch in unified diff format.
             ground_truth=task.ground_truth,
             error=None if passed else f"Patch similarity too low: {similarity:.2f}",
             metadata={
-                'evaluation_type': 'similarity',
-                'similarity': similarity,
-                'patch_extracted': patch_preview
-            }
+                "evaluation_type": "similarity",
+                "similarity": similarity,
+                "patch_extracted": patch_preview,
+            },
         )
 
     def _extract_patch(self, response: str) -> Optional[str]:
         """Extraire le patch de la reponse"""
         # Look for code blocks with diff
-        diff_pattern = r'```diff\n(.*?)\n```'
+        diff_pattern = r"```diff\n(.*?)\n```"
         matches = re.findall(diff_pattern, response, re.DOTALL)
 
         if matches:
             return matches[0].strip()
 
         # Look for unified diff markers
-        if '---' in response and '+++' in response:
+        if "---" in response and "+++" in response:
             # Extract everything that looks like a diff
-            lines = response.split('\n')
+            lines = response.split("\n")
             diff_lines: List[str] = []
             in_diff = False
             for line in lines:
-                if line.startswith('---') or line.startswith('+++'):
+                if line.startswith("---") or line.startswith("+++"):
                     in_diff = True
                 if in_diff:
                     diff_lines.append(line)
-                if in_diff and line.strip() == '':
+                if in_diff and line.strip() == "":
                     break
             if diff_lines:
-                return '\n'.join(diff_lines)
+                return "\n".join(diff_lines)
 
         return None
 
@@ -307,11 +307,11 @@ Your response should contain the patch in unified diff format.
             return False, "Empty patch"
 
         # Check for unified diff markers
-        if '---' not in patch or '+++' not in patch:
+        if "---" not in patch or "+++" not in patch:
             return False, "Missing unified diff markers (--- and +++)"
 
         # Check for hunk markers
-        if not any(line.startswith('@@') for line in patch.split('\n')):
+        if not any(line.startswith("@@") for line in patch.split("\n")):
             return False, "Missing hunk markers (@@)"
 
         return True, None
@@ -324,8 +324,8 @@ Your response should contain the patch in unified diff format.
         """
         try:
             # Normalize patches
-            p1_lines = [line.strip() for line in patch1.split('\n') if line.strip()]
-            p2_lines = [line.strip() for line in patch2.split('\n') if line.strip()]
+            p1_lines = [line.strip() for line in patch1.split("\n") if line.strip()]
+            p2_lines = [line.strip() for line in patch2.split("\n") if line.strip()]
 
             # Compute similarity
             matcher = SequenceMatcher(None, p1_lines, p2_lines)

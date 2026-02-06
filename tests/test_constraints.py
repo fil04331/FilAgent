@@ -20,13 +20,13 @@ from runtime.middleware.constraints import (
     Guardrail,
     ConstraintsEngine,
     get_constraints_engine,
-    init_constraints_engine
+    init_constraints_engine,
 )
-
 
 # ============================================================================
 # TESTS: Guardrail - JSONSchema Validation
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_guardrail_jsonschema_valid():
@@ -39,11 +39,8 @@ def test_guardrail_jsonschema_valid():
     """
     schema = {
         "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "number"}
-        },
-        "required": ["name", "age"]
+        "properties": {"name": {"type": "string"}, "age": {"type": "number"}},
+        "required": ["name", "age"],
     }
 
     guardrail = Guardrail(name="test_schema", schema=schema)
@@ -66,11 +63,8 @@ def test_guardrail_jsonschema_invalid_missing_required():
     """
     schema = {
         "type": "object",
-        "properties": {
-            "name": {"type": "string"},
-            "age": {"type": "number"}
-        },
-        "required": ["name", "age"]
+        "properties": {"name": {"type": "string"}, "age": {"type": "number"}},
+        "required": ["name", "age"],
     }
 
     guardrail = Guardrail(name="test_schema", schema=schema)
@@ -93,12 +87,7 @@ def test_guardrail_jsonschema_invalid_type():
     - Détection des types incorrects
     - Message d'erreur approprié
     """
-    schema = {
-        "type": "object",
-        "properties": {
-            "age": {"type": "number"}
-        }
-    }
+    schema = {"type": "object", "properties": {"age": {"type": "number"}}}
 
     guardrail = Guardrail(name="test_schema", schema=schema)
 
@@ -120,12 +109,7 @@ def test_guardrail_jsonschema_invalid_json_format():
     - Détection de JSON malformé
     - Message d'erreur "Invalid JSON format"
     """
-    schema = {
-        "type": "object",
-        "properties": {
-            "name": {"type": "string"}
-        }
-    }
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
 
     guardrail = Guardrail(name="test_schema", schema=schema)
 
@@ -155,28 +139,19 @@ def test_guardrail_jsonschema_nested_objects():
                     "name": {"type": "string"},
                     "address": {
                         "type": "object",
-                        "properties": {
-                            "city": {"type": "string"}
-                        },
-                        "required": ["city"]
-                    }
+                        "properties": {"city": {"type": "string"}},
+                        "required": ["city"],
+                    },
                 },
-                "required": ["name", "address"]
+                "required": ["name", "address"],
             }
         },
-        "required": ["user"]
+        "required": ["user"],
     }
 
     guardrail = Guardrail(name="test_nested", schema=schema)
 
-    valid_json = json.dumps({
-        "user": {
-            "name": "Alice",
-            "address": {
-                "city": "Montreal"
-            }
-        }
-    })
+    valid_json = json.dumps({"user": {"name": "Alice", "address": {"city": "Montreal"}}})
 
     is_valid, error = guardrail.validate(valid_json)
 
@@ -195,14 +170,8 @@ def test_guardrail_jsonschema_arrays():
     """
     schema = {
         "type": "object",
-        "properties": {
-            "tags": {
-                "type": "array",
-                "items": {"type": "string"},
-                "minItems": 1
-            }
-        },
-        "required": ["tags"]
+        "properties": {"tags": {"type": "array", "items": {"type": "string"}, "minItems": 1}},
+        "required": ["tags"],
     }
 
     guardrail = Guardrail(name="test_array", schema=schema)
@@ -226,6 +195,7 @@ def test_guardrail_jsonschema_arrays():
 # TESTS: Guardrail - Regex Pattern Matching
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_guardrail_regex_pattern_valid():
     """
@@ -236,7 +206,7 @@ def test_guardrail_regex_pattern_valid():
     - Pas d'erreur retournée
     """
     # Pattern pour email
-    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     guardrail = Guardrail(name="email_validator", pattern=email_pattern)
 
     valid_email = "user@example.com"
@@ -255,7 +225,7 @@ def test_guardrail_regex_pattern_invalid():
     - Détection de texte ne correspondant pas au pattern
     - Message d'erreur approprié
     """
-    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     guardrail = Guardrail(name="email_validator", pattern=email_pattern)
 
     invalid_email = "not-an-email"
@@ -275,7 +245,7 @@ def test_guardrail_regex_max_length():
     - Pattern pour max_length
     """
     # Pattern pour max 10 caractères
-    max_length_pattern = r'^.{0,10}$'
+    max_length_pattern = r"^.{0,10}$"
     guardrail = Guardrail(name="max_length", pattern=max_length_pattern)
 
     # Texte valide (10 caractères)
@@ -299,7 +269,7 @@ def test_guardrail_regex_phone_number():
     - Pattern pour format nord-américain
     """
     # Pattern pour numéro nord-américain: (XXX) XXX-XXXX
-    phone_pattern = r'^\(\d{3}\) \d{3}-\d{4}$'
+    phone_pattern = r"^\(\d{3}\) \d{3}-\d{4}$"
     guardrail = Guardrail(name="phone_validator", pattern=phone_pattern)
 
     valid_phone = "(514) 123-4567"
@@ -321,7 +291,7 @@ def test_guardrail_regex_multiline():
     - Pattern avec support multiligne
     """
     # Pattern pour détecter la présence d'un mot
-    pattern = r'important'
+    pattern = r"important"
     guardrail = Guardrail(name="keyword_search", pattern=pattern)
 
     multiline_text = """
@@ -337,6 +307,7 @@ def test_guardrail_regex_multiline():
 # ============================================================================
 # TESTS: Guardrail - Blocklist
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_guardrail_blocklist_single_word():
@@ -373,11 +344,7 @@ def test_guardrail_blocklist_case_insensitive():
     guardrail = Guardrail(name="blocklist_test", blocklist=blocklist)
 
     # Différentes casses
-    texts = [
-        "My PASSWORD is secret",
-        "my password is secret",
-        "My PaSsWoRd is secret"
-    ]
+    texts = ["My PASSWORD is secret", "my password is secret", "My PaSsWoRd is secret"]
 
     for text in texts:
         is_valid, error = guardrail.validate(text)
@@ -444,6 +411,7 @@ def test_guardrail_blocklist_empty():
 # TESTS: Guardrail - Allowedlist (TODO dans le code source)
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_guardrail_allowedlist():
     """
@@ -487,6 +455,7 @@ def test_guardrail_allowedlist():
 # TESTS: Guardrail - Combinaisons de contraintes
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_guardrail_combined_blocklist_and_pattern():
     """
@@ -497,13 +466,9 @@ def test_guardrail_combined_blocklist_and_pattern():
     - Ordre de validation (blocklist vérifié en premier)
     """
     blocklist = ["forbidden"]
-    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 
-    guardrail = Guardrail(
-        name="combined_test",
-        blocklist=blocklist,
-        pattern=email_pattern
-    )
+    guardrail = Guardrail(name="combined_test", blocklist=blocklist, pattern=email_pattern)
 
     # Texte valide pour pattern mais contient mot bloqué
     text = "forbidden@example.com"
@@ -539,17 +504,11 @@ def test_guardrail_combined_schema_and_blocklist():
     blocklist = ["malicious"]
     schema = {
         "type": "object",
-        "properties": {
-            "message": {"type": "string"}
-        },
-        "required": ["message"]
+        "properties": {"message": {"type": "string"}},
+        "required": ["message"],
     }
 
-    guardrail = Guardrail(
-        name="schema_blocklist",
-        blocklist=blocklist,
-        schema=schema
-    )
+    guardrail = Guardrail(name="schema_blocklist", blocklist=blocklist, schema=schema)
 
     # JSON valide mais contient mot bloqué
     text = json.dumps({"message": "This is malicious content"})
@@ -562,6 +521,7 @@ def test_guardrail_combined_schema_and_blocklist():
 # ============================================================================
 # TESTS: ConstraintsEngine
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_constraints_engine_initialization(tmp_path):
@@ -589,7 +549,7 @@ def test_constraints_engine_add_guardrail():
     """
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
 
-    guardrail = Guardrail(name="custom", pattern=r'^\d+$')
+    guardrail = Guardrail(name="custom", pattern=r"^\d+$")
     engine.add_guardrail(guardrail)
 
     assert len(engine.guardrails) == 1
@@ -608,7 +568,7 @@ def test_constraints_engine_validate_output_success():
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
 
     # Ajouter des guardrails
-    engine.add_guardrail(Guardrail(name="length", pattern=r'^.{0,100}$'))
+    engine.add_guardrail(Guardrail(name="length", pattern=r"^.{0,100}$"))
     engine.add_guardrail(Guardrail(name="blocklist", blocklist=["forbidden"]))
 
     text = "This is a valid output"
@@ -629,7 +589,7 @@ def test_constraints_engine_validate_output_failure():
     """
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
 
-    engine.add_guardrail(Guardrail(name="length", pattern=r'^.{0,10}$'))
+    engine.add_guardrail(Guardrail(name="length", pattern=r"^.{0,10}$"))
     engine.add_guardrail(Guardrail(name="blocklist", blocklist=["forbidden"]))
 
     # Texte trop long ET contient mot bloqué
@@ -657,7 +617,7 @@ def test_constraints_engine_validate_output_multiple_guardrails():
     guardrails = [
         Guardrail(name="g1", blocklist=["bad1"]),
         Guardrail(name="g2", blocklist=["bad2"]),
-        Guardrail(name="g3", blocklist=["bad3"])
+        Guardrail(name="g3", blocklist=["bad3"]),
     ]
 
     for g in guardrails:
@@ -684,10 +644,8 @@ def test_constraints_engine_validate_json_output_valid():
 
     schema = {
         "type": "object",
-        "properties": {
-            "status": {"type": "string"}
-        },
-        "required": ["status"]
+        "properties": {"status": {"type": "string"}},
+        "required": ["status"],
     }
 
     valid_json = json.dumps({"status": "success"})
@@ -708,13 +666,7 @@ def test_constraints_engine_validate_json_output_invalid_schema():
     """
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
 
-    schema = {
-        "type": "object",
-        "properties": {
-            "count": {"type": "number"}
-        },
-        "required": ["count"]
-    }
+    schema = {"type": "object", "properties": {"count": {"type": "number"}}, "required": ["count"]}
 
     # count manquant
     invalid_json = json.dumps({"status": "success"})
@@ -748,6 +700,7 @@ def test_constraints_engine_validate_json_output_invalid_format():
 # TESTS: ConstraintsEngine - Configuration YAML
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_constraints_engine_load_from_config(tmp_path):
     """
@@ -778,8 +731,7 @@ policies:
 
     # Vérifier le guardrail de blocklist
     blocklist_guardrail = next(
-        (g for g in engine.guardrails if g.name == "keyword_blocklist"),
-        None
+        (g for g in engine.guardrails if g.name == "keyword_blocklist"), None
     )
     assert blocklist_guardrail is not None
     assert "forbidden" in blocklist_guardrail.blocklist
@@ -833,12 +785,10 @@ policies:
 
     # Vérifier les guardrails de longueur
     max_prompt_guardrail = next(
-        (g for g in engine.guardrails if g.name == "max_prompt_length"),
-        None
+        (g for g in engine.guardrails if g.name == "max_prompt_length"), None
     )
     max_response_guardrail = next(
-        (g for g in engine.guardrails if g.name == "max_response_length"),
-        None
+        (g for g in engine.guardrails if g.name == "max_response_length"), None
     )
 
     assert max_prompt_guardrail is not None
@@ -848,6 +798,7 @@ policies:
 # ============================================================================
 # TESTS: Singleton Pattern
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_get_constraints_engine_singleton():
@@ -892,6 +843,7 @@ def test_init_constraints_engine_creates_new_instance(tmp_path):
 # TESTS: Edge Cases et Robustesse
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_guardrail_empty_text():
     """
@@ -916,7 +868,7 @@ def test_guardrail_whitespace_only():
     Vérifie:
     - Validation de texte contenant uniquement des espaces
     """
-    guardrail = Guardrail(name="test", pattern=r'^\s+$')
+    guardrail = Guardrail(name="test", pattern=r"^\s+$")
 
     is_valid, error = guardrail.validate("   ")
 
@@ -984,6 +936,7 @@ def test_constraints_engine_no_guardrails():
 # TESTS: Compliance - Constraint Violation Handling
 # ============================================================================
 
+
 @pytest.mark.compliance
 def test_constraint_violation_detailed_error_messages():
     """
@@ -996,7 +949,7 @@ def test_constraint_violation_detailed_error_messages():
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
 
     engine.add_guardrail(Guardrail(name="security_check", blocklist=["hack"]))
-    engine.add_guardrail(Guardrail(name="length_check", pattern=r'^.{0,10}$'))
+    engine.add_guardrail(Guardrail(name="length_check", pattern=r"^.{0,10}$"))
 
     text = "This is a hack attempt that is too long"
     is_valid, errors = engine.validate_output(text)
@@ -1022,10 +975,7 @@ def test_constraint_violation_order_of_execution():
     # Guardrail avec blocklist, pattern et schema
     schema = {"type": "object", "properties": {"key": {"type": "string"}}}
     guardrail = Guardrail(
-        name="multi_constraint",
-        blocklist=["forbidden"],
-        pattern=r'^.{0,20}$',
-        schema=schema
+        name="multi_constraint", blocklist=["forbidden"], pattern=r"^.{0,20}$", schema=schema
     )
 
     # Texte contenant mot bloqué (doit échouer sur blocklist en premier)
@@ -1047,15 +997,15 @@ def test_pii_detection_in_constraints():
     """
     # Guardrails pour détecter PII
     pii_patterns = [
-        r'\b\d{3}-\d{2}-\d{4}\b',  # SSN format XXX-XX-XXXX
-        r'\b\d{16}\b',  # Credit card (16 digits)
+        r"\b\d{3}-\d{2}-\d{4}\b",  # SSN format XXX-XX-XXXX
+        r"\b\d{16}\b",  # Credit card (16 digits)
     ]
 
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
 
     # Ajouter des guardrails pour chaque pattern PII
     for i, pattern in enumerate(pii_patterns):
-        engine.add_guardrail(Guardrail(name=f"pii_check_{i}", pattern=f'^((?!{pattern}).)*$'))
+        engine.add_guardrail(Guardrail(name=f"pii_check_{i}", pattern=f"^((?!{pattern}).)*$"))
 
     # Texte sûr
     safe_text = "This is normal text"
@@ -1069,6 +1019,7 @@ def test_pii_detection_in_constraints():
 # TESTS: Integration avec autres middlewares
 # ============================================================================
 
+
 @pytest.mark.integration
 def test_constraints_integration_with_logging(isolated_logging):
     """
@@ -1081,7 +1032,7 @@ def test_constraints_integration_with_logging(isolated_logging):
     engine = ConstraintsEngine(config_path="nonexistent.yaml")
     engine.add_guardrail(Guardrail(name="test", blocklist=["forbidden"]))
 
-    logger = isolated_logging['event_logger']
+    logger = isolated_logging["event_logger"]
 
     text = "This contains forbidden word"
     is_valid, errors = engine.validate_output(text)
@@ -1092,20 +1043,20 @@ def test_constraints_integration_with_logging(isolated_logging):
             actor="constraints_engine",
             event="constraint.violation",
             level="WARNING",
-            metadata={"errors": errors}
+            metadata={"errors": errors},
         )
 
     # Vérifier que l'événement a été logué
-    event_files = list(isolated_logging['event_log_dir'].glob("*.jsonl"))
+    event_files = list(isolated_logging["event_log_dir"].glob("*.jsonl"))
     assert len(event_files) > 0
 
     # Lire le dernier événement
-    with open(event_files[-1], 'r') as f:
+    with open(event_files[-1], "r") as f:
         last_line = f.readlines()[-1]
         event = json.loads(last_line)
 
-        assert event['event'] == "constraint.violation"
-        assert event['level'] == "WARNING"
+        assert event["event"] == "constraint.violation"
+        assert event["level"] == "WARNING"
 
 
 @pytest.mark.unit
@@ -1127,7 +1078,7 @@ def test_constraints_with_decision_records_metadata():
         "constraint_validation": {
             "is_valid": is_valid,
             "errors": errors,
-            "guardrails_applied": [g.name for g in engine.guardrails]
+            "guardrails_applied": [g.name for g in engine.guardrails],
         }
     }
 

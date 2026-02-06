@@ -54,7 +54,7 @@ class RateLimiter:
         max_retries: int = 3,
         initial_backoff: float = 1.0,
         max_backoff: float = 32.0,
-        backoff_multiplier: float = 2.0
+        backoff_multiplier: float = 2.0,
     ) -> None:
         """
         Initialize rate limiter
@@ -100,18 +100,15 @@ class RateLimiter:
             self.hour_requests.popleft()
 
     def _get_request_id(
-        self,
-        func: Callable[..., object],
-        args: tuple[object, ...],
-        kwargs: dict[str, object]
+        self, func: Callable[..., object], args: tuple[object, ...], kwargs: dict[str, object]
     ) -> str:
         """Generate unique ID for request based on function and arguments"""
         # Create hash of function name and arguments for tracking
-        func_name: str = func.__name__ if hasattr(func, '__name__') else str(func)
+        func_name: str = func.__name__ if hasattr(func, "__name__") else str(func)
         data: dict[str, str] = {
-            'func': func_name,
-            'args': str(args),
-            'kwargs': str(sorted(kwargs.items()))
+            "func": func_name,
+            "args": str(args),
+            "kwargs": str(sorted(kwargs.items())),
         }
         return hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -123,7 +120,7 @@ class RateLimiter:
 
         backoff = min(
             self.initial_backoff * (self.backoff_multiplier ** (failure_count - 1)),
-            self.max_backoff
+            self.max_backoff,
         )
         return backoff
 
@@ -167,12 +164,7 @@ class RateLimiter:
 
             return wait_time
 
-    def execute_with_backoff(
-        self,
-        func: Callable[P, T],
-        *args: P.args,
-        **kwargs: P.kwargs
-    ) -> T:
+    def execute_with_backoff(self, func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
         Execute function with rate limiting and exponential backoff
 
@@ -224,9 +216,12 @@ class RateLimiter:
 
                 # Sanitize error message to prevent information leakage
                 error_str = str(e).lower()
-                if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret', 'password']):
+                if any(
+                    sensitive in error_str
+                    for sensitive in ["api", "key", "token", "secret", "password"]
+                ):
                     safe_error = "Authentication or authorization error"
-                elif 'rate' in error_str and 'limit' in error_str:
+                elif "rate" in error_str and "limit" in error_str:
                     safe_error = "Rate limit exceeded"
                 else:
                     safe_error = "API request failed"
@@ -234,8 +229,7 @@ class RateLimiter:
                 # If this was the last attempt, raise
                 if attempt == self.max_retries - 1:
                     raise RateLimitError(
-                        f"{safe_error} after {self.max_retries} attempts",
-                        attempts=self.max_retries
+                        f"{safe_error} after {self.max_retries} attempts", attempts=self.max_retries
                     ) from e
 
                 print(f"Request failed: {safe_error}. Retrying...")
@@ -248,10 +242,7 @@ class RateLimiter:
 _rate_limiter: Optional[RateLimiter] = None
 
 
-def get_rate_limiter(
-    requests_per_minute: int = 10,
-    requests_per_hour: int = 500
-) -> RateLimiter:
+def get_rate_limiter(requests_per_minute: int = 10, requests_per_hour: int = 500) -> RateLimiter:
     """
     Get or create the global rate limiter instance
 
@@ -265,7 +256,6 @@ def get_rate_limiter(
     global _rate_limiter
     if _rate_limiter is None:
         _rate_limiter = RateLimiter(
-            requests_per_minute=requests_per_minute,
-            requests_per_hour=requests_per_hour
+            requests_per_minute=requests_per_minute, requests_per_hour=requests_per_hour
         )
     return _rate_limiter

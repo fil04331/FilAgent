@@ -10,7 +10,14 @@ import operator
 from typing import Callable, Dict, List, Optional, Union
 import ast  # For safe expression evaluation
 
-from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
+from .base import (
+    BaseTool,
+    ToolResult,
+    ToolStatus,
+    ToolParamValue,
+    ToolMetadataValue,
+    ToolSchemaDict,
+)
 
 # Types stricts pour le calculateur
 MathOperation = Callable[[float, float], float]
@@ -32,7 +39,8 @@ class CalculatorTool(BaseTool):
 
     def __init__(self) -> None:
         super().__init__(
-            name="math_calculator", description="Evaluer des expressions mathematiques de maniere securisee"
+            name="math_calculator",
+            description="Evaluer des expressions mathematiques de maniere securisee",
         )
 
         # Operations autorisees
@@ -74,7 +82,9 @@ class CalculatorTool(BaseTool):
         # Valider les arguments
         is_valid, error = self.validate_arguments(arguments)
         if not is_valid:
-            return ToolResult(status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}")
+            return ToolResult(
+                status=ToolStatus.ERROR, output="", error=f"Invalid arguments: {error}"
+            )
 
         expression = str(arguments["expression"])
 
@@ -105,7 +115,9 @@ class CalculatorTool(BaseTool):
             )
 
         except ValueError as e:
-            return ToolResult(status=ToolStatus.ERROR, output="", error=f"Failed to evaluate expression: {str(e)}")
+            return ToolResult(
+                status=ToolStatus.ERROR, output="", error=f"Failed to evaluate expression: {str(e)}"
+            )
         except ZeroDivisionError:
             return ToolResult(status=ToolStatus.ERROR, output="", error="Division by zero")
         except OverflowError:
@@ -120,13 +132,11 @@ class CalculatorTool(BaseTool):
         # Autoriser uniquement les noms surs (fonctions et constantes)
         allowed_names: Dict[str, SafeFunctionValue] = {**self.safe_functions}
         allowed_func_names: set[str] = set(self.safe_functions.keys())
-        allowed_ops = (
-            ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd
-        )
+        allowed_ops = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod, ast.USub, ast.UAdd)
 
         # Parse l'expression en AST
         try:
-            node = ast.parse(expression.strip(), mode='eval')
+            node = ast.parse(expression.strip(), mode="eval")
         except SyntaxError as exc:
             raise ValueError("Expression non valide") from exc
 
@@ -156,7 +166,7 @@ class CalculatorTool(BaseTool):
                 elif isinstance(node.op, ast.Div):
                     return left / right
                 elif isinstance(node.op, ast.Pow):
-                    return left ** right
+                    return left**right
                 elif isinstance(node.op, ast.Mod):
                     return left % right
             elif isinstance(node, ast.UnaryOp):
@@ -183,7 +193,7 @@ class CalculatorTool(BaseTool):
                 raise ValueError(f"Résultat non numérique: {func_name}")
             elif isinstance(node, ast.Name):
                 name = node.id
-                if name not in {'pi', 'e'}:
+                if name not in {"pi", "e"}:
                     raise ValueError(f"Nom non autorisé: {name}")
                 if name not in allowed_names:
                     raise ValueError(f"Constante non disponible: {name}")
@@ -219,7 +229,10 @@ class CalculatorTool(BaseTool):
                 raise ValueError("Expression non autorisée")
 
         return _eval(node)
-    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
+
+    def validate_arguments(
+        self, arguments: Dict[str, ToolParamValue]
+    ) -> tuple[bool, Optional[str]]:
         """Valider les arguments"""
         if not isinstance(arguments, dict):
             return False, "Arguments must be a dictionary"

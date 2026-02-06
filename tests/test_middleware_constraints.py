@@ -22,7 +22,7 @@ from runtime.middleware.constraints import (
     Guardrail,
     ConstraintsEngine,
     get_constraints_engine,
-    init_constraints_engine
+    init_constraints_engine,
 )
 
 
@@ -39,12 +39,12 @@ def temp_config_file(tmp_path):
                 "enabled": True,
                 "blocklist_keywords": ["forbidden", "secret", "password"],
                 "max_prompt_length": 1000,
-                "max_response_length": 2000
+                "max_response_length": 2000,
             }
         }
     }
 
-    with open(config_file, 'w') as f:
+    with open(config_file, "w") as f:
         yaml.dump(config, f)
 
     return config_file
@@ -66,8 +66,7 @@ class TestGuardrailCreation:
     def test_creation_with_pattern(self):
         """Test création avec pattern regex"""
         guardrail = Guardrail(
-            name="email_guardrail",
-            pattern=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+            name="email_guardrail", pattern=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
         )
 
         assert guardrail.pattern is not None
@@ -76,10 +75,8 @@ class TestGuardrailCreation:
         """Test création avec JSONSchema"""
         schema = {
             "type": "object",
-            "properties": {
-                "name": {"type": "string"}
-            },
-            "required": ["name"]
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
         }
 
         guardrail = Guardrail(name="json_guardrail", schema=schema)
@@ -88,19 +85,13 @@ class TestGuardrailCreation:
 
     def test_creation_with_blocklist(self):
         """Test création avec blocklist"""
-        guardrail = Guardrail(
-            name="blocklist_guardrail",
-            blocklist=["forbidden", "secret"]
-        )
+        guardrail = Guardrail(name="blocklist_guardrail", blocklist=["forbidden", "secret"])
 
         assert len(guardrail.blocklist) == 2
 
     def test_creation_with_allowedlist(self):
         """Test création avec allowedlist"""
-        guardrail = Guardrail(
-            name="allowedlist_guardrail",
-            allowedlist=["allowed1", "allowed2"]
-        )
+        guardrail = Guardrail(name="allowedlist_guardrail", allowedlist=["allowed1", "allowed2"])
 
         assert len(guardrail.allowedlist) == 2
 
@@ -110,10 +101,7 @@ class TestBlocklistValidation:
 
     def test_blocklist_detection(self):
         """Test détection de mot bloqué"""
-        guardrail = Guardrail(
-            name="test",
-            blocklist=["forbidden", "secret"]
-        )
+        guardrail = Guardrail(name="test", blocklist=["forbidden", "secret"])
 
         is_valid, error = guardrail.validate("This contains forbidden word")
 
@@ -122,10 +110,7 @@ class TestBlocklistValidation:
 
     def test_blocklist_case_insensitive(self):
         """Test que blocklist est case-insensitive"""
-        guardrail = Guardrail(
-            name="test",
-            blocklist=["forbidden"]
-        )
+        guardrail = Guardrail(name="test", blocklist=["forbidden"])
 
         is_valid, error = guardrail.validate("This contains FORBIDDEN word")
 
@@ -133,10 +118,7 @@ class TestBlocklistValidation:
 
     def test_blocklist_multiple_matches(self):
         """Test détection avec plusieurs mots bloqués"""
-        guardrail = Guardrail(
-            name="test",
-            blocklist=["word1", "word2", "word3"]
-        )
+        guardrail = Guardrail(name="test", blocklist=["word1", "word2", "word3"])
 
         is_valid, error = guardrail.validate("This contains word2")
 
@@ -144,10 +126,7 @@ class TestBlocklistValidation:
 
     def test_blocklist_no_match(self):
         """Test pas de match avec blocklist"""
-        guardrail = Guardrail(
-            name="test",
-            blocklist=["forbidden"]
-        )
+        guardrail = Guardrail(name="test", blocklist=["forbidden"])
 
         is_valid, error = guardrail.validate("This is a clean text")
 
@@ -160,10 +139,7 @@ class TestRegexValidation:
 
     def test_regex_pattern_match(self):
         """Test validation avec pattern qui match"""
-        guardrail = Guardrail(
-            name="test",
-            pattern=r"^\d{3}$"  # Exactly 3 digits
-        )
+        guardrail = Guardrail(name="test", pattern=r"^\d{3}$")  # Exactly 3 digits
 
         is_valid, error = guardrail.validate("123")
 
@@ -171,10 +147,7 @@ class TestRegexValidation:
 
     def test_regex_pattern_no_match(self):
         """Test validation avec pattern qui ne match pas"""
-        guardrail = Guardrail(
-            name="test",
-            pattern=r"^\d{3}$"
-        )
+        guardrail = Guardrail(name="test", pattern=r"^\d{3}$")
 
         is_valid, error = guardrail.validate("abc")
 
@@ -184,8 +157,7 @@ class TestRegexValidation:
     def test_regex_email_pattern(self):
         """Test validation d'email avec regex"""
         guardrail = Guardrail(
-            name="email",
-            pattern=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+            name="email", pattern=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
         )
 
         is_valid, error = guardrail.validate("Contact: john@example.com")
@@ -194,10 +166,7 @@ class TestRegexValidation:
 
     def test_regex_complex_pattern(self):
         """Test validation avec pattern complexe"""
-        guardrail = Guardrail(
-            name="version",
-            pattern=r"v\d+\.\d+\.\d+"  # Version format
-        )
+        guardrail = Guardrail(name="version", pattern=r"v\d+\.\d+\.\d+")  # Version format
 
         is_valid, error = guardrail.validate("Version v1.2.3")
 
@@ -211,11 +180,8 @@ class TestJSONSchemaValidation:
         """Test validation JSON valide"""
         schema = {
             "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "age": {"type": "number"}
-            },
-            "required": ["name"]
+            "properties": {"name": {"type": "string"}, "age": {"type": "number"}},
+            "required": ["name"],
         }
 
         guardrail = Guardrail(name="test", schema=schema)
@@ -229,10 +195,8 @@ class TestJSONSchemaValidation:
         """Test validation JSON invalide"""
         schema = {
             "type": "object",
-            "properties": {
-                "name": {"type": "string"}
-            },
-            "required": ["name"]
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
         }
 
         guardrail = Guardrail(name="test", schema=schema)
@@ -245,12 +209,7 @@ class TestJSONSchemaValidation:
 
     def test_schema_validation_invalid_json(self):
         """Test validation avec JSON mal formé"""
-        schema = {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"}
-            }
-        }
+        schema = {"type": "object", "properties": {"name": {"type": "string"}}}
 
         guardrail = Guardrail(name="test", schema=schema)
 
@@ -261,12 +220,7 @@ class TestJSONSchemaValidation:
 
     def test_schema_validation_type_mismatch(self):
         """Test validation avec type incorrect"""
-        schema = {
-            "type": "object",
-            "properties": {
-                "age": {"type": "number"}
-            }
-        }
+        schema = {"type": "object", "properties": {"age": {"type": "number"}}}
 
         guardrail = Guardrail(name="test", schema=schema)
 
@@ -343,10 +297,7 @@ class TestCustomGuardrails:
         """Test ajout d'un guardrail personnalisé"""
         engine = ConstraintsEngine(config_path=str(temp_config_file))
 
-        custom_guardrail = Guardrail(
-            name="custom",
-            pattern=r"^\d+$"
-        )
+        custom_guardrail = Guardrail(name="custom", pattern=r"^\d+$")
 
         initial_count = len(engine.guardrails)
         engine.add_guardrail(custom_guardrail)
@@ -357,10 +308,7 @@ class TestCustomGuardrails:
         """Test validation avec guardrail personnalisé"""
         engine = ConstraintsEngine(config_path=str(temp_config_file))
 
-        custom_guardrail = Guardrail(
-            name="numbers_only",
-            pattern=r"^\d+$"
-        )
+        custom_guardrail = Guardrail(name="numbers_only", pattern=r"^\d+$")
 
         engine.add_guardrail(custom_guardrail)
 
@@ -378,10 +326,8 @@ class TestJSONOutputValidation:
 
         schema = {
             "type": "object",
-            "properties": {
-                "status": {"type": "string"}
-            },
-            "required": ["status"]
+            "properties": {"status": {"type": "string"}},
+            "required": ["status"],
         }
 
         json_text = json.dumps({"status": "success"})
@@ -396,10 +342,8 @@ class TestJSONOutputValidation:
 
         schema = {
             "type": "object",
-            "properties": {
-                "status": {"type": "string"}
-            },
-            "required": ["status"]
+            "properties": {"status": {"type": "string"}},
+            "required": ["status"],
         }
 
         json_text = json.dumps({"result": "success"})  # Missing 'status'
@@ -440,15 +384,9 @@ class TestMaxLengthGuardrails:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "guardrails": {
-                    "enabled": False
-                }
-            }
-        }
+        config = {"policies": {"guardrails": {"enabled": False}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         engine = ConstraintsEngine(config_path=str(config_file))
@@ -505,10 +443,7 @@ class TestEdgeCases:
 
     def test_blocklist_partial_word_match(self):
         """Test que blocklist ne match pas les mots partiels"""
-        guardrail = Guardrail(
-            name="test",
-            blocklist=["test"]
-        )
+        guardrail = Guardrail(name="test", blocklist=["test"])
 
         # "test" should match "testing"
         is_valid, error = guardrail.validate("This is testing")
@@ -517,10 +452,7 @@ class TestEdgeCases:
 
     def test_guardrail_with_empty_blocklist(self):
         """Test guardrail avec blocklist vide"""
-        guardrail = Guardrail(
-            name="test",
-            blocklist=[]
-        )
+        guardrail = Guardrail(name="test", blocklist=[])
 
         is_valid, error = guardrail.validate("Any text")
 
@@ -537,20 +469,15 @@ class TestEdgeCases:
                     "type": "object",
                     "properties": {
                         "name": {"type": "string"},
-                        "age": {"type": "number", "minimum": 0}
+                        "age": {"type": "number", "minimum": 0},
                     },
-                    "required": ["name"]
+                    "required": ["name"],
                 }
             },
-            "required": ["user"]
+            "required": ["user"],
         }
 
-        json_text = json.dumps({
-            "user": {
-                "name": "John",
-                "age": 30
-            }
-        })
+        json_text = json.dumps({"user": {"name": "John", "age": 30}})
 
         is_valid, error = engine.validate_json_output(json_text, schema)
 
@@ -566,7 +493,7 @@ class TestGracefulFallbacks:
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Invalid YAML
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             f.write("{ invalid yaml")
 
         # Should handle gracefully
@@ -583,16 +510,9 @@ class TestGracefulFallbacks:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "guardrails": {
-                    "enabled": True,
-                    "invalid_field": "value"
-                }
-            }
-        }
+        config = {"policies": {"guardrails": {"enabled": True, "invalid_field": "value"}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         # Should handle gracefully
@@ -630,10 +550,7 @@ class TestComplianceRequirements:
         engine = ConstraintsEngine(config_path=str(temp_config_file))
 
         # Add custom guardrail
-        custom_guardrail = Guardrail(
-            name="custom",
-            blocklist=["badword"]
-        )
+        custom_guardrail = Guardrail(name="custom", blocklist=["badword"])
         engine.add_guardrail(custom_guardrail)
 
         # Text violates multiple guardrails

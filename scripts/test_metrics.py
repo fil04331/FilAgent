@@ -19,6 +19,7 @@ except ImportError:  # pragma: no cover
 # Import requests (optionnel, avec message d'erreur clair)
 try:
     import requests
+
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
@@ -47,18 +48,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def test_metrics_endpoint(host="localhost", port=8000):
     """Test l'endpoint /metrics"""
     url = f"http://{host}:{port}/metrics"
-    
+
     print(f"🔍 Test de l'endpoint métriques...")
     print(f"   URL: {url}\n")
-    
+
     try:
         response = requests.get(url, timeout=5)
-        
+
         if response.status_code == 200:
             print(f"✅ Endpoint accessible (code {response.status_code})")
             print(f"   Content-Type: {response.headers.get('Content-Type', 'unknown')}")
             print(f"   Taille: {len(response.text)} bytes\n")
-            
+
             # Vérifier présence métriques HTN
             content = response.text
             htn_metrics = [
@@ -69,18 +70,20 @@ def test_metrics_endpoint(host="localhost", port=8000):
                 "htn_tasks_failed_total",
                 "htn_verifications_total",
             ]
-            
+
             found_metrics = []
             for metric in htn_metrics:
                 if metric in content:
                     found_metrics.append(metric)
-            
+
             if found_metrics:
                 print(f"✅ Métriques HTN trouvées ({len(found_metrics)}/{len(htn_metrics)}):")
                 for metric in found_metrics:
                     print(f"   ✓ {metric}")
             else:
-                print("❌ Aucune métrique HTN trouvée. Exécutez au moins une requête HTN pour les générer.")
+                print(
+                    "❌ Aucune métrique HTN trouvée. Exécutez au moins une requête HTN pour les générer."
+                )
 
             # Afficher quelques lignes d'exemple
             print("\n📋 Exemple de métriques (premières lignes):")
@@ -90,25 +93,26 @@ def test_metrics_endpoint(host="localhost", port=8000):
                     print(f"   {line}")
 
             return bool(found_metrics)
-            
+
         else:
             print(f"❌ Endpoint retourne code {response.status_code}")
             print(f"   Réponse: {response.text[:200]}")
             return False
-            
+
     except requests.exceptions.ConnectionError:
         print(f"❌ Impossible de se connecter à {url}")
         print("   Le serveur FilAgent n'est probablement pas démarré.")
         print("   Démarrez-le avec: python3 -m runtime.server")
         return False
-        
+
     except requests.exceptions.Timeout:
         print(f"❌ Timeout lors de la connexion à {url}")
         return False
-        
+
     except Exception as e:
         print(f"❌ Erreur: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -116,11 +120,14 @@ def test_metrics_endpoint(host="localhost", port=8000):
 def test_prometheus_client():
     """Test que prometheus-client est installé"""
     print("🔍 Vérification de prometheus-client...\n")
-    
+
     try:
         import prometheus_client
+
         # Use getattr to get version if available
-        version = getattr(prometheus_client, "__version__", getattr(prometheus_client, "VERSION", "unknown"))
+        version = getattr(
+            prometheus_client, "__version__", getattr(prometheus_client, "VERSION", "unknown")
+        )
         print(f"✅ prometheus-client installé (version: {version})")
         return True
     except ImportError:
@@ -131,9 +138,7 @@ def test_prometheus_client():
 
 def main():
     """Exécute tous les tests"""
-    parser = argparse.ArgumentParser(
-        description="Teste la configuration Prometheus de FilAgent"
-    )
+    parser = argparse.ArgumentParser(description="Teste la configuration Prometheus de FilAgent")
     parser.add_argument(
         "--allow-success",
         action="store_true",
@@ -141,22 +146,22 @@ def main():
     )
     args = parser.parse_args()
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST DE L'ENDPOINT MÉTRIQUES PROMETHEUS")
-    print("="*70 + "\n")
-    
+    print("=" * 70 + "\n")
+
     # Test 1: prometheus-client installé
     client_ok = test_prometheus_client()
     print()
-    
+
     # Test 2: Endpoint métriques
     endpoint_ok = test_metrics_endpoint()
-    
+
     # Résumé
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("RÉSUMÉ")
-    print("="*70)
-    
+    print("=" * 70)
+
     all_checks_ok = client_ok and endpoint_ok
 
     if all_checks_ok:
@@ -166,7 +171,9 @@ def main():
         print("   2. Configurer Prometheus (voir docs/PROMETHEUS_SETUP.md)")
         print("   3. Créer dashboard Grafana (voir docs/PROMETHEUS_DASHBOARD.md)")
         if not args.allow_success:
-            print("\n⚠️  Exécutez avec --allow-success après validation manuelle pour retourner un code 0.")
+            print(
+                "\n⚠️  Exécutez avec --allow-success après validation manuelle pour retourner un code 0."
+            )
             return 1
         return 0
     else:

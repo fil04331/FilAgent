@@ -5,6 +5,7 @@ Compatible avec le format OpenAI pour faciliter l'intégration
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
+
 load_dotenv()  # Load .env file at startup
 
 from fastapi import FastAPI, HTTPException, Path as FastAPIPath, BackgroundTasks
@@ -20,7 +21,11 @@ import uuid
 from .config import get_config
 from .agent import get_agent
 from memory.episodic import get_messages, get_connection
-from memory.analytics import add_interaction_log, create_tables as create_analytics_tables, compute_hash
+from memory.analytics import (
+    add_interaction_log,
+    create_tables as create_analytics_tables,
+    compute_hash,
+)
 from .middleware.logging import get_logger
 from .middleware.worm import get_worm_logger
 
@@ -35,11 +40,14 @@ except ImportError:
 # Import OpenTelemetry for distributed tracing
 try:
     from .telemetry import initialize_telemetry, get_telemetry_manager, get_trace_context
+
     TELEMETRY_AVAILABLE = True
 except ImportError:
     TELEMETRY_AVAILABLE = False
+
     def get_trace_context():
         return {}
+
 
 app = FastAPI(
     title="FilAgent API",
@@ -85,33 +93,35 @@ class ChatRequest(BaseModel):
     """Requête de chat"""
 
     messages: List[Message]
-    conversation_id: Optional[str] = Field(None, max_length=128, pattern=r'^[a-zA-Z0-9\-_]+$')
-    task_id: Optional[str] = Field(None, max_length=128, pattern=r'^[a-zA-Z0-9\-_]+$')
+    conversation_id: Optional[str] = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9\-_]+$")
+    task_id: Optional[str] = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9\-_]+$")
     # Compatibilité OpenAI
     model: Optional[str] = Field(None, max_length=256)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(None, ge=1, le=10000)
 
-    @field_validator('conversation_id')
+    @field_validator("conversation_id")
     @classmethod
     def validate_conversation_id(cls, v):
         """Valider le format du conversation_id"""
         if v is not None:
-            if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
-                raise ValueError('conversation_id must contain only alphanumeric, dash, and underscore')
+            if not re.match(r"^[a-zA-Z0-9\-_]+$", v):
+                raise ValueError(
+                    "conversation_id must contain only alphanumeric, dash, and underscore"
+                )
             if len(v) > 128:
-                raise ValueError('conversation_id too long (max 128 characters)')
+                raise ValueError("conversation_id too long (max 128 characters)")
         return v
 
-    @field_validator('task_id')
+    @field_validator("task_id")
     @classmethod
     def validate_task_id(cls, v):
         """Valider le format du task_id"""
         if v is not None:
-            if not re.match(r'^[a-zA-Z0-9\-_]+$', v):
-                raise ValueError('task_id must contain only alphanumeric, dash, and underscore')
+            if not re.match(r"^[a-zA-Z0-9\-_]+$", v):
+                raise ValueError("task_id must contain only alphanumeric, dash, and underscore")
             if len(v) > 128:
-                raise ValueError('task_id too long (max 128 characters)')
+                raise ValueError("task_id too long (max 128 characters)")
         return v
 
 
@@ -128,7 +138,7 @@ class ChatResponse(BaseModel):
 
 class FeedbackRequest(BaseModel):
     """Requête de feedback utilisateur"""
-    
+
     score: int = Field(..., ge=1, le=5, description="Score de satisfaction (1-5)")
     text: Optional[str] = Field(None, max_length=2000, description="Commentaire optionnel")
     latency_ms: Optional[float] = Field(None, ge=0, description="Latence observée en ms")
@@ -242,9 +252,13 @@ async def chat(request: ChatRequest):
         last_user_message = user_messages[-1].content
 
         if agent is not None:
-            result = agent.chat(message=last_user_message, conversation_id=conversation_id, task_id=request.task_id)
+            result = agent.chat(
+                message=last_user_message, conversation_id=conversation_id, task_id=request.task_id
+            )
             response_content = result["response"]
-            usage = result.get("usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+            usage = result.get(
+                "usage", {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            )
         else:
             # Mode stub pour conserver la conformité API en environnement sans modèle
             response_content = "[stub] Agent indisponible. Réponse factice pour tests de contrat."
@@ -256,7 +270,11 @@ async def chat(request: ChatRequest):
             "created": int(datetime.now().timestamp()),
             "model": getattr(getattr(config, "model", None), "name", "unknown"),
             "choices": [
-                {"index": 0, "message": {"role": "assistant", "content": response_content}, "finish_reason": "stop"}
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": response_content},
+                    "finish_reason": "stop",
+                }
             ],
             "usage": {
                 "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -267,13 +285,13 @@ async def chat(request: ChatRequest):
         }
         # Ajouter un header X-Trace-ID si disponible via logger ou OpenTelemetry
         headers = {}
-        
+
         # Try OpenTelemetry trace context first
         if TELEMETRY_AVAILABLE:
             trace_ctx = get_trace_context()
             if trace_ctx.get("trace_id"):
                 headers["X-Trace-ID"] = trace_ctx["trace_id"]
-        
+
         # Fallback to logger trace_id
         if not headers:
             try:
@@ -285,7 +303,7 @@ async def chat(request: ChatRequest):
                 pass
 
         return JSONResponse(status_code=200, content=response, headers=headers)
-    except Exception as e:
+    except Exception:
         # Dernier repli : ne pas exposer les détails d'exception à l'utilisateur; journaliser l'erreur serveur uniquement
         logger = None
         try:
@@ -305,7 +323,10 @@ async def chat(request: ChatRequest):
             "choices": [
                 {
                     "index": 0,
-                    "message": {"role": "assistant", "content": "[stub-error] An internal error has occurred."},
+                    "message": {
+                        "role": "assistant",
+                        "content": "[stub-error] An internal error has occurred.",
+                    },
                     "finish_reason": "error",
                 }
             ],
@@ -320,13 +341,13 @@ async def get_conversation(
     conversation_id: str = FastAPIPath(
         ...,
         max_length=128,
-        pattern=r'^[a-zA-Z0-9\-_]+$',
-        description="Identifiant unique de la conversation"
+        pattern=r"^[a-zA-Z0-9\-_]+$",
+        description="Identifiant unique de la conversation",
     )
 ):
     """Récupérer l'historique d'une conversation"""
     # Validation supplémentaire du conversation_id
-    if not re.match(r'^[a-zA-Z0-9\-_]+$', conversation_id):
+    if not re.match(r"^[a-zA-Z0-9\-_]+$", conversation_id):
         raise HTTPException(status_code=400, detail="Invalid conversation_id format")
 
     if len(conversation_id) > 128:
@@ -347,46 +368,46 @@ async def submit_feedback(
     conversation_id: str = FastAPIPath(
         ...,
         max_length=128,
-        pattern=r'^[a-zA-Z0-9\-_]+$',
-        description="Identifiant unique de la conversation"
-    )
+        pattern=r"^[a-zA-Z0-9\-_]+$",
+        description="Identifiant unique de la conversation",
+    ),
 ):
     """
     Soumettre un feedback utilisateur pour une conversation.
-    
+
     Le feedback est stocké de manière asynchrone pour ne pas ralentir la réponse.
     Capture le score de satisfaction (1-5), commentaires optionnels,
     et métriques de performance (latence, tokens).
     """
     # Validation supplémentaire du conversation_id
-    if not re.match(r'^[a-zA-Z0-9\-_]+$', conversation_id):
+    if not re.match(r"^[a-zA-Z0-9\-_]+$", conversation_id):
         raise HTTPException(status_code=400, detail="Invalid conversation_id format")
-    
+
     if len(conversation_id) > 128:
         raise HTTPException(status_code=400, detail="conversation_id too long")
-    
+
     # Vérifier que la conversation existe
     messages = get_messages(conversation_id)
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
+
     # Fonction pour stocker le feedback de manière asynchrone
     def store_feedback():
         try:
             # Compute hashes from the last user message and assistant response
             input_hash = None
             output_hash = None
-            
+
             # Find last user message and last assistant message
-            user_messages = [msg for msg in messages if msg['role'] == 'user']
-            assistant_messages = [msg for msg in messages if msg['role'] == 'assistant']
-            
+            user_messages = [msg for msg in messages if msg["role"] == "user"]
+            assistant_messages = [msg for msg in messages if msg["role"] == "assistant"]
+
             if user_messages:
-                input_hash = compute_hash(user_messages[-1]['content'])
-            
+                input_hash = compute_hash(user_messages[-1]["content"])
+
             if assistant_messages:
-                output_hash = compute_hash(assistant_messages[-1]['content'])
-            
+                output_hash = compute_hash(assistant_messages[-1]["content"])
+
             # Store the feedback
             add_interaction_log(
                 conversation_id=conversation_id,
@@ -398,8 +419,8 @@ async def submit_feedback(
                 tokens_used=feedback.tokens_used,
                 metadata={
                     "submitted_at": datetime.now().isoformat(),
-                    "message_count": len(messages)
-                }
+                    "message_count": len(messages),
+                },
             )
         except Exception as e:
             # Log error but don't fail the request
@@ -412,15 +433,15 @@ async def submit_feedback(
                 logger.error(f"Failed to store feedback: {e}", exc_info=True)
             else:
                 print(f"Failed to store feedback: {e}")
-    
+
     # Add the storage task to background tasks
     background_tasks.add_task(store_feedback)
-    
+
     return {
         "status": "success",
         "message": "Feedback received and will be processed",
         "conversation_id": conversation_id,
-        "feedback_score": feedback.score
+        "feedback_score": feedback.score,
     }
 
 
@@ -436,7 +457,8 @@ async def metrics():
         from fastapi.responses import PlainTextResponse
 
         return PlainTextResponse(
-            content="# Prometheus client not available. Install with: pip install prometheus-client\n", status_code=200
+            content="# Prometheus client not available. Install with: pip install prometheus-client\n",
+            status_code=200,
         )
 
     from fastapi.responses import Response

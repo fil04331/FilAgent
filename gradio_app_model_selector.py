@@ -39,7 +39,7 @@ PERPLEXITY_MODELS = {
         "latency": "Très faible (<300ms)",
         "quality": "Bonne pour questions simples",
         "cost": "$",
-        "features": ["Recherche web", "Rapide", "Économique"]
+        "features": ["Recherche web", "Rapide", "Économique"],
     },
     "sonar-pro": {
         "name": "Sonar Pro (Équilibré)",
@@ -49,7 +49,7 @@ PERPLEXITY_MODELS = {
         "latency": "Faible (<500ms)",
         "quality": "Très bonne qualité/vitesse",
         "cost": "$$",
-        "features": ["Recherche web avancée", "Recommandé"]
+        "features": ["Recherche web avancée", "Recommandé"],
     },
     "sonar-reasoning": {
         "name": "Sonar Reasoning (Raisonnement)",
@@ -59,7 +59,7 @@ PERPLEXITY_MODELS = {
         "latency": "Modérée (<1s)",
         "quality": "Excellence pour raisonnement",
         "cost": "$$$",
-        "features": ["Recherche web", "Chain-of-thought", "Raisonnement"]
+        "features": ["Recherche web", "Chain-of-thought", "Raisonnement"],
     },
     "sonar-reasoning-pro": {
         "name": "Sonar Reasoning Pro (Précis)",
@@ -69,7 +69,7 @@ PERPLEXITY_MODELS = {
         "latency": "Élevée (<2s)",
         "quality": "Qualité maximale avec justification",
         "cost": "$$$$",
-        "features": ["Recherche web", "DeepSeek-R1", "Qualité maximale"]
+        "features": ["Recherche web", "DeepSeek-R1", "Qualité maximale"],
     },
     "sonar-deep-research": {
         "name": "Deep Research (Expert)",
@@ -79,13 +79,14 @@ PERPLEXITY_MODELS = {
         "latency": "Très élevée (>10s)",
         "quality": "Rapports experts détaillés",
         "cost": "$$$$$",
-        "features": ["Recherche exhaustive", "Rapports longs", "Expert"]
-    }
+        "features": ["Recherche exhaustive", "Rapports longs", "Expert"],
+    },
 }
 
 # ============================================================================
 # CLASSE GESTIONNAIRE DE MODÈLES
 # ============================================================================
+
 
 class ModelManager:
     """Gestionnaire pour charger et utiliser différents modèles Perplexity"""
@@ -93,11 +94,7 @@ class ModelManager:
     def __init__(self):
         self.current_model = None
         self.current_model_name = None
-        self.generation_config = GenerationConfig(
-            temperature=0.7,
-            max_tokens=2048,
-            seed=42
-        )
+        self.generation_config = GenerationConfig(temperature=0.7, max_tokens=2048, seed=42)
 
     def load_model(self, model_key: str) -> bool:
         """
@@ -115,11 +112,7 @@ class ModelManager:
 
             print(f"🔄 Chargement du modèle: {full_name}")
 
-            self.current_model = init_model(
-                backend="perplexity",
-                model_path=full_name,
-                config={}
-            )
+            self.current_model = init_model(backend="perplexity", model_path=full_name, config={})
 
             self.current_model_name = model_key
             print(f"✅ Modèle chargé: {model_info['name']}")
@@ -140,7 +133,7 @@ class ModelManager:
 
         sources = []
         # Chercher les patterns de sources [1], [2], etc.
-        citation_pattern = r'\[(\d+)\]'
+        citation_pattern = r"\[(\d+)\]"
         citations = re.findall(citation_pattern, text)
 
         # Pour l'instant, on garde les citations telles quelles
@@ -164,7 +157,7 @@ class ModelManager:
         import re
 
         # Cas 1: Si la réponse contient <think>...</think>, extraire et formater
-        think_pattern = r'<think>(.*?)</think>\s*(.*)'
+        think_pattern = r"<think>(.*?)</think>\s*(.*)"
         match = re.search(think_pattern, text, flags=re.DOTALL)
 
         if match:
@@ -242,9 +235,7 @@ class ModelManager:
             start_time = time.time()
 
             result: GenerationResult = self.current_model.generate(
-                prompt=prompt,
-                config=self.generation_config,
-                system_prompt=system_prompt
+                prompt=prompt, config=self.generation_config, system_prompt=system_prompt
             )
 
             generation_time = (time.time() - start_time) * 1000  # en ms
@@ -256,7 +247,7 @@ class ModelManager:
                 "completion_tokens": result.tokens_generated,
                 "total_tokens": result.total_tokens,
                 "finish_reason": result.finish_reason,
-                "response_length": len(result.text)
+                "response_length": len(result.text),
             }
 
             # Nettoyer la réponse pour affichage Gradio avec citations
@@ -272,6 +263,7 @@ class ModelManager:
 # ============================================================================
 # INTERFACE GRADIO
 # ============================================================================
+
 
 class FilAgentModelSelector:
     """Interface Gradio avec sélection de modèle"""
@@ -304,10 +296,7 @@ class FilAgentModelSelector:
 """
 
     def process_message(
-        self,
-        message: str,
-        model_key: str,
-        history: List[List[str]]
+        self, message: str, model_key: str, history: List[List[str]]
     ) -> Tuple[str, List[List[str]], str]:
         """
         Traite un message avec le modèle sélectionné
@@ -327,7 +316,9 @@ class FilAgentModelSelector:
         if self.model_manager.current_model_name != model_key:
             success = self.model_manager.load_model(model_key)
             if not success:
-                error_msg = f"❌ Impossible de charger le modèle {PERPLEXITY_MODELS[model_key]['name']}"
+                error_msg = (
+                    f"❌ Impossible de charger le modèle {PERPLEXITY_MODELS[model_key]['name']}"
+                )
                 history.append([message, error_msg])
                 return "", history, ""
 
@@ -351,13 +342,7 @@ class FilAgentModelSelector:
 
         return "", history, metrics_text
 
-    def compare_models(
-        self,
-        query: str,
-        model1_key: str,
-        model2_key: str,
-        model3_key: str
-    ) -> str:
+    def compare_models(self, query: str, model1_key: str, model2_key: str, model3_key: str) -> str:
         """
         Compare les réponses de plusieurs modèles
 
@@ -426,10 +411,7 @@ def create_interface() -> gr.Blocks:
 
     with gr.Blocks(
         title="FilAgent - Sélection de Modèle Perplexity",
-        theme=gr.themes.Soft(
-            primary_hue="blue",
-            secondary_hue="gray"
-        )
+        theme=gr.themes.Soft(primary_hue="blue", secondary_hue="gray"),
     ) as app:
 
         gr.Markdown("""
@@ -447,17 +429,13 @@ def create_interface() -> gr.Blocks:
                             choices=list(PERPLEXITY_MODELS.keys()),
                             label="🎯 Sélectionnez un modèle",
                             value="sonar-pro",
-                            interactive=True
+                            interactive=True,
                         )
 
-                        model_info = gr.Markdown(
-                            app_instance.format_model_info("sonar-pro")
-                        )
+                        model_info = gr.Markdown(app_instance.format_model_info("sonar-pro"))
 
                         chatbot = gr.Chatbot(
-                            label="Conversation",
-                            height=400,
-                            show_copy_button=True
+                            label="Conversation", height=400, show_copy_button=True
                         )
 
                         with gr.Row():
@@ -465,7 +443,7 @@ def create_interface() -> gr.Blocks:
                                 label="Message",
                                 placeholder="Posez votre question...",
                                 lines=2,
-                                scale=4
+                                scale=4,
                             )
                             send_btn = gr.Button("📤 Envoyer", variant="primary", scale=1)
 
@@ -479,7 +457,7 @@ def create_interface() -> gr.Blocks:
                                 "Quels sont les risques d'utiliser l'IA sans conformité?",
                             ],
                             inputs=msg_input,
-                            label="💡 Questions exemples"
+                            label="💡 Questions exemples",
                         )
 
                     with gr.Column(scale=1):
@@ -502,27 +480,22 @@ def create_interface() -> gr.Blocks:
 
                 # Connexions événements
                 model_selector.change(
-                    fn=app_instance.format_model_info,
-                    inputs=[model_selector],
-                    outputs=[model_info]
+                    fn=app_instance.format_model_info, inputs=[model_selector], outputs=[model_info]
                 )
 
                 msg_input.submit(
                     fn=app_instance.process_message,
                     inputs=[msg_input, model_selector, chatbot],
-                    outputs=[msg_input, chatbot, metrics_display]
+                    outputs=[msg_input, chatbot, metrics_display],
                 )
 
                 send_btn.click(
                     fn=app_instance.process_message,
                     inputs=[msg_input, model_selector, chatbot],
-                    outputs=[msg_input, chatbot, metrics_display]
+                    outputs=[msg_input, chatbot, metrics_display],
                 )
 
-                clear_btn.click(
-                    fn=lambda: ([], ""),
-                    outputs=[chatbot, metrics_display]
-                )
+                clear_btn.click(fn=lambda: ([], ""), outputs=[chatbot, metrics_display])
 
             # ========== ONGLET COMPARAISON ==========
             with gr.Tab("⚖️ Comparaison de Modèles"):
@@ -534,26 +507,20 @@ vitesse et style de réponse.
                 """)
 
                 compare_query = gr.Textbox(
-                    label="Question à tester",
-                    placeholder="Entrez votre question...",
-                    lines=3
+                    label="Question à tester", placeholder="Entrez votre question...", lines=3
                 )
 
                 with gr.Row():
                     compare_model1 = gr.Dropdown(
-                        choices=list(PERPLEXITY_MODELS.keys()),
-                        label="Modèle 1",
-                        value="sonar"
+                        choices=list(PERPLEXITY_MODELS.keys()), label="Modèle 1", value="sonar"
                     )
                     compare_model2 = gr.Dropdown(
-                        choices=list(PERPLEXITY_MODELS.keys()),
-                        label="Modèle 2",
-                        value="sonar-pro"
+                        choices=list(PERPLEXITY_MODELS.keys()), label="Modèle 2", value="sonar-pro"
                     )
                     compare_model3 = gr.Dropdown(
                         choices=list(PERPLEXITY_MODELS.keys()),
                         label="Modèle 3",
-                        value="sonar-reasoning"
+                        value="sonar-reasoning",
                     )
 
                 compare_btn = gr.Button("🔍 Comparer les modèles", variant="primary", size="lg")
@@ -567,13 +534,13 @@ vitesse et style de réponse.
                         "Compare les avantages et inconvénients de 3 tailles de modèles LLM (petit, moyen, grand)",
                     ],
                     inputs=compare_query,
-                    label="💡 Questions de comparaison"
+                    label="💡 Questions de comparaison",
                 )
 
                 compare_btn.click(
                     fn=app_instance.compare_models,
                     inputs=[compare_query, compare_model1, compare_model2, compare_model3],
-                    outputs=[comparison_results]
+                    outputs=[comparison_results],
                 )
 
             # ========== ONGLET INFO MODÈLES ==========
@@ -585,7 +552,9 @@ Chaque modèle a ses forces et cas d'usage spécifiques.
                 """)
 
                 for model_key, model_info in PERPLEXITY_MODELS.items():
-                    with gr.Accordion(f"{model_info['name']} - {model_info['description']}", open=False):
+                    with gr.Accordion(
+                        f"{model_info['name']} - {model_info['description']}", open=False
+                    ):
                         gr.Markdown(f"""
 **Nom complet**: `{model_info['full_name']}`
 
@@ -620,15 +589,10 @@ if __name__ == "__main__":
         print("❌ ERREUR: PERPLEXITY_API_KEY non définie dans .env")
         sys.exit(1)
 
-    print("="*60)
+    print("=" * 60)
     print("🚀 Lancement de FilAgent Model Selector")
-    print("="*60)
+    print("=" * 60)
 
     app = create_interface()
 
-    app.launch(
-        server_name="0.0.0.0",
-        server_port=7861,
-        share=False,
-        show_error=True
-    )
+    app.launch(server_name="0.0.0.0", server_port=7861, share=False, show_error=True)

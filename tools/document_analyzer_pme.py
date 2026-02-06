@@ -12,7 +12,14 @@ import docx
 import re
 import logging
 from pathlib import Path
-from .base import BaseTool, ToolResult, ToolStatus, ToolParamValue, ToolMetadataValue, ToolSchemaDict
+from .base import (
+    BaseTool,
+    ToolResult,
+    ToolStatus,
+    ToolParamValue,
+    ToolMetadataValue,
+    ToolSchemaDict,
+)
 
 # Setup standard Python logger for testing compatibility
 logger = logging.getLogger(__name__)
@@ -316,7 +323,9 @@ class DocumentAnalyzerPME(BaseTool):
                 error=f"Error analyzing document: {safe_error_msg}",
             )
 
-    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(
+        self, arguments: Dict[str, ToolParamValue]
+    ) -> tuple[bool, Optional[str]]:
         """Validate arguments with security checks"""
         if "file_path" not in arguments:
             return False, "Missing required argument: file_path"
@@ -326,7 +335,7 @@ class DocumentAnalyzerPME(BaseTool):
             return False, "file_path must be a string"
 
         # Security: Check for null byte injection
-        if '\0' in file_path:
+        if "\0" in file_path:
             return False, "Null byte detected in path"
 
         # Security: Check path length (prevent buffer overflow)
@@ -337,7 +346,7 @@ class DocumentAnalyzerPME(BaseTool):
         # Check this BEFORE extension validation for better security
         try:
             path = Path(file_path)
-            
+
             # Check if file exists before path validation
             # This prevents information leakage about file existence outside allowed paths
             if path.exists():
@@ -350,8 +359,8 @@ class DocumentAnalyzerPME(BaseTool):
                             level="WARNING",
                             metadata={
                                 "attempted_path": self._redact_file_path(file_path),
-                                "reason": "Path not in allowlist"
-                            }
+                                "reason": "Path not in allowlist",
+                            },
                         )
                     return False, f"Access denied: Path not in allowed directories"
         except Exception as e:
@@ -504,7 +513,7 @@ class DocumentAnalyzerPME(BaseTool):
         date_patterns = [
             r"\d{1,2}[\s/-]\w+[\s/-]\d{4}",  # 15 janvier 2024
             r"\d{4}[\s/-]\d{2}[\s/-]\d{2}",  # 2024-01-15
-            r"\d{1,2}/\d{1,2}/\d{4}",        # 15/01/2024
+            r"\d{1,2}/\d{1,2}/\d{4}",  # 15/01/2024
         ]
         dates_found: List[str] = []
         for pattern in date_patterns:
@@ -517,7 +526,9 @@ class DocumentAnalyzerPME(BaseTool):
 
         # Get paragraphs count
         paragraphs_raw = data.get("paragraphs")
-        paragraphs: int = int(paragraphs_raw) if isinstance(paragraphs_raw, int) else len(text.split("\n\n"))
+        paragraphs: int = (
+            int(paragraphs_raw) if isinstance(paragraphs_raw, int) else len(text.split("\n\n"))
+        )
 
         return {
             "analysis_type": "contract",
@@ -557,10 +568,12 @@ class DocumentAnalyzerPME(BaseTool):
             line_stripped = line.strip()
             # Titres potentiels: lignes courtes, numerotees, ou en majuscules
             if len(line_stripped) < 80:
-                if (line_stripped.isupper() or
-                    re.match(r"^\d+[\.\)]\s+", line_stripped) or
-                    re.match(r"^[IVX]+[\.\)]\s+", line_stripped) or
-                    line_stripped.startswith("#")):
+                if (
+                    line_stripped.isupper()
+                    or re.match(r"^\d+[\.\)]\s+", line_stripped)
+                    or re.match(r"^[IVX]+[\.\)]\s+", line_stripped)
+                    or line_stripped.startswith("#")
+                ):
                     sections.append(line_stripped[:50])  # Tronquer
 
         # Extraction de mots-cles de rapport

@@ -54,10 +54,7 @@ class TestWorkStealingQueue:
     def test_push_multiple_tasks(self):
         """Test ajout de plusieurs tâches"""
         queue = WorkStealingQueue(worker_id=0)
-        tasks = [
-            Task(name=f"task_{i}", action="test_action")
-            for i in range(5)
-        ]
+        tasks = [Task(name=f"task_{i}", action="test_action") for i in range(5)]
 
         for task in tasks:
             queue.push(task)
@@ -161,10 +158,7 @@ class TestWorkStealingQueue:
 
         def push_tasks(thread_id):
             for i in range(tasks_per_thread):
-                task = Task(
-                    name=f"task_{thread_id}_{i}",
-                    action="test_action"
-                )
+                task = Task(name=f"task_{thread_id}_{i}", action="test_action")
                 queue.push(task)
 
         # Créer et démarrer les threads
@@ -356,10 +350,7 @@ class TestWorkStealingExecutor:
         """Test distribution round-robin des tâches batch"""
         executor = WorkStealingExecutor(num_workers=3)
 
-        tasks = [
-            Task(name=f"task_{i}", action="test_action")
-            for i in range(9)
-        ]
+        tasks = [Task(name=f"task_{i}", action="test_action") for i in range(9)]
 
         executor.submit_batch(tasks)
 
@@ -376,16 +367,9 @@ class TestWorkStealingExecutor:
         def test_action(value):
             return value * 2
 
-        executor = WorkStealingExecutor(
-            num_workers=1,
-            action_registry={"test_action": test_action}
-        )
+        executor = WorkStealingExecutor(num_workers=1, action_registry={"test_action": test_action})
 
-        task = Task(
-            name="test_task",
-            action="test_action",
-            params={"value": 21}
-        )
+        task = Task(name="test_task", action="test_action", params={"value": 21})
 
         executor.submit(task)
         time.sleep(0.5)  # Attendre l'exécution
@@ -409,18 +393,10 @@ class TestWorkStealingExecutor:
                 execution_log.append(f"end_{task_id}")
             return f"result_{task_id}"
 
-        executor = WorkStealingExecutor(
-            num_workers=3,
-            action_registry={"slow_action": slow_action}
-        )
+        executor = WorkStealingExecutor(num_workers=3, action_registry={"slow_action": slow_action})
 
         tasks = [
-            Task(
-                name=f"task_{i}",
-                action="slow_action",
-                params={"task_id": i}
-            )
-            for i in range(6)
+            Task(name=f"task_{i}", action="slow_action", params={"task_id": i}) for i in range(6)
         ]
 
         executor.submit_batch(tasks)
@@ -451,14 +427,11 @@ class TestWorkStealingExecutor:
         executor = WorkStealingExecutor(
             num_workers=2,
             action_registry={"counting_action": counting_action},
-            steal_strategy=StealStrategy.LEAST_LOADED
+            steal_strategy=StealStrategy.LEAST_LOADED,
         )
 
         # Soumettre toutes les tâches au worker 0
-        tasks = [
-            Task(name=f"task_{i}", action="counting_action")
-            for i in range(10)
-        ]
+        tasks = [Task(name=f"task_{i}", action="counting_action") for i in range(10)]
 
         for task in tasks:
             executor.submit(task, worker_id=0)
@@ -477,10 +450,7 @@ class TestWorkStealingExecutor:
 
     def test_steal_strategy_random(self):
         """Test stratégie de vol RANDOM"""
-        executor = WorkStealingExecutor(
-            num_workers=4,
-            steal_strategy=StealStrategy.RANDOM
-        )
+        executor = WorkStealingExecutor(num_workers=4, steal_strategy=StealStrategy.RANDOM)
 
         targets = executor._get_random_targets(worker_id=1)
 
@@ -493,10 +463,7 @@ class TestWorkStealingExecutor:
 
     def test_steal_strategy_round_robin(self):
         """Test stratégie de vol ROUND_ROBIN"""
-        executor = WorkStealingExecutor(
-            num_workers=4,
-            steal_strategy=StealStrategy.ROUND_ROBIN
-        )
+        executor = WorkStealingExecutor(num_workers=4, steal_strategy=StealStrategy.ROUND_ROBIN)
 
         targets = executor._get_round_robin_targets(worker_id=1)
 
@@ -507,10 +474,7 @@ class TestWorkStealingExecutor:
 
     def test_steal_strategy_least_loaded(self):
         """Test stratégie de vol LEAST_LOADED"""
-        executor = WorkStealingExecutor(
-            num_workers=4,
-            steal_strategy=StealStrategy.LEAST_LOADED
-        )
+        executor = WorkStealingExecutor(num_workers=4, steal_strategy=StealStrategy.LEAST_LOADED)
 
         # Ajouter différentes charges aux queues
         for i in range(5):
@@ -529,12 +493,12 @@ class TestWorkStealingExecutor:
 
     def test_task_execution_error_handling(self):
         """Test gestion des erreurs d'exécution"""
+
         def failing_action():
             raise ValueError("Test error")
 
         executor = WorkStealingExecutor(
-            num_workers=1,
-            action_registry={"failing_action": failing_action}
+            num_workers=1, action_registry={"failing_action": failing_action}
         )
 
         task = Task(name="failing_task", action="failing_action")
@@ -550,10 +514,7 @@ class TestWorkStealingExecutor:
 
     def test_action_not_found_error(self):
         """Test erreur quand l'action n'existe pas"""
-        executor = WorkStealingExecutor(
-            num_workers=1,
-            action_registry={}
-        )
+        executor = WorkStealingExecutor(num_workers=1, action_registry={})
 
         task = Task(name="unknown_task", action="unknown_action")
 
@@ -585,19 +546,16 @@ class TestWorkStealingExecutor:
 
     def test_get_stats_after_execution(self):
         """Test statistiques après exécution"""
+
         def simple_action():
             return "done"
 
         executor = WorkStealingExecutor(
-            num_workers=2,
-            action_registry={"simple_action": simple_action}
+            num_workers=2, action_registry={"simple_action": simple_action}
         )
 
         # Soumettre plusieurs tâches
-        tasks = [
-            Task(name=f"task_{i}", action="simple_action")
-            for i in range(5)
-        ]
+        tasks = [Task(name=f"task_{i}", action="simple_action") for i in range(5)]
 
         executor.submit_batch(tasks)
         time.sleep(1.0)
@@ -611,19 +569,16 @@ class TestWorkStealingExecutor:
 
     def test_stats_thread_safety(self):
         """Test thread-safety des statistiques"""
+
         def simple_action():
             return "done"
 
         executor = WorkStealingExecutor(
-            num_workers=4,
-            action_registry={"simple_action": simple_action}
+            num_workers=4, action_registry={"simple_action": simple_action}
         )
 
         # Soumettre beaucoup de tâches pour provoquer de la concurrence
-        tasks = [
-            Task(name=f"task_{i}", action="simple_action")
-            for i in range(100)
-        ]
+        tasks = [Task(name=f"task_{i}", action="simple_action") for i in range(100)]
 
         executor.submit_batch(tasks)
 
@@ -640,10 +595,7 @@ class TestWorkStealingExecutor:
 
     def test_empty_queue_handling(self):
         """Test comportement avec queues vides"""
-        executor = WorkStealingExecutor(
-            num_workers=2,
-            action_registry={}
-        )
+        executor = WorkStealingExecutor(num_workers=2, action_registry={})
 
         executor.start()
 
@@ -660,18 +612,15 @@ class TestWorkStealingExecutor:
 
     def test_single_worker_no_stealing(self):
         """Test qu'un seul worker ne tente pas de voler"""
+
         def simple_action():
             return "done"
 
         executor = WorkStealingExecutor(
-            num_workers=1,
-            action_registry={"simple_action": simple_action}
+            num_workers=1, action_registry={"simple_action": simple_action}
         )
 
-        tasks = [
-            Task(name=f"task_{i}", action="simple_action")
-            for i in range(5)
-        ]
+        tasks = [Task(name=f"task_{i}", action="simple_action") for i in range(5)]
 
         executor.submit_batch(tasks)
         time.sleep(0.5)
@@ -692,12 +641,7 @@ class TestStealResult:
     def test_steal_result_success(self):
         """Test création d'un résultat de vol réussi"""
         task = Task(name="stolen_task", action="test_action")
-        result = StealResult(
-            success=True,
-            task=task,
-            from_worker=2,
-            attempt_count=3
-        )
+        result = StealResult(success=True, task=task, from_worker=2, attempt_count=3)
 
         assert result.success is True
         assert result.task == task
@@ -706,10 +650,7 @@ class TestStealResult:
 
     def test_steal_result_failure(self):
         """Test création d'un résultat de vol échoué"""
-        result = StealResult(
-            success=False,
-            attempt_count=5
-        )
+        result = StealResult(success=False, attempt_count=5)
 
         assert result.success is False
         assert result.task is None
@@ -739,10 +680,7 @@ class TestGlobalSingleton:
 
     def test_get_executor_with_custom_params(self):
         """Test création du singleton avec paramètres personnalisés"""
-        executor = get_work_stealing_executor(
-            num_workers=6,
-            steal_strategy=StealStrategy.RANDOM
-        )
+        executor = get_work_stealing_executor(num_workers=6, steal_strategy=StealStrategy.RANDOM)
 
         assert executor.num_workers == 6
         assert executor.steal_strategy == StealStrategy.RANDOM
@@ -815,16 +753,12 @@ class TestEdgeCases:
 
     def test_task_with_complex_parameters(self):
         """Test tâche avec paramètres complexes"""
+
         def complex_action(data, config, options):
-            return {
-                "data_len": len(data),
-                "config": config,
-                "options": options
-            }
+            return {"data_len": len(data), "config": config, "options": options}
 
         executor = WorkStealingExecutor(
-            num_workers=1,
-            action_registry={"complex_action": complex_action}
+            num_workers=1, action_registry={"complex_action": complex_action}
         )
 
         task = Task(
@@ -833,8 +767,8 @@ class TestEdgeCases:
             params={
                 "data": [1, 2, 3, 4, 5],
                 "config": {"debug": True, "retries": 3},
-                "options": ["opt1", "opt2"]
-            }
+                "options": ["opt1", "opt2"],
+            },
         )
 
         executor.submit(task)
@@ -848,19 +782,14 @@ class TestEdgeCases:
 
     def test_rapid_submit_and_shutdown(self):
         """Test soumission rapide suivie d'un shutdown immédiat"""
+
         def slow_action():
             time.sleep(0.1)
             return "done"
 
-        executor = WorkStealingExecutor(
-            num_workers=2,
-            action_registry={"slow_action": slow_action}
-        )
+        executor = WorkStealingExecutor(num_workers=2, action_registry={"slow_action": slow_action})
 
-        tasks = [
-            Task(name=f"task_{i}", action="slow_action")
-            for i in range(10)
-        ]
+        tasks = [Task(name=f"task_{i}", action="slow_action") for i in range(10)]
 
         executor.submit_batch(tasks)
 
@@ -873,10 +802,7 @@ class TestEdgeCases:
 
     def test_metrics_disabled(self):
         """Test fonctionnement sans métriques"""
-        executor = WorkStealingExecutor(
-            num_workers=2,
-            enable_metrics=False
-        )
+        executor = WorkStealingExecutor(num_workers=2, enable_metrics=False)
 
         assert executor.metrics is None
 
@@ -888,12 +814,12 @@ class TestEdgeCases:
 
     def test_concurrent_submit_from_multiple_threads(self):
         """Test soumission concurrente depuis plusieurs threads"""
+
         def simple_action():
             return "done"
 
         executor = WorkStealingExecutor(
-            num_workers=4,
-            action_registry={"simple_action": simple_action}
+            num_workers=4, action_registry={"simple_action": simple_action}
         )
 
         num_submitters = 5
@@ -901,16 +827,10 @@ class TestEdgeCases:
 
         def submit_tasks(submitter_id):
             for i in range(tasks_per_submitter):
-                task = Task(
-                    name=f"task_{submitter_id}_{i}",
-                    action="simple_action"
-                )
+                task = Task(name=f"task_{submitter_id}_{i}", action="simple_action")
                 executor.submit(task)
 
-        threads = [
-            threading.Thread(target=submit_tasks, args=(i,))
-            for i in range(num_submitters)
-        ]
+        threads = [threading.Thread(target=submit_tasks, args=(i,)) for i in range(num_submitters)]
 
         for thread in threads:
             thread.start()

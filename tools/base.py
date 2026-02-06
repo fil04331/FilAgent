@@ -2,6 +2,7 @@
 Interface de base pour les outils sandbox
 Tous les outils doivent hériter de cette classe
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -68,17 +69,17 @@ class BaseTool(ABC):
         Returns:
             ToolResult avec le statut et la sortie
         """
-        pass
 
     @abstractmethod
-    def validate_arguments(self, arguments: Dict[str, ToolParamValue]) -> tuple[bool, Optional[str]]:
+    def validate_arguments(
+        self, arguments: Dict[str, ToolParamValue]
+    ) -> tuple[bool, Optional[str]]:
         """
         Valider les arguments avant exécution
 
         Returns:
             (is_valid, error_message)
         """
-        pass
 
     def get_schema(self) -> ToolSchemaDict:
         """
@@ -88,9 +89,12 @@ class BaseTool(ABC):
         Returns:
             Dictionnaire avec 'name', 'description', 'parameters'
         """
-        return {"name": self.name, "description": self.description, "parameters": self._get_parameters_schema()}
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": self._get_parameters_schema(),
+        }
 
     @abstractmethod
     def _get_parameters_schema(self) -> ToolSchemaDict:
         """Retourner le schéma JSON des paramètres"""
-        pass

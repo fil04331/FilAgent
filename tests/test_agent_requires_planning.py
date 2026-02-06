@@ -4,6 +4,7 @@ Tests for Agent._requires_planning method
 Tests pour vérifier la détection automatique des requêtes multi-étapes
 qui nécessitent une planification HTN.
 """
+
 import pytest
 import sys
 from pathlib import Path
@@ -38,10 +39,12 @@ def mock_config_htn_disabled():
 @pytest.fixture
 def agent_with_planner(mock_config_htn_enabled):
     """Agent avec planificateur initialisé"""
-    with patch('runtime.agent.get_config', return_value=mock_config_htn_enabled):
-        with patch('runtime.agent.get_logger'), \
-             patch('runtime.agent.get_dr_manager'), \
-             patch('runtime.agent.get_tracker'):
+    with patch("runtime.agent.get_config", return_value=mock_config_htn_enabled):
+        with (
+            patch("runtime.agent.get_logger"),
+            patch("runtime.agent.get_dr_manager"),
+            patch("runtime.agent.get_tracker"),
+        ):
             agent = Agent(config=mock_config_htn_enabled)
             # Simuler un planificateur initialisé
             agent.planner = Mock()
@@ -51,10 +54,12 @@ def agent_with_planner(mock_config_htn_enabled):
 @pytest.fixture
 def agent_without_planner(mock_config_htn_enabled):
     """Agent sans planificateur (non initialisé)"""
-    with patch('runtime.agent.get_config', return_value=mock_config_htn_enabled):
-        with patch('runtime.agent.get_logger'), \
-             patch('runtime.agent.get_dr_manager'), \
-             patch('runtime.agent.get_tracker'):
+    with patch("runtime.agent.get_config", return_value=mock_config_htn_enabled):
+        with (
+            patch("runtime.agent.get_logger"),
+            patch("runtime.agent.get_dr_manager"),
+            patch("runtime.agent.get_tracker"),
+        ):
             agent = Agent(config=mock_config_htn_enabled)
             agent.planner = None
             return agent
@@ -110,10 +115,12 @@ class TestRequiresPlanning:
         htn_planning.enabled = False
         config.htn_planning = htn_planning
 
-        with patch('runtime.agent.get_config', return_value=config):
-            with patch('runtime.agent.get_logger'), \
-                 patch('runtime.agent.get_dr_manager'), \
-                 patch('runtime.agent.get_tracker'):
+        with patch("runtime.agent.get_config", return_value=config):
+            with (
+                patch("runtime.agent.get_logger"),
+                patch("runtime.agent.get_dr_manager"),
+                patch("runtime.agent.get_tracker"),
+            ):
                 agent = Agent(config=config)
                 agent.planner = Mock()
 
@@ -190,10 +197,12 @@ class TestRequiresPlanning:
         config = Mock()
         config.htn_planning = None
 
-        with patch('runtime.agent.get_config', return_value=config):
-            with patch('runtime.agent.get_logger'), \
-                 patch('runtime.agent.get_dr_manager'), \
-                 patch('runtime.agent.get_tracker'):
+        with patch("runtime.agent.get_config", return_value=config):
+            with (
+                patch("runtime.agent.get_logger"),
+                patch("runtime.agent.get_dr_manager"),
+                patch("runtime.agent.get_tracker"),
+            ):
                 agent = Agent(config=config)
                 agent.planner = Mock()
 
@@ -206,10 +215,12 @@ class TestRequiresPlanning:
         htn_planning = Mock(spec=[])  # Mock sans attributs
         config.htn_planning = htn_planning
 
-        with patch('runtime.agent.get_config', return_value=config):
-            with patch('runtime.agent.get_logger'), \
-                 patch('runtime.agent.get_dr_manager'), \
-                 patch('runtime.agent.get_tracker'):
+        with patch("runtime.agent.get_config", return_value=config):
+            with (
+                patch("runtime.agent.get_logger"),
+                patch("runtime.agent.get_dr_manager"),
+                patch("runtime.agent.get_tracker"),
+            ):
                 agent = Agent(config=config)
                 agent.planner = Mock()
 
@@ -271,18 +282,21 @@ class TestRequiresPlanningEdgeCases:
         assert agent_with_planner._requires_planning(query)
 
 
-@pytest.mark.parametrize("query,expected", [
-    ("Lis le fichier", False),  # Single action
-    ("Lis le fichier puis analyse", True),  # Multi-step
-    ("Lis et analyse", True),  # Two actions
-    ("Bonjour", False),  # No actions
-    ("Read and analyze", True),  # English multi-step
-    ("Read file", False),  # English single action
-    ("Génère rapport", False),  # Single action
-    ("Génère rapport et crée graphique", True),  # Two actions
-    ("", False),  # Empty
-    ("   ", False),  # Whitespace
-])
+@pytest.mark.parametrize(
+    "query,expected",
+    [
+        ("Lis le fichier", False),  # Single action
+        ("Lis le fichier puis analyse", True),  # Multi-step
+        ("Lis et analyse", True),  # Two actions
+        ("Bonjour", False),  # No actions
+        ("Read and analyze", True),  # English multi-step
+        ("Read file", False),  # English single action
+        ("Génère rapport", False),  # Single action
+        ("Génère rapport et crée graphique", True),  # Two actions
+        ("", False),  # Empty
+        ("   ", False),  # Whitespace
+    ],
+)
 def test_requires_planning_parametrized(query, expected, agent_with_planner):
     """Tests paramétrés pour _requires_planning"""
     assert agent_with_planner._requires_planning(query) == expected

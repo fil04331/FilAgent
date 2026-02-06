@@ -120,9 +120,7 @@ class TestCodeQLWorkflows:
         version1 = get_python_version(codeql_workflow)
         version2 = get_python_version(codeql_security_workflow)
 
-        assert (
-            version1 is not None
-        ), "Le workflow codeql.yml doit définir une version Python"
+        assert version1 is not None, "Le workflow codeql.yml doit définir une version Python"
         assert (
             version2 is not None
         ), "Le workflow codeql-security.yml doit définir une version Python"
@@ -136,9 +134,7 @@ class TestCodeQLWorkflows:
             f"(trouvé: {v1_str} vs {v2_str})"
         )
 
-    def test_codeql_security_workflow_has_advanced_queries(
-        self, codeql_security_workflow
-    ):
+    def test_codeql_security_workflow_has_advanced_queries(self, codeql_security_workflow):
         """Vérifie que le workflow de sécurité utilise des queries avancées."""
         jobs = codeql_security_workflow.get("jobs", {})
         analyze_job = jobs.get("analyze", {})
@@ -154,8 +150,7 @@ class TestCodeQLWorkflows:
                     break
 
         assert found_advanced_queries, (
-            "Le workflow de sécurité doit utiliser des queries avancées "
-            "(security-and-quality)"
+            "Le workflow de sécurité doit utiliser des queries avancées " "(security-and-quality)"
         )
 
     def test_codeql_security_workflow_has_custom_checks(self, codeql_security_workflow):
@@ -194,8 +189,7 @@ class TestCodeQLWorkflows:
                 if item.get("language") == "python":
                     build_mode = item.get("build-mode")
                     assert build_mode == "none", (
-                        f"Le build mode pour Python doit être 'none', "
-                        f"trouvé: {build_mode}"
+                        f"Le build mode pour Python doit être 'none', " f"trouvé: {build_mode}"
                     )
 
     def test_python_files_exist_in_critical_directories(self):

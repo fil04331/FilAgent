@@ -29,7 +29,7 @@ DEMO_MODELS = [
 DEMO_QUERIES = {
     "faible": "Quelle est la capitale du Québec?",
     "moyen": "Explique les différences entre la Loi 25 du Québec et le RGPD européen en 3 points.",
-    "eleve": "Une PME québécoise veut implémenter un système d'IA pour analyser les CV. Quelles sont les 3 principales obligations de conformité avec la Loi 25?"
+    "eleve": "Une PME québécoise veut implémenter un système d'IA pour analyser les CV. Quelles sont les 3 principales obligations de conformité avec la Loi 25?",
 }
 
 
@@ -41,11 +41,7 @@ def test_query_with_model(query: str, model_name: str, model_full_name: str) -> 
         start_time = time.time()
 
         # Charger le modèle
-        model = init_model(
-            backend="perplexity",
-            model_path=model_full_name,
-            config={}
-        )
+        model = init_model(backend="perplexity", model_path=model_full_name, config={})
 
         # Générer
         config = GenerationConfig(temperature=0.7, max_tokens=2048, seed=42)
@@ -60,22 +56,18 @@ def test_query_with_model(query: str, model_name: str, model_full_name: str) -> 
             "model": model_name,
             "response": result.text,
             "time_ms": elapsed,
-            "tokens": result.total_tokens
+            "tokens": result.total_tokens,
         }
 
     except Exception as e:
         print(f"  ❌ Erreur: {e}")
-        return {
-            "success": False,
-            "model": model_name,
-            "error": str(e)
-        }
+        return {"success": False, "model": model_name, "error": str(e)}
 
 
 def main():
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🎯 DÉMONSTRATION COMPARAISON MODÈLES PERPLEXITY")
-    print("="*80)
+    print("=" * 80)
 
     # Vérifier clé API
     if not os.getenv("PERPLEXITY_API_KEY"):
@@ -90,9 +82,9 @@ def main():
 
     # Tester chaque niveau
     for difficulty, query in DEMO_QUERIES.items():
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print(f"📊 NIVEAU: {difficulty.upper()}")
-        print("="*80)
+        print("=" * 80)
         print(f"\n❓ Question: {query}\n")
 
         results = []
@@ -102,15 +94,12 @@ def main():
             results.append(result)
             time.sleep(0.5)  # Pause entre requêtes
 
-        all_results[difficulty] = {
-            "query": query,
-            "results": results
-        }
+        all_results[difficulty] = {"query": query, "results": results}
 
     # Afficher le rapport
-    print("\n\n" + "="*80)
+    print("\n\n" + "=" * 80)
     print("📋 RAPPORT DE COMPARAISON")
-    print("="*80)
+    print("=" * 80)
 
     for difficulty, data in all_results.items():
         print(f"\n\n## {difficulty.upper()}\n")
@@ -130,9 +119,9 @@ def main():
                 print("-" * 80)
 
     # Générer les recommandations
-    print("\n\n" + "="*80)
+    print("\n\n" + "=" * 80)
     print("🎯 RECOMMANDATIONS")
-    print("="*80)
+    print("=" * 80)
 
     print("""
 ### FAIBLE difficulté

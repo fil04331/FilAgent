@@ -14,13 +14,14 @@ import threading
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-
 # Type aliases for strict typing
 DRConstraintValue = Union[str, int, float, bool, None]
 DRConstraints = Dict[str, DRConstraintValue]
 DRMetadata = Dict[str, Union[str, int, float, bool, None]]
 SignatureDict = Dict[str, str]
-DRRecordDict = Dict[str, Union[str, int, float, bool, None, List[str], DRConstraints, SignatureDict]]
+DRRecordDict = Dict[
+    str, Union[str, int, float, bool, None, List[str], DRConstraints, SignatureDict]
+]
 
 
 class DecisionRecord:
@@ -155,7 +156,8 @@ class DRManager:
 
         # Sauvegarder la cle publique
         public_pem = self.public_key.public_bytes(
-            encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
 
         public_key_file = Path("provenance/signatures/public_key.pem")
@@ -291,7 +293,9 @@ class DRManager:
 
         # Reconstruire le DR
         prompt_hash_raw = data.get("prompt_hash", "")
-        prompt_hash = prompt_hash_raw.replace("sha256:", "") if isinstance(prompt_hash_raw, str) else ""
+        prompt_hash = (
+            prompt_hash_raw.replace("sha256:", "") if isinstance(prompt_hash_raw, str) else ""
+        )
 
         dr = DecisionRecord(
             actor=data.get("actor", ""),

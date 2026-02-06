@@ -22,10 +22,10 @@ from tools.calculator import CalculatorTool
 from tools.python_sandbox import PythonSandboxTool
 from tools.file_reader import FileReaderTool
 
-
 # ============================================================================
 # Mock Tools for Testing
 # ============================================================================
+
 
 class MockTool(BaseTool):
     """Outil mock pour les tests"""
@@ -36,8 +36,7 @@ class MockTool(BaseTool):
     def execute(self, arguments: Dict[str, Any]) -> ToolResult:
         """Exécution mock"""
         return ToolResult(
-            status=ToolStatus.SUCCESS,
-            output=f"Mock execution with args: {arguments}"
+            status=ToolStatus.SUCCESS, output=f"Mock execution with args: {arguments}"
         )
 
     def validate_arguments(self, arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
@@ -48,10 +47,8 @@ class MockTool(BaseTool):
         """Schéma mock"""
         return {
             "type": "object",
-            "properties": {
-                "param": {"type": "string", "description": "Test parameter"}
-            },
-            "required": ["param"]
+            "properties": {"param": {"type": "string", "description": "Test parameter"}},
+            "required": ["param"],
         }
 
 
@@ -91,6 +88,7 @@ class CustomToolB(BaseTool):
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def empty_registry():
     """Fixture pour un registre vide (sans outils par défaut)"""
@@ -112,6 +110,7 @@ def registry_with_mock():
 # ============================================================================
 # Tests: Enregistrement d'outils
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_register_single_tool(empty_registry):
@@ -181,6 +180,7 @@ def test_default_tools_registered():
 # Tests: Recherche d'outils (get method)
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_get_existing_tool(registry_with_mock):
     """Test récupération d'un outil existant"""
@@ -230,6 +230,7 @@ def test_get_tool_after_multiple_registrations(empty_registry):
 # ============================================================================
 # Tests: Listage des outils (list_all)
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_list_all_empty_registry(empty_registry):
@@ -290,6 +291,7 @@ def test_list_all_default_tools():
 # ============================================================================
 # Tests: Schémas des outils (get_schemas)
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_get_schemas_empty_registry(empty_registry):
@@ -372,6 +374,7 @@ def test_get_schemas_default_tools():
 # Tests: Singleton pattern (get_registry)
 # ============================================================================
 
+
 @pytest.mark.unit
 def test_get_registry_singleton():
     """Test que get_registry retourne toujours la même instance"""
@@ -404,6 +407,7 @@ def test_get_registry_has_default_tools():
 # ============================================================================
 # Tests: Reload registry (reload_registry)
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_reload_registry_creates_new_instance():
@@ -469,6 +473,7 @@ def test_reload_registry_subsequent_get_registry_calls():
 # ============================================================================
 # Tests: Intégration et cas complexes
 # ============================================================================
+
 
 @pytest.mark.integration
 def test_full_workflow():
@@ -556,6 +561,7 @@ def test_schema_validation_for_registered_tools():
 # ============================================================================
 # Tests: Edge cases et robustesse
 # ============================================================================
+
 
 @pytest.mark.unit
 def test_register_tool_with_special_characters_in_name():

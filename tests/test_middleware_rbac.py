@@ -21,7 +21,7 @@ from runtime.middleware.rbac import (
     Role,
     RBACManager,
     get_rbac_manager,
-    init_rbac_manager
+    init_rbac_manager,
 )
 
 
@@ -43,30 +43,25 @@ def temp_config_file(tmp_path):
                             "execute_code",
                             "read_files",
                             "write_files",
-                            "manage_users"
-                        ]
+                            "manage_users",
+                        ],
                     },
                     {
                         "name": "user",
                         "description": "Standard user role",
-                        "permissions": [
-                            "execute_code",
-                            "read_files"
-                        ]
+                        "permissions": ["execute_code", "read_files"],
                     },
                     {
                         "name": "readonly",
                         "description": "Read-only role",
-                        "permissions": [
-                            "read_files"
-                        ]
-                    }
+                        "permissions": ["read_files"],
+                    },
                 ]
             }
         }
     }
 
-    with open(config_file, 'w') as f:
+    with open(config_file, "w") as f:
         yaml.dump(config, f)
 
     return config_file
@@ -96,9 +91,7 @@ class TestRoleDataclass:
     def test_create_role(self):
         """Test création d'un rôle"""
         role = Role(
-            name="admin",
-            permissions=["read", "write", "execute"],
-            description="Admin role"
+            name="admin", permissions=["read", "write", "execute"], description="Admin role"
         )
 
         assert role.name == "admin"
@@ -107,20 +100,14 @@ class TestRoleDataclass:
 
     def test_create_role_without_description(self):
         """Test création sans description"""
-        role = Role(
-            name="user",
-            permissions=["read"]
-        )
+        role = Role(name="user", permissions=["read"])
 
         assert role.name == "user"
         assert role.description == ""
 
     def test_has_permission_true(self):
         """Test has_permission avec permission présente"""
-        role = Role(
-            name="admin",
-            permissions=["read", "write", "execute"]
-        )
+        role = Role(name="admin", permissions=["read", "write", "execute"])
 
         assert role.has_permission("read") is True
         assert role.has_permission("write") is True
@@ -128,20 +115,14 @@ class TestRoleDataclass:
 
     def test_has_permission_false(self):
         """Test has_permission avec permission absente"""
-        role = Role(
-            name="user",
-            permissions=["read"]
-        )
+        role = Role(name="user", permissions=["read"])
 
         assert role.has_permission("write") is False
         assert role.has_permission("execute") is False
 
     def test_has_permission_case_sensitive(self):
         """Test que has_permission est case-sensitive"""
-        role = Role(
-            name="admin",
-            permissions=["read"]
-        )
+        role = Role(name="admin", permissions=["read"])
 
         assert role.has_permission("read") is True
         assert role.has_permission("READ") is False
@@ -396,20 +377,9 @@ class TestEdgeCases:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "rbac": {
-                    "roles": [
-                        {
-                            "name": "empty_role",
-                            "permissions": []
-                        }
-                    ]
-                }
-            }
-        }
+        config = {"policies": {"rbac": {"roles": [{"name": "empty_role", "permissions": []}]}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         manager = RBACManager(config_path=str(config_file))
@@ -423,15 +393,9 @@ class TestEdgeCases:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "rbac": {
-                    "roles": []
-                }
-            }
-        }
+        config = {"policies": {"rbac": {"roles": []}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         manager = RBACManager(config_path=str(config_file))
@@ -444,19 +408,9 @@ class TestEdgeCases:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "rbac": {
-                    "roles": [
-                        {
-                            "name": "incomplete_role"
-                        }
-                    ]
-                }
-            }
-        }
+        config = {"policies": {"rbac": {"roles": [{"name": "incomplete_role"}]}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         manager = RBACManager(config_path=str(config_file))
@@ -473,17 +427,12 @@ class TestEdgeCases:
         config = {
             "policies": {
                 "rbac": {
-                    "roles": [
-                        {
-                            "name": "duplicate_role",
-                            "permissions": ["read", "read", "write"]
-                        }
-                    ]
+                    "roles": [{"name": "duplicate_role", "permissions": ["read", "read", "write"]}]
                 }
             }
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         manager = RBACManager(config_path=str(config_file))
@@ -502,7 +451,7 @@ class TestGracefulFallbacks:
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Invalid YAML
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             f.write("{ invalid yaml")
 
         # Should handle gracefully
@@ -519,13 +468,9 @@ class TestGracefulFallbacks:
         config_file = tmp_path / "config" / "policies.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        config = {
-            "policies": {
-                "other_section": {}
-            }
-        }
+        config = {"policies": {"other_section": {}}}
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         manager = RBACManager(config_path=str(config_file))
@@ -542,17 +487,14 @@ class TestGracefulFallbacks:
             "policies": {
                 "rbac": {
                     "roles": [
-                        {
-                            "name": "valid_role",
-                            "permissions": ["read"]
-                        },
-                        "invalid_entry"  # Not a dict
+                        {"name": "valid_role", "permissions": ["read"]},
+                        "invalid_entry",  # Not a dict
                     ]
                 }
             }
         }
 
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(config, f)
 
         # Should handle gracefully
@@ -621,9 +563,7 @@ class TestComplianceRequirements:
         manager = RBACManager(config_path=str(temp_config_file))
 
         # All permissions from all roles should be registered
-        expected_permissions = [
-            "execute_code", "read_files", "write_files", "manage_users"
-        ]
+        expected_permissions = ["execute_code", "read_files", "write_files", "manage_users"]
 
         for perm in expected_permissions:
             assert perm in manager.permissions

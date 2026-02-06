@@ -28,11 +28,10 @@ import time
 import traceback
 
 if TYPE_CHECKING:
-    from .task_graph import Task, TaskGraph
+    from .task_graph import Task
 
 from .task_graph import TaskStatus
 from .metrics import get_metrics
-
 
 # Type aliases for strict typing
 TaskResult = Union[str, int, float, bool, Dict[str, object], List[object], None]
@@ -43,7 +42,8 @@ StatsDict = Dict[str, Union[str, int, float, List[int]]]
 
 class StealStrategy(str, Enum):
     """Strategies de vol de travail"""
-    RANDOM = "random"        # Vol aleatoire
+
+    RANDOM = "random"  # Vol aleatoire
     ROUND_ROBIN = "round_robin"  # Round-robin
     LEAST_LOADED = "least_loaded"  # Moins charge
 
@@ -51,6 +51,7 @@ class StealStrategy(str, Enum):
 @dataclass
 class StealResult:
     """Resultat d'une tentative de vol"""
+
     success: bool
     task: Optional[Task] = None
     from_worker: Optional[int] = None
@@ -295,6 +296,7 @@ class WorkStealingExecutor:
     def _get_random_targets(self, worker_id: int) -> List[int]:
         """Retourne des cibles aleatoires pour vol"""
         import random
+
         targets = list(range(self.num_workers))
         targets.remove(worker_id)
         random.shuffle(targets)
@@ -358,7 +360,7 @@ class WorkStealingExecutor:
         task.metadata["completed_at"] = datetime.now().isoformat()
 
         # Log l'erreur (conformite Loi 25)
-        _error_trace = traceback.format_exc()
+        traceback.format_exc()
         # TODO: Integrer avec systeme de logging
 
         self._record_metrics("task_failed")
@@ -367,10 +369,7 @@ class WorkStealingExecutor:
         """Retourne les statistiques de l'executeur"""
         with self._global_lock:
             total_steals = self._successful_steals + self._failed_steals
-            steal_success_rate = (
-                self._successful_steals / total_steals
-                if total_steals > 0 else 0.0
-            )
+            steal_success_rate = self._successful_steals / total_steals if total_steals > 0 else 0.0
 
             return {
                 "total_tasks_completed": self._total_tasks_completed,
@@ -386,7 +385,7 @@ class WorkStealingExecutor:
 
     def _record_metrics(self, event: str) -> None:
         """Enregistre les metriques Prometheus"""
-        if not self.metrics or not hasattr(self.metrics, 'record_work_stealing'):
+        if not self.metrics or not hasattr(self.metrics, "record_work_stealing"):
             return
 
         try:

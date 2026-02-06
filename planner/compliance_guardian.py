@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 import hashlib
 import time
-from typing import Dict, List, Literal, Optional, Set, Union
+from typing import Dict, List, Optional, Set, Union
 from datetime import datetime
 from pathlib import Path
 from enum import Enum
@@ -24,12 +24,12 @@ import yaml
 # Import metrics for observability
 try:
     from runtime.metrics import get_agent_metrics
+
     METRICS_AVAILABLE = True
 except ImportError:
     METRICS_AVAILABLE = False
 
 from pydantic import BaseModel, Field
-
 
 __all__ = [
     "RiskLevel",
@@ -50,6 +50,7 @@ __all__ = [
 
 class RiskLevel(str, Enum):
     """Niveaux de risque de conformite"""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -58,15 +59,20 @@ class RiskLevel(str, Enum):
 
 class ValidationMetadata(BaseModel):
     """Metadonnees de validation pour audit trail"""
+
     timestamp: str = Field(description="ISO timestamp de la validation")
     query_hash: Optional[str] = Field(default=None, description="SHA256 hash de la requete")
     plan_hash: Optional[str] = Field(default=None, description="SHA256 hash du plan")
     pii_detected: bool = Field(default=False, description="PII detecte dans la requete")
     pii_count: int = Field(default=0, ge=0, description="Nombre d'instances PII detectees")
     requires_approval: bool = Field(default=False, description="Approbation requise")
-    approval_tools: List[str] = Field(default_factory=list, description="Outils necessitant approbation")
+    approval_tools: List[str] = Field(
+        default_factory=list, description="Outils necessitant approbation"
+    )
     task_action: Optional[str] = Field(default=None, description="Action de la tache")
-    context: Dict[str, Union[str, int, bool]] = Field(default_factory=dict, description="Contexte additionnel")
+    context: Dict[str, Union[str, int, bool]] = Field(
+        default_factory=dict, description="Contexte additionnel"
+    )
 
 
 class ValidationResult(BaseModel):
@@ -76,11 +82,16 @@ class ValidationResult(BaseModel):
     Utilise pour auditer les decisions de conformite selon Loi 25/PIPEDA.
     Tous les champs sont loggables pour tracabilite reglementaire.
     """
+
     is_compliant: bool = Field(description="True si la tache/action est conforme aux regles")
-    violations: List[str] = Field(default_factory=list, description="Liste des violations detectees")
+    violations: List[str] = Field(
+        default_factory=list, description="Liste des violations detectees"
+    )
     risk_level: RiskLevel = Field(default=RiskLevel.LOW, description="Niveau de risque")
     warnings: List[str] = Field(default_factory=list, description="Avertissements non-bloquants")
-    metadata: Optional[ValidationMetadata] = Field(default=None, description="Metadonnees pour audit")
+    metadata: Optional[ValidationMetadata] = Field(
+        default=None, description="Metadonnees pour audit"
+    )
 
     class Config:
         use_enum_values = True
@@ -88,6 +99,7 @@ class ValidationResult(BaseModel):
 
 class QueryValidationResult(BaseModel):
     """Resultat de validation d'une requete utilisateur (Pydantic V2)"""
+
     valid: bool = Field(description="True si la requete est valide")
     warnings: List[str] = Field(default_factory=list, description="Avertissements")
     errors: List[str] = Field(default_factory=list, description="Erreurs de validation")
@@ -100,6 +112,7 @@ class QueryValidationResult(BaseModel):
 
 class PlanValidationResult(BaseModel):
     """Resultat de validation d'un plan d'execution (Pydantic V2)"""
+
     valid: bool = Field(description="True si le plan est valide")
     warnings: List[str] = Field(default_factory=list, description="Avertissements")
     errors: List[str] = Field(default_factory=list, description="Erreurs de validation")
@@ -112,16 +125,20 @@ class PlanValidationResult(BaseModel):
 
 class ComplianceCheckResult(BaseModel):
     """Resultat de verification de conformite"""
+
     passed: bool = Field(default=True, description="True si la verification est passee")
     issues: List[str] = Field(default_factory=list, description="Problemes detectes")
 
 
 class ExecutionAuditResult(BaseModel):
     """Resultat d'audit d'execution (Pydantic V2)"""
+
     audited: bool = Field(default=True, description="True si l'audit a ete effectue")
     timestamp: str = Field(description="ISO timestamp de l'audit")
     execution_hash: str = Field(description="SHA256 hash du resultat d'execution")
-    compliance_check: ComplianceCheckResult = Field(description="Resultat de verification de conformite")
+    compliance_check: ComplianceCheckResult = Field(
+        description="Resultat de verification de conformite"
+    )
 
     def to_dict(self) -> Dict[str, object]:
         """Conversion en dict pour compatibilite"""
@@ -130,12 +147,14 @@ class ExecutionAuditResult(BaseModel):
 
 class DecisionRecordMetadata(BaseModel):
     """Metadonnees d'un Decision Record"""
+
     guardian_version: str = Field(default="1.0.0", description="Version du guardian")
     rules_version: str = Field(default="1.0.0", description="Version des regles")
 
 
 class DecisionRecord(BaseModel):
     """Decision Record pour tracabilite Loi 25/PIPEDA (Pydantic V2)"""
+
     dr_id: str = Field(description="ID unique du Decision Record")
     timestamp: str = Field(description="ISO timestamp de creation")
     decision_type: str = Field(description="Type de decision")
@@ -146,8 +165,12 @@ class DecisionRecord(BaseModel):
     execution_hash: str = Field(description="SHA256 hash de l'execution")
     tools_used: Set[str] = Field(default_factory=set, description="Outils utilises")
     success: bool = Field(description="True si l'execution a reussi")
-    compliance_frameworks: List[str] = Field(default_factory=list, description="Frameworks de conformite")
-    metadata: DecisionRecordMetadata = Field(default_factory=DecisionRecordMetadata, description="Metadonnees")
+    compliance_frameworks: List[str] = Field(
+        default_factory=list, description="Frameworks de conformite"
+    )
+    metadata: DecisionRecordMetadata = Field(
+        default_factory=DecisionRecordMetadata, description="Metadonnees"
+    )
 
     class Config:
         arbitrary_types_allowed = True
@@ -155,7 +178,7 @@ class DecisionRecord(BaseModel):
     def to_dict(self) -> Dict[str, object]:
         """Conversion en dict pour compatibilite"""
         data = self.model_dump()
-        data['tools_used'] = list(self.tools_used)  # Convert set to list for JSON
+        data["tools_used"] = list(self.tools_used)  # Convert set to list for JSON
         return data
 
 
@@ -174,7 +197,7 @@ TaskDict = Dict[str, Union[str, Dict[str, str]]]
 
 class ComplianceError(Exception):
     """Exception levee lors d'une violation de conformite"""
-    pass
+
 
 
 class ComplianceGuardian:
@@ -213,7 +236,7 @@ class ComplianceGuardian:
             # Regles par defaut si le fichier n'existe pas
             return self._get_default_rules()
 
-        with open(config_file, 'r', encoding='utf-8') as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             loaded_rules = yaml.safe_load(f)
             if loaded_rules is None:
                 return self._get_default_rules()
@@ -225,35 +248,35 @@ class ComplianceGuardian:
     def _get_default_rules(self) -> RulesDict:
         """Retourner les regles de conformite par defaut"""
         return {
-            'validation': {
-                'max_query_length': 10000,
-                'forbidden_patterns': [
-                    r'(?i)(password|secret|token|api[_-]?key)',  # Secrets
-                    r'(?i)(hack|exploit|bypass|inject)',  # Mots malveillants
+            "validation": {
+                "max_query_length": 10000,
+                "forbidden_patterns": [
+                    r"(?i)(password|secret|token|api[_-]?key)",  # Secrets
+                    r"(?i)(hack|exploit|bypass|inject)",  # Mots malveillants
                 ],
-                'pii_patterns': [
-                    r'\b\d{3}-\d{2}-\d{4}\b',  # SSN
-                    r'\b[A-Z]{2}\d{6}\b',  # Quebec Health Insurance
-                    r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Email
+                "pii_patterns": [
+                    r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
+                    r"\b[A-Z]{2}\d{6}\b",  # Quebec Health Insurance
+                    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
                 ],
-                'required_fields': ['query', 'user_id'],
+                "required_fields": ["query", "user_id"],
             },
-            'execution': {
-                'max_plan_depth': 5,
-                'max_tools_per_plan': 20,
-                'forbidden_tools': [],
-                'require_approval_for': ['file_delete', 'system_command'],
+            "execution": {
+                "max_plan_depth": 5,
+                "max_tools_per_plan": 20,
+                "forbidden_tools": [],
+                "require_approval_for": ["file_delete", "system_command"],
             },
-            'audit': {
-                'log_all_queries': True,
-                'log_all_plans': True,
-                'log_all_executions': True,
-                'retention_days': 365,
+            "audit": {
+                "log_all_queries": True,
+                "log_all_plans": True,
+                "log_all_executions": True,
+                "retention_days": 365,
             },
-            'legal': {
-                'frameworks': ['loi25', 'gdpr', 'ai_act', 'nist_ai_rmf'],
-                'data_classification': ['public', 'internal', 'confidential', 'restricted'],
-            }
+            "legal": {
+                "frameworks": ["loi25", "gdpr", "ai_act", "nist_ai_rmf"],
+                "data_classification": ["public", "internal", "confidential", "restricted"],
+            },
         }
 
     def validate_query(
@@ -287,29 +310,25 @@ class ComplianceGuardian:
         )
 
         # Verifier la longueur
-        validation_rules = self.rules.get('validation', {})
-        max_length = validation_rules.get('max_query_length', 10000)
+        validation_rules = self.rules.get("validation", {})
+        max_length = validation_rules.get("max_query_length", 10000)
         if isinstance(max_length, int) and len(query) > max_length:
             is_valid = False
-            errors_list.append(
-                f"Query exceeds maximum length of {max_length} characters"
-            )
+            errors_list.append(f"Query exceeds maximum length of {max_length} characters")
             # Record rejection metric
             if self.metrics:
-                user_id = str(context.get('user_id', 'anonymous'))
+                user_id = str(context.get("user_id", "anonymous"))
                 self.metrics.record_compliance_rejection(
-                    reason="max_length_exceeded",
-                    risk_level="MEDIUM",
-                    user_id=user_id
+                    reason="max_length_exceeded", risk_level="MEDIUM", user_id=user_id
                 )
 
         # Verifier les patterns interdits
-        forbidden_patterns = validation_rules.get('forbidden_patterns', [])
+        forbidden_patterns = validation_rules.get("forbidden_patterns", [])
         # Map patterns to their types for reliable categorization
         pii_pattern_types = {
-            r'\b\d{3}-\d{2}-\d{4}\b': 'ssn',
-            r'\b[A-Z]{2}\d{6}\b': 'health_insurance',
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 'email',
+            r"\b\d{3}-\d{2}-\d{4}\b": "ssn",
+            r"\b[A-Z]{2}\d{6}\b": "health_insurance",
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b": "email",
         }
         if isinstance(forbidden_patterns, list):
             for pattern in forbidden_patterns:
@@ -321,25 +340,20 @@ class ComplianceGuardian:
 
                     if pattern_triggered:
                         is_valid = False
-                        errors_list.append(
-                            f"Query contains forbidden pattern: {pattern}"
-                        )
+                        errors_list.append(f"Query contains forbidden pattern: {pattern}")
                         # Record rejection metric
                         if self.metrics:
-                            user_id = str(context.get('user_id', 'anonymous'))
+                            user_id = str(context.get("user_id", "anonymous"))
                             self.metrics.record_compliance_rejection(
-                                reason="forbidden_pattern",
-                                risk_level="HIGH",
-                                user_id=user_id
+                                reason="forbidden_pattern", risk_level="HIGH", user_id=user_id
                             )
                             # Record as suspicious pattern for security monitoring
                             self.metrics.record_suspicious_pattern(
-                                pattern_type="forbidden_keyword",
-                                action_taken="blocked"
+                                pattern_type="forbidden_keyword", action_taken="blocked"
                             )
 
         # Detecter les PII
-        pii_patterns = validation_rules.get('pii_patterns', [])
+        pii_patterns = validation_rules.get("pii_patterns", [])
         pii_found: List[str] = []
         pii_types_detected: List[str] = []
         if isinstance(pii_patterns, list):
@@ -349,7 +363,7 @@ class ComplianceGuardian:
                     if matches:
                         pii_found.extend(matches)
                         # Determine PII type using mapping
-                        pii_type = pii_pattern_types.get(pattern, 'unknown')
+                        pii_type = pii_pattern_types.get(pattern, "unknown")
                         pii_types_detected.append(pii_type)
 
         if pii_found:
@@ -362,50 +376,42 @@ class ComplianceGuardian:
             # Record PII detection metrics
             if self.metrics:
                 for pii_type in set(pii_types_detected):
-                    self.metrics.record_pii_detection(
-                        pii_type=pii_type,
-                        action_taken="logged"
-                    )
+                    self.metrics.record_pii_detection(pii_type=pii_type, action_taken="logged")
 
         # Verifier les champs requis dans le contexte
-        required_fields = validation_rules.get('required_fields', [])
+        required_fields = validation_rules.get("required_fields", [])
         if isinstance(required_fields, list):
             missing_fields = [field for field in required_fields if field not in context]
-            if missing_fields and 'query' not in missing_fields:  # query is the query itself
+            if missing_fields and "query" not in missing_fields:  # query is the query itself
                 warnings_list.append(
                     f"Missing recommended context fields: {', '.join(missing_fields)}"
                 )
 
         # Logger l'audit
-        audit_rules = self.rules.get('audit', {})
-        if audit_rules.get('log_all_queries', True):
-            self._log_audit('query_validation', {
-                'query_hash': metadata.query_hash or '',
-                'valid': is_valid,
-                'warnings_count': len(warnings_list),
-                'errors_count': len(errors_list),
-                'context': context,
-            })
+        audit_rules = self.rules.get("audit", {})
+        if audit_rules.get("log_all_queries", True):
+            self._log_audit(
+                "query_validation",
+                {
+                    "query_hash": metadata.query_hash or "",
+                    "valid": is_valid,
+                    "warnings_count": len(warnings_list),
+                    "errors_count": len(errors_list),
+                    "context": context,
+                },
+            )
 
         # Record validation metrics
         duration = time.time() - start_time
         if self.metrics:
-            status = "rejected" if not is_valid else (
-                "warning" if warnings_list else "passed"
-            )
-            risk_level = "HIGH" if not is_valid else (
-                "MEDIUM" if warnings_list else "LOW"
-            )
+            status = "rejected" if not is_valid else ("warning" if warnings_list else "passed")
+            risk_level = "HIGH" if not is_valid else ("MEDIUM" if warnings_list else "LOW")
             self.metrics.record_compliance_validation(
-                status=status,
-                risk_level=risk_level,
-                duration_seconds=duration
+                status=status, risk_level=risk_level, duration_seconds=duration
             )
 
         if not is_valid:
-            raise ComplianceError(
-                f"Query validation failed: {'; '.join(errors_list)}"
-            )
+            raise ComplianceError(f"Query validation failed: {'; '.join(errors_list)}")
 
         return QueryValidationResult(
             valid=is_valid,
@@ -448,35 +454,29 @@ class ComplianceGuardian:
         plan_depth = self._calculate_plan_depth(plan)
 
         # Verifier la profondeur
-        execution_rules = self.rules.get('execution', {})
-        max_depth = execution_rules.get('max_plan_depth', 5)
+        execution_rules = self.rules.get("execution", {})
+        max_depth = execution_rules.get("max_plan_depth", 5)
         if isinstance(max_depth, int) and plan_depth > max_depth:
             is_valid = False
-            errors_list.append(
-                f"Plan depth {plan_depth} exceeds maximum of {max_depth}"
-            )
+            errors_list.append(f"Plan depth {plan_depth} exceeds maximum of {max_depth}")
 
         # Verifier le nombre d'outils
-        max_tools = execution_rules.get('max_tools_per_plan', 20)
+        max_tools = execution_rules.get("max_tools_per_plan", 20)
         if isinstance(max_tools, int) and len(tools_used) > max_tools:
             is_valid = False
-            errors_list.append(
-                f"Plan uses {len(tools_used)} tools, exceeds maximum of {max_tools}"
-            )
+            errors_list.append(f"Plan uses {len(tools_used)} tools, exceeds maximum of {max_tools}")
 
         # Verifier les outils interdits
-        forbidden_tools_list = execution_rules.get('forbidden_tools', [])
+        forbidden_tools_list = execution_rules.get("forbidden_tools", [])
         if isinstance(forbidden_tools_list, list):
             forbidden_tools: Set[str] = set(str(t) for t in forbidden_tools_list)
             used_forbidden = forbidden_tools.intersection(tools_used)
             if used_forbidden:
                 is_valid = False
-                errors_list.append(
-                    f"Plan uses forbidden tools: {', '.join(used_forbidden)}"
-                )
+                errors_list.append(f"Plan uses forbidden tools: {', '.join(used_forbidden)}")
 
         # Verifier les outils necessitant approbation
-        require_approval_list = execution_rules.get('require_approval_for', [])
+        require_approval_list = execution_rules.get("require_approval_for", [])
         if isinstance(require_approval_list, list):
             require_approval: Set[str] = set(str(t) for t in require_approval_list)
             needs_approval = require_approval.intersection(tools_used)
@@ -488,22 +488,23 @@ class ComplianceGuardian:
                 metadata.approval_tools = list(needs_approval)
 
         # Logger l'audit
-        audit_rules = self.rules.get('audit', {})
-        if audit_rules.get('log_all_plans', True):
-            self._log_audit('plan_validation', {
-                'plan_hash': metadata.plan_hash or '',
-                'valid': is_valid,
-                'tools_count': len(tools_used),
-                'plan_depth': plan_depth,
-                'warnings_count': len(warnings_list),
-                'errors_count': len(errors_list),
-                'context': context,
-            })
+        audit_rules = self.rules.get("audit", {})
+        if audit_rules.get("log_all_plans", True):
+            self._log_audit(
+                "plan_validation",
+                {
+                    "plan_hash": metadata.plan_hash or "",
+                    "valid": is_valid,
+                    "tools_count": len(tools_used),
+                    "plan_depth": plan_depth,
+                    "warnings_count": len(warnings_list),
+                    "errors_count": len(errors_list),
+                    "context": context,
+                },
+            )
 
         if not is_valid:
-            raise ComplianceError(
-                f"Plan validation failed: {'; '.join(errors_list)}"
-            )
+            raise ComplianceError(f"Plan validation failed: {'; '.join(errors_list)}")
 
         return PlanValidationResult(
             valid=is_valid,
@@ -532,19 +533,15 @@ class ComplianceGuardian:
         execution_hash = hashlib.sha256(str(execution_result).encode()).hexdigest()
 
         # Verifier si l'execution a reussi
-        success = execution_result.get('success', False)
+        success = execution_result.get("success", False)
         if not success:
-            issues_list.append(
-                'Execution failed - review required'
-            )
+            issues_list.append("Execution failed - review required")
 
         # Verifier les erreurs
-        errors = execution_result.get('errors', [])
+        errors = execution_result.get("errors", [])
         errors_list = errors if isinstance(errors, list) else []
         if errors_list:
-            issues_list.append(
-                f"Execution had {len(errors_list)} error(s)"
-            )
+            issues_list.append(f"Execution had {len(errors_list)} error(s)")
 
         # Create compliance check result
         compliance_check = ComplianceCheckResult(
@@ -553,15 +550,18 @@ class ComplianceGuardian:
         )
 
         # Logger l'audit
-        audit_rules = self.rules.get('audit', {})
-        if audit_rules.get('log_all_executions', True):
-            self._log_audit('execution_audit', {
-                'execution_hash': execution_hash,
-                'success': bool(success),
-                'errors_count': len(errors_list),
-                'issues_count': len(issues_list),
-                'context': context,
-            })
+        audit_rules = self.rules.get("audit", {})
+        if audit_rules.get("log_all_executions", True):
+            self._log_audit(
+                "execution_audit",
+                {
+                    "execution_hash": execution_hash,
+                    "success": bool(success),
+                    "errors_count": len(errors_list),
+                    "issues_count": len(issues_list),
+                    "context": context,
+                },
+            )
 
         return ExecutionAuditResult(
             audited=True,
@@ -576,7 +576,7 @@ class ComplianceGuardian:
         query: str,
         plan: PlanDict,
         execution_result: ExecutionResultDict,
-        context: Optional[ContextDict] = None
+        context: Optional[ContextDict] = None,
     ) -> DecisionRecord:
         """
         Generer un Decision Record pour tracabilite
@@ -593,20 +593,20 @@ class ComplianceGuardian:
         """
         context = context or {}
 
-        legal_rules = self.rules.get('legal', {})
-        frameworks = legal_rules.get('frameworks', [])
+        legal_rules = self.rules.get("legal", {})
+        frameworks = legal_rules.get("frameworks", [])
         frameworks_list = [str(f) for f in frameworks] if isinstance(frameworks, list) else []
 
         dr_id = self._generate_dr_id()
         tools_used = self._extract_tools_from_plan(plan)
-        success = bool(execution_result.get('success', False))
+        success = bool(execution_result.get("success", False))
 
         dr = DecisionRecord(
             dr_id=dr_id,
             timestamp=datetime.utcnow().isoformat(),
             decision_type=decision_type,
-            actor=str(context.get('actor', 'system')),
-            task_id=str(context.get('task_id', '')),
+            actor=str(context.get("actor", "system")),
+            task_id=str(context.get("task_id", "")),
             query_hash=hashlib.sha256(query.encode()).hexdigest(),
             plan_hash=hashlib.sha256(str(plan).encode()).hexdigest(),
             execution_hash=hashlib.sha256(str(execution_result).encode()).hexdigest(),
@@ -614,17 +614,20 @@ class ComplianceGuardian:
             success=success,
             compliance_frameworks=frameworks_list,
             metadata=DecisionRecordMetadata(
-                guardian_version='1.0.0',
-                rules_version=str(self.rules.get('version', '1.0.0')),
+                guardian_version="1.0.0",
+                rules_version=str(self.rules.get("version", "1.0.0")),
             ),
         )
 
         # Logger le DR
-        self._log_audit('decision_record_created', {
-            'dr_id': dr_id,
-            'decision_type': decision_type,
-            'success': success,
-        })
+        self._log_audit(
+            "decision_record_created",
+            {
+                "dr_id": dr_id,
+                "decision_type": decision_type,
+                "success": success,
+            },
+        )
 
         return dr
 
@@ -633,25 +636,25 @@ class ComplianceGuardian:
         tools: Set[str] = set()
 
         # Si le plan a une structure HTN avec un graphe
-        if 'graph' in plan:
-            graph = plan['graph']
-            if hasattr(graph, 'nodes'):
-                nodes = getattr(graph, 'nodes', {})
+        if "graph" in plan:
+            graph = plan["graph"]
+            if hasattr(graph, "nodes"):
+                nodes = getattr(graph, "nodes", {})
                 for node in nodes.values():
-                    if hasattr(node, 'action'):
-                        tools.add(str(getattr(node, 'action')))
+                    if hasattr(node, "action"):
+                        tools.add(str(getattr(node, "action")))
 
         # Si le plan est une liste d'actions
-        elif 'actions' in plan:
-            actions = plan['actions']
+        elif "actions" in plan:
+            actions = plan["actions"]
             if isinstance(actions, list):
                 for action in actions:
-                    if isinstance(action, dict) and 'tool' in action:
-                        tools.add(str(action['tool']))
+                    if isinstance(action, dict) and "tool" in action:
+                        tools.add(str(action["tool"]))
 
         # Si le plan a des tools_used directement
-        elif 'tools_used' in plan:
-            tools_used = plan['tools_used']
+        elif "tools_used" in plan:
+            tools_used = plan["tools_used"]
             if isinstance(tools_used, set):
                 tools.update(str(t) for t in tools_used)
             elif isinstance(tools_used, list):
@@ -662,15 +665,15 @@ class ComplianceGuardian:
     def _calculate_plan_depth(self, plan: PlanDict) -> int:
         """Calculer la profondeur d'un plan"""
         # Si le plan a une structure HTN
-        if 'graph' in plan:
-            graph = plan['graph']
-            if hasattr(graph, 'get_max_depth'):
-                depth = getattr(graph, 'get_max_depth')()
+        if "graph" in plan:
+            graph = plan["graph"]
+            if hasattr(graph, "get_max_depth"):
+                depth = getattr(graph, "get_max_depth")()
                 return int(depth) if isinstance(depth, (int, float)) else 1
 
         # Si le plan est une liste d'actions
-        elif 'actions' in plan:
-            actions = plan['actions']
+        elif "actions" in plan:
+            actions = plan["actions"]
             if isinstance(actions, list):
                 return len(actions)
 
@@ -688,9 +691,9 @@ class ComplianceGuardian:
     ) -> None:
         """Logger un evenement d'audit"""
         audit_entry: AuditEntryDict = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'event_type': event_type,
-            'data': data,
+            "timestamp": datetime.utcnow().isoformat(),
+            "event_type": event_type,
+            "data": data,
         }
         self.audit_log.append(audit_entry)
 
@@ -724,14 +727,14 @@ class ComplianceGuardian:
         risk_level = "LOW"
 
         # Extraire l'action/outil de la tache
-        action_raw = task.get('action') or task.get('tool') or task.get('name', '')
-        action = str(action_raw) if action_raw else ''
-        task_params = task.get('parameters', {}) or task.get('arguments', {})
+        action_raw = task.get("action") or task.get("tool") or task.get("name", "")
+        action = str(action_raw) if action_raw else ""
+        task_params = task.get("parameters", {}) or task.get("arguments", {})
         task_params_dict = task_params if isinstance(task_params, dict) else {}
 
         # Verifier les outils interdits
-        execution_rules = self.rules.get('execution', {})
-        forbidden_tools_list = execution_rules.get('forbidden_tools', [])
+        execution_rules = self.rules.get("execution", {})
+        forbidden_tools_list = execution_rules.get("forbidden_tools", [])
         if isinstance(forbidden_tools_list, list):
             forbidden_tools: Set[str] = set(str(t) for t in forbidden_tools_list)
             if action in forbidden_tools:
@@ -739,7 +742,7 @@ class ComplianceGuardian:
                 risk_level = "CRITICAL"
 
         # Verifier les outils necessitant approbation
-        require_approval_list = execution_rules.get('require_approval_for', [])
+        require_approval_list = execution_rules.get("require_approval_for", [])
         if isinstance(require_approval_list, list):
             require_approval: Set[str] = set(str(t) for t in require_approval_list)
             if action in require_approval:
@@ -748,8 +751,8 @@ class ComplianceGuardian:
 
         # Verifier les patterns dangereux dans les parametres
         params_str = str(task_params_dict)
-        validation_rules = self.rules.get('validation', {})
-        forbidden_patterns = validation_rules.get('forbidden_patterns', [])
+        validation_rules = self.rules.get("validation", {})
+        forbidden_patterns = validation_rules.get("forbidden_patterns", [])
         if isinstance(forbidden_patterns, list):
             for pattern in forbidden_patterns:
                 if isinstance(pattern, str) and re.search(pattern, params_str):
@@ -757,7 +760,7 @@ class ComplianceGuardian:
                     risk_level = "HIGH"
 
         # Verifier les patterns PII
-        pii_patterns = validation_rules.get('pii_patterns', [])
+        pii_patterns = validation_rules.get("pii_patterns", [])
         pii_found: List[str] = []
         if isinstance(pii_patterns, list):
             for pattern in pii_patterns:
@@ -797,18 +800,19 @@ class ComplianceGuardian:
         )
 
         # Logger l'audit
-        self._log_audit('task_validation', {
-            'action': action,
-            'is_compliant': is_compliant,
-            'violations_count': len(violations),
-            'warnings_count': len(warnings),
-            'risk_level': risk_level,
-        })
+        self._log_audit(
+            "task_validation",
+            {
+                "action": action,
+                "is_compliant": is_compliant,
+                "violations_count": len(violations),
+                "warnings_count": len(warnings),
+                "risk_level": risk_level,
+            },
+        )
 
         # Lever une exception si violation critique
         if not is_compliant and risk_level_enum == RiskLevel.CRITICAL:
-            raise ComplianceError(
-                f"Task validation failed: {'; '.join(violations)}"
-            )
+            raise ComplianceError(f"Task validation failed: {'; '.join(violations)}")
 
         return result

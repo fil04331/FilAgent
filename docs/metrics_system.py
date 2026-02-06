@@ -19,11 +19,13 @@ from pydantic import BaseModel, Field, StrictInt, StrictFloat, field_validator, 
 METRICS_FILE = Path("data/metrics_storage.json")
 BACKUP_COUNT = 5
 
+
 class DailyStats(BaseModel):
     """
     Modèle représentant les métriques agrégées pour une journée spécifique.
     Strictly typed pour éviter les dérives de données.
     """
+
     date_ref: str = Field(..., description="Date de référence au format ISO YYYY-MM-DD")
     total_operations: StrictInt = Field(default=0, ge=0)
     total_errors: StrictInt = Field(default=0, ge=0)
@@ -33,25 +35,29 @@ class DailyStats(BaseModel):
     # Configuration Pydantic V2 stricte
     model_config = ConfigDict(frozen=False, validate_assignment=True)
 
+
 class SessionStats(BaseModel):
     """
     Métriques volatiles de la session en cours.
     """
+
     start_time: datetime = Field(default_factory=datetime.now)
     uptime_seconds: float = Field(default=0.0)
     active_operations: StrictInt = Field(default=0)
+
 
 class GlobalMetrics(BaseModel):
     """
     Agrégat racine pour la persistance.
     Contient l'historique et l'état actuel.
     """
+
     last_updated: datetime = Field(default_factory=datetime.now)
     version: str = Field(default="1.0.0")
     # Mapping date string -> DailyStats pour accès O(1)
     history: Dict[str, DailyStats] = Field(default_factory=dict)
 
-    @field_validator('history')
+    @field_validator("history")
     @classmethod
     def validate_history_keys(cls, v: Dict[str, DailyStats]) -> Dict[str, DailyStats]:
         """Vérifie que les clés correspondent au format de date."""
@@ -61,6 +67,7 @@ class GlobalMetrics(BaseModel):
             except ValueError:
                 raise ValueError(f"Clé d'historique invalide: {key}. Format attendu YYYY-MM-DD")
         return v
+
 
 class MetricsManager:
     """
@@ -79,13 +86,15 @@ class MetricsManager:
             return GlobalMetrics()
 
         try:
-            with open(self.storage_path, 'r', encoding='utf-8') as f:
+            with open(self.storage_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
             return GlobalMetrics(**raw_data)
         except (json.JSONDecodeError, ValueError) as e:
             # Audit First: On ne supprime pas silencieusement les données corrompues.
             # On les déplace pour analyse ultérieure.
-            backup_path = self.storage_path.with_suffix(f".corrupt.{datetime.now().timestamp()}.json")
+            backup_path = self.storage_path.with_suffix(
+                f".corrupt.{datetime.now().timestamp()}.json"
+            )
             if self.storage_path.exists():
                 shutil.move(str(self.storage_path), str(backup_path))
             print(f"[WARN] Metrics corrupted. Moved to {backup_path}. Error: {e}")
@@ -127,10 +136,7 @@ class MetricsManager:
         """
         # Création d'un fichier temporaire dans le même dossier
         temp_file = tempfile.NamedTemporaryFile(
-            mode='w',
-            dir=self.storage_path.parent,
-            delete=False,
-            encoding='utf-8'
+            mode="w", dir=self.storage_path.parent, delete=False, encoding="utf-8"
         )
 
         try:
@@ -146,7 +152,7 @@ class MetricsManager:
             Path(temp_file.name).unlink(missing_ok=True)
             raise RuntimeError(f"Critical: Failed to persist metrics. {e}")
 
-    def get_stats_summary(self) -> Dict[str, Any]: # type: ignore - Any used for broad output dict
+    def get_stats_summary(self) -> Dict[str, Any]:  # type: ignore - Any used for broad output dict
         """Retourne un résumé pour l'API/Dashboard."""
         today = date.today().isoformat()
         today_stats = self.data.history.get(today, DailyStats(date_ref=today))
@@ -156,5 +162,5 @@ class MetricsManager:
             "last_updated": self.data.last_updated,
             "session_uptime": (datetime.now() - self.session.start_time).seconds,
             "today": today_stats.model_dump(),
-            "historical_days_tracked": len(self.data.history)
+            "historical_days_tracked": len(self.data.history),
         }

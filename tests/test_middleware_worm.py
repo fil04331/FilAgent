@@ -23,7 +23,7 @@ from runtime.middleware.worm import (
     MerkleTree,
     WormLogger,
     get_worm_logger,
-    init_worm_logger
+    init_worm_logger,
 )
 
 
@@ -243,7 +243,7 @@ class TestAppendOnlyLogging:
         logger.append("Line 2")
         logger.append("Line 3")
 
-        with open(logger.default_log_file, 'r') as f:
+        with open(logger.default_log_file, "r") as f:
             lines = f.readlines()
 
         assert len(lines) == 3
@@ -258,7 +258,7 @@ class TestAppendOnlyLogging:
         logger.append("Test line")
 
         # Should be immediately available
-        with open(logger.default_log_file, 'r') as f:
+        with open(logger.default_log_file, "r") as f:
             content = f.read()
 
         assert "Test line" in content
@@ -328,7 +328,7 @@ class TestCheckpointCreation:
         logger.create_checkpoint()
 
         checkpoint_file = temp_digest_dir / "events-checkpoint.json"
-        with open(checkpoint_file, 'r') as f:
+        with open(checkpoint_file, "r") as f:
             data = json.load(f)
 
         assert "file" in data
@@ -442,7 +442,7 @@ class TestThreadSafety:
             thread.join()
 
         # All lines should be written
-        with open(logger.default_log_file, 'r') as f:
+        with open(logger.default_log_file, "r") as f:
             lines = f.readlines()
 
         assert len(lines) == 50  # 5 threads * 10 lines
@@ -477,7 +477,7 @@ class TestEdgeCases:
 
         assert success is True
 
-        with open(logger.default_log_file, 'r') as f:
+        with open(logger.default_log_file, "r") as f:
             lines = f.readlines()
 
         assert len(lines) == 1
@@ -489,7 +489,7 @@ class TestEdgeCases:
         logger.append("Line with accents: éàü")
         logger.append("Line with symbols: €£¥")
 
-        with open(logger.default_log_file, 'r', encoding='utf-8') as f:
+        with open(logger.default_log_file, "r", encoding="utf-8") as f:
             content = f.read()
 
         assert "éàü" in content
@@ -533,7 +533,7 @@ class TestComplianceRequirements:
         logger.append("Line 2")
 
         # Verify lines are append-only
-        with open(logger.default_log_file, 'r') as f:
+        with open(logger.default_log_file, "r") as f:
             lines = f.readlines()
 
         assert len(lines) == 2
@@ -550,7 +550,7 @@ class TestComplianceRequirements:
         checkpoint_hash = logger.create_checkpoint()
 
         # Manually tamper with log file
-        with open(logger.default_log_file, 'a') as f:
+        with open(logger.default_log_file, "a") as f:
             f.write("Tampered line\n")
 
         # Verification should fail

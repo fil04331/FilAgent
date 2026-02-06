@@ -3,6 +3,7 @@
 Simple standalone test for configuration persistence
 Can be run without pytest
 """
+
 import sys
 import tempfile
 from pathlib import Path
@@ -248,6 +249,7 @@ def main():
             print(f"✗ {test.__name__} failed: {e}")
             failed += 1
             import traceback
+
             traceback.print_exc()
 
     print()

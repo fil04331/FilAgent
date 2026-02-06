@@ -13,6 +13,7 @@ from pathlib import Path
 from src.core.metrics import MetricsManager, DailyStats, GlobalMetrics
 from datetime import date
 
+
 # Fixture pour isoler les tests du système de fichiers réel
 @pytest.fixture
 def temp_metrics_file(tmp_path):
@@ -21,11 +22,13 @@ def temp_metrics_file(tmp_path):
     p = d / "test_metrics.json"
     return p
 
+
 def test_initialization_creates_empty_metrics(temp_metrics_file):
     """Vérifie que le manager s'initialise correctement sans fichier."""
     manager = MetricsManager(storage_path=temp_metrics_file)
     assert isinstance(manager.data, GlobalMetrics)
     assert len(manager.data.history) == 0
+
 
 def test_persistence_cycle(temp_metrics_file):
     """Vérifie l'écriture et la relecture après 'redémarrage'."""
@@ -44,16 +47,18 @@ def test_persistence_cycle(temp_metrics_file):
     assert saved_day.total_operations == 1
     assert saved_day.total_tokens_used == 100
 
+
 def test_atomic_file_integrity(temp_metrics_file):
     """Vérifie que le fichier JSON est valide."""
     manager = MetricsManager(storage_path=temp_metrics_file)
     manager.record_operation(tokens=10, latency_ms=10.0)
 
-    with open(temp_metrics_file, 'r') as f:
+    with open(temp_metrics_file, "r") as f:
         content = json.load(f)
 
     assert "history" in content
     assert "version" in content
+
 
 def test_corrupted_file_recovery(temp_metrics_file):
     """
@@ -61,7 +66,7 @@ def test_corrupted_file_recovery(temp_metrics_file):
     Le système doit survivre à un fichier corrompu et le sauvegarder.
     """
     # Création fichier corrompu
-    with open(temp_metrics_file, 'w') as f:
+    with open(temp_metrics_file, "w") as f:
         f.write("{ invalid json ...")
 
     manager = MetricsManager(storage_path=temp_metrics_file)

@@ -9,6 +9,7 @@ Interface professionnelle pour FilAgent avec architecture modulaire,
 respect des bonnes pratiques et évolutivité garantie.
 Conforme aux standards: Loi 25, RGPD, AI Act, ISO 27001
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -160,7 +161,7 @@ class FileValidationError(Exception):
 def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
     """
     Valider un fichier avant traitement avec sécurité renforcée
-    
+
     Security: Validates path against allowlist to prevent path traversal attacks
 
     Args:
@@ -173,7 +174,7 @@ def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
         path = Path(file_path)
 
         # Security: Check for null byte injection
-        if '\0' in file_path:
+        if "\0" in file_path:
             return False, "❌ **Erreur de sécurité**: Caractère null détecté dans le chemin"
 
         # Security: Check path length
@@ -192,11 +193,11 @@ def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
             "memory/working_set/",
             "/tmp/",  # Gradio uploads to system temp
         ]
-        
+
         try:
             path_resolved = path.resolve(strict=True)
             is_allowed = False
-            
+
             for allowed in allowed_paths:
                 try:
                     allowed_resolved = Path(allowed).resolve()
@@ -206,11 +207,14 @@ def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
                     break
                 except ValueError:
                     continue
-            
+
             if not is_allowed:
                 logger.warning(f"⚠️ Blocked access to unauthorized path: {file_path}")
-                return False, "❌ **Erreur de sécurité**: Accès au fichier refusé (chemin non autorisé)"
-                
+                return (
+                    False,
+                    "❌ **Erreur de sécurité**: Accès au fichier refusé (chemin non autorisé)",
+                )
+
         except (OSError, RuntimeError) as e:
             logger.error(f"Path validation error: {e}")
             return False, f"❌ **Erreur de validation**: {str(e)}"
@@ -554,8 +558,7 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             # Table conversations
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -565,12 +568,10 @@ class DatabaseManager:
                     retention_days INTEGER DEFAULT 90,
                     metadata JSON
                 )
-            """
-            )
+            """)
 
             # Table messages avec index
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
                     conversation_id TEXT NOT NULL,
@@ -582,12 +583,10 @@ class DatabaseManager:
                     embedding BLOB,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id)
                 )
-            """
-            )
+            """)
 
             # Table decision_records pour conformité
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS decision_records (
                     id TEXT PRIMARY KEY,
                     conversation_id TEXT,
@@ -602,12 +601,10 @@ class DatabaseManager:
                     provenance JSON,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id)
                 )
-            """
-            )
+            """)
 
             # Table audit_trail pour logs immuables
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS audit_trail (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -619,23 +616,18 @@ class DatabaseManager:
                     metadata JSON,
                     hash_chain TEXT NOT NULL
                 )
-            """
-            )
+            """)
 
             # Index pour performance
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_messages_conversation
                 ON messages(conversation_id)
-            """
-            )
+            """)
 
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_decisions_conversation
                 ON decision_records(conversation_id)
-            """
-            )
+            """)
 
             conn.commit()
             logger.info("Base de donnees initialisee avec schema complet")
@@ -758,12 +750,10 @@ class DatabaseManager:
                 cursor = conn.cursor()
 
                 # Obtenir le dernier hash pour la chaîne
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT hash_chain FROM audit_trail
                     ORDER BY id DESC LIMIT 1
-                """
-                )
+                """)
                 last_row = cursor.fetchone()
                 previous_hash = last_row["hash_chain"] if last_row else "genesis"
 
@@ -806,12 +796,10 @@ class DatabaseManager:
                 metrics.total_decisions = cursor.fetchone()["count"]
 
                 # PII redactions
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT COUNT(*) as count FROM messages
                     WHERE pii_redacted = TRUE
-                """
-                )
+                """)
                 metrics.pii_redactions = cursor.fetchone()["count"]
 
                 # Audit records
@@ -819,11 +807,9 @@ class DatabaseManager:
                 metrics.audit_records = cursor.fetchone()["count"]
 
                 # Last audit
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT MAX(timestamp) as last FROM audit_trail
-                """
-                )
+                """)
                 last = cursor.fetchone()["last"]
                 if last:
                     metrics.last_audit = datetime.fromisoformat(last)
@@ -846,7 +832,10 @@ class FilAgentEngine:
     security: SecurityManager
     database: DatabaseManager
     executor: ThreadPoolExecutor
-    tools: Dict[str, Union[TaxCalculatorTool, DocumentAnalyzerTool, ComplianceCheckerTool, ReportGeneratorTool]]
+    tools: Dict[
+        str,
+        Union[TaxCalculatorTool, DocumentAnalyzerTool, ComplianceCheckerTool, ReportGeneratorTool],
+    ]
     model: Optional[object]
     model_loaded: bool
     generation_config: Optional[object]
@@ -932,7 +921,12 @@ class FilAgentEngine:
             logger.error(f"Erreur reload: {e}")
             return f"Erreur: {str(e)}"
 
-    def _initialize_tools(self) -> Dict[str, Union[TaxCalculatorTool, DocumentAnalyzerTool, ComplianceCheckerTool, ReportGeneratorTool]]:
+    def _initialize_tools(
+        self,
+    ) -> Dict[
+        str,
+        Union[TaxCalculatorTool, DocumentAnalyzerTool, ComplianceCheckerTool, ReportGeneratorTool],
+    ]:
         """Initialiser les outils PME disponibles"""
         return {
             "tax_calculator": TaxCalculatorTool(),
@@ -2049,7 +2043,9 @@ class FilAgentInterface:
                 f"<p style='color: #f44336; padding: 20px;'>❌ Erreur lecture Word: {error_str}</p>"
             )
 
-    def export_analysis_results(self, export_format: str) -> Tuple[Optional[str], str]:  # noqa: C901
+    def export_analysis_results(
+        self, export_format: str
+    ) -> Tuple[Optional[str], str]:  # noqa: C901
         """
         Exporter les resultats d'analyse dans le format choisi (Phase 6.1: Enhanced)
 
@@ -2398,12 +2394,10 @@ def create_gradio_interface() -> gr.Blocks:  # noqa: C901
         _conversation_id = gr.State(value=str(uuid.uuid4()))
 
         # En-tête
-        gr.Markdown(
-            """
+        gr.Markdown("""
         # 🤖 **FilAgent** - Assistant IA pour PME Québécoises
         ### 🔒 Safety by Design | 🏛️ 100% Conforme Loi 25 | 💻 Données 100% Locales
-        """
-        )
+        """)
 
         with gr.Tabs():
             # ========== ONGLET CHAT ==========
@@ -2512,15 +2506,13 @@ def create_gradio_interface() -> gr.Blocks:  # noqa: C901
 
                 # ========== ANALYSEUR DE DOCUMENTS (NOUVEAU) ==========
                 with gr.Accordion("📄 Analyseur de Documents - REAL TOOL", open=True):
-                    gr.Markdown(
-                        """
+                    gr.Markdown("""
                     ### 🔍 Analyse Intelligente de Documents
                     Téléversez vos factures, états financiers ou rapports
                     pour une analyse automatique avec calculs TPS/TVQ.
 
                     **Formats supportés**: PDF, Excel (.xlsx, .xls), Word (.docx, .doc)
-                    """
-                    )
+                    """)
 
                     with gr.Row():
                         with gr.Column(scale=2):
@@ -2567,7 +2559,9 @@ Téléversez un fichier pour commencer l'analyse.
                             )
 
                     # Zone d'aperçu (ACTIVÉE - Phase 4)
-                    with gr.Accordion("👁️ Aperçu du Document", open=False) as _doc_preview_accordion:
+                    with gr.Accordion(
+                        "👁️ Aperçu du Document", open=False
+                    ) as _doc_preview_accordion:
                         doc_preview_html = gr.HTML(
                             label="Contenu",
                             value=(
@@ -2593,13 +2587,11 @@ Téléversez un fichier pour commencer l'analyse.
                     with gr.Accordion(
                         "📤 Exporter les Résultats", open=False
                     ) as _doc_export_accordion:
-                        gr.Markdown(
-                            """
+                        gr.Markdown("""
                         ### 💾 Formats d'Export Disponibles
 
                         Exportez les résultats d'analyse dans le format de votre choix.
-                        """
-                        )
+                        """)
 
                         with gr.Row():
                             with gr.Column(scale=2):
@@ -2634,16 +2626,14 @@ Téléversez un fichier pour commencer l'analyse.
                 # ========== CALCULATEUR MATHEMATIQUE ==========
                 gr.Markdown("---")
                 with gr.Accordion("🔢 Calculateur Mathématique", open=False):
-                    gr.Markdown(
-                        """
+                    gr.Markdown("""
                     ### 🧮 Évaluation d'Expressions Mathématiques
 
                     Évaluez des expressions mathématiques de manière sécurisée.
                     Supporte: opérations de base, fonctions trigonométriques, logarithmes, etc.
 
                     **Exemples**: `2 + 3 * 4`, `sqrt(16)`, `sin(3.14159/2)`, `log(100)`
-                    """
-                    )
+                    """)
 
                     with gr.Row():
                         with gr.Column(scale=2):
@@ -2682,16 +2672,14 @@ Téléversez un fichier pour commencer l'analyse.
 
                 # ========== SANDBOX PYTHON ==========
                 with gr.Accordion("🐍 Sandbox Python", open=False):
-                    gr.Markdown(
-                        """
+                    gr.Markdown("""
                     ### 🔒 Exécution Python Sécurisée
 
                     Exécutez du code Python dans un environnement sandbox isolé.
                     Limites: CPU 30s, Mémoire 512 MB, pas d'accès réseau/fichiers.
 
                     **Sécurité**: Validation AST, blocage imports dangereux, isolation processus.
-                    """
-                    )
+                    """)
 
                     with gr.Row():
                         with gr.Column(scale=2):
@@ -2721,16 +2709,14 @@ Téléversez un fichier pour commencer l'analyse.
 
                 # ========== LECTEUR DE FICHIERS ==========
                 with gr.Accordion("📂 Lecteur de Fichiers", open=False):
-                    gr.Markdown(
-                        """
+                    gr.Markdown("""
                     ### 📖 Lecture Sécurisée de Fichiers
 
                     Lisez le contenu de fichiers texte dans les répertoires autorisés.
                     Taille max: 10 MB. Protection contre path traversal et symlinks.
 
                     **Répertoires autorisés**: `working_set/`, `temp/`, `memory/working_set/`
-                    """
-                    )
+                    """)
 
                     with gr.Row():
                         with gr.Column(scale=2):
@@ -2740,9 +2726,7 @@ Téléversez un fichier pour commencer l'analyse.
                                 lines=1,
                             )
                             with gr.Row():
-                                file_read_btn = gr.Button(
-                                    "📖 Lire", variant="primary", size="lg"
-                                )
+                                file_read_btn = gr.Button("📖 Lire", variant="primary", size="lg")
                                 file_clear_btn = gr.Button(
                                     "🗑️ Effacer", variant="secondary", size="lg"
                                 )
@@ -2762,8 +2746,7 @@ Téléversez un fichier pour commencer l'analyse.
 
             # ========== ONGLET CONFORMITÉ ==========
             with gr.Tab("🔒 Conformité", id=3):
-                gr.Markdown(
-                    """
+                gr.Markdown("""
                 ## Tableau de Bord Conformité
 
                 ### ✅ Certifications Actives
@@ -2785,8 +2768,7 @@ Téléversez un fichier pour commencer l'analyse.
                 - Decision Records signés: 100%
                 - Audit trail complet: 100%
                 - Rétention conforme: 90 jours
-                """
-                )
+                """)
 
         # ========== CONNEXIONS ÉVÉNEMENTS ==========
 
@@ -2995,9 +2977,7 @@ Téléversez un fichier pour commencer l'analyse.
                     None,
                 )
 
-        def clear_document_analysis() -> Tuple[
-            None, str, str, Dict[str, bool], None
-        ]:
+        def clear_document_analysis() -> Tuple[None, str, str, Dict[str, bool], None]:
             """Effacer les resultats d'analyse"""
             return (
                 None,  # Clear file upload

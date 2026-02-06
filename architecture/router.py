@@ -19,33 +19,35 @@ from pydantic import BaseModel, Field
 
 class ExecutionStrategy(str, Enum):
     """Execution strategy options"""
-    
+
     SIMPLE = "simple"  # Direct execution without planning
     HTN = "htn"  # Hierarchical Task Network planning
 
 
 class RoutingDecision(BaseModel):
     """Result of routing decision with justification"""
-    
+
     strategy: ExecutionStrategy
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in decision (0-1)")
     reasoning: str = Field(description="Human-readable explanation of decision")
-    detected_patterns: list[str] = Field(default_factory=list, description="Patterns detected in query")
+    detected_patterns: list[str] = Field(
+        default_factory=list, description="Patterns detected in query"
+    )
 
 
 class StrategyRouter:
     """
     Router component that decides execution strategy based on query analysis.
-    
+
     This class implements semantic routing to determine if a query requires
     HTN planning or can be handled with simple execution.
-    
+
     Design:
     - Stateless: No instance variables except configuration
     - Pure logic: Decision based only on input parameters
     - Testable: No external dependencies
     """
-    
+
     def __init__(
         self,
         htn_enabled: bool = True,
@@ -55,7 +57,7 @@ class StrategyRouter:
     ):
         """
         Initialize router with configuration.
-        
+
         Args:
             htn_enabled: Whether HTN planning is available
             multi_step_keywords: Keywords indicating multi-step tasks
@@ -64,24 +66,47 @@ class StrategyRouter:
         """
         self.htn_enabled = htn_enabled
         self.multi_step_keywords = multi_step_keywords or [
-            "puis", "ensuite", "après", "finalement", "et",
-            "then", "next", "after", "finally", "and"
+            "puis",
+            "ensuite",
+            "après",
+            "finalement",
+            "et",
+            "then",
+            "next",
+            "after",
+            "finally",
+            "and",
         ]
         self.action_verbs = action_verbs or [
-            "lis", "analyse", "génère", "crée", "calcule",
-            "read", "analyze", "generate", "create", "calculate",
-            "écris", "supprime", "modifie", "vérifie",
-            "write", "delete", "modify", "verify", "check"
+            "lis",
+            "analyse",
+            "génère",
+            "crée",
+            "calcule",
+            "read",
+            "analyze",
+            "generate",
+            "create",
+            "calculate",
+            "écris",
+            "supprime",
+            "modifie",
+            "vérifie",
+            "write",
+            "delete",
+            "modify",
+            "verify",
+            "check",
         ]
         self.min_actions_for_planning = min_actions_for_planning
-    
+
     def route(self, query: str) -> RoutingDecision:
         """
         Analyze query and decide execution strategy.
-        
+
         Args:
             query: User query to analyze
-            
+
         Returns:
             RoutingDecision with strategy, confidence, and reasoning
         """
@@ -91,33 +116,27 @@ class StrategyRouter:
                 strategy=ExecutionStrategy.SIMPLE,
                 confidence=1.0,
                 reasoning="HTN planning is disabled in configuration",
-                detected_patterns=[]
+                detected_patterns=[],
             )
-        
+
         # Analyze query patterns
         query_lower = query.lower()
         detected_patterns = []
-        
+
         # Check for multi-step keywords
-        multi_step_detected = any(
-            keyword in query_lower for keyword in self.multi_step_keywords
-        )
+        multi_step_detected = any(keyword in query_lower for keyword in self.multi_step_keywords)
         if multi_step_detected:
-            detected_keywords = [
-                kw for kw in self.multi_step_keywords if kw in query_lower
-            ]
+            detected_keywords = [kw for kw in self.multi_step_keywords if kw in query_lower]
             detected_patterns.append(f"multi_step_keywords: {', '.join(detected_keywords)}")
-        
+
         # Count action verbs
-        action_count = sum(
-            1 for verb in self.action_verbs if verb in query_lower
-        )
+        action_count = sum(1 for verb in self.action_verbs if verb in query_lower)
         if action_count >= self.min_actions_for_planning:
             detected_patterns.append(f"action_verbs: {action_count} detected")
-        
+
         # Decision logic
         requires_planning = multi_step_detected or action_count >= self.min_actions_for_planning
-        
+
         if requires_planning:
             # Calculate confidence based on strength of signals
             confidence = 0.7  # Base confidence
@@ -126,28 +145,28 @@ class StrategyRouter:
             if action_count >= 3:
                 confidence += 0.15
             confidence = min(confidence, 1.0)
-            
+
             return RoutingDecision(
                 strategy=ExecutionStrategy.HTN,
                 confidence=confidence,
                 reasoning=f"Complex query detected: {len(detected_patterns)} patterns matched",
-                detected_patterns=detected_patterns
+                detected_patterns=detected_patterns,
             )
         else:
             return RoutingDecision(
                 strategy=ExecutionStrategy.SIMPLE,
                 confidence=0.8,
                 reasoning="Simple query, direct execution sufficient",
-                detected_patterns=[]
+                detected_patterns=[],
             )
-    
+
     def should_use_planning(self, query: str) -> bool:
         """
         Simplified boolean decision for backward compatibility.
-        
+
         Args:
             query: User query to analyze
-            
+
         Returns:
             True if HTN planning should be used
         """

@@ -1,7 +1,7 @@
 """
 Architecture Components for FilAgent
 
-This package contains architectural components that follow Clean Architecture 
+This package contains architectural components that follow Clean Architecture
 and SOLID principles:
 
 - Router: Strategic decision-making (Planning vs Direct execution)

@@ -11,6 +11,7 @@ from pathlib import Path
 # Charger les variables d'environnement (.env) pour les API keys
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # dotenv optional, env vars may be set by system
@@ -58,22 +59,20 @@ class ModelInterface(ABC):
     @abstractmethod
     def load(self, model_path: str, config: Dict) -> bool:
         """Charger le modèle depuis le chemin spécifié"""
-        pass
 
     @abstractmethod
-    def generate(self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None) -> GenerationResult:
+    def generate(
+        self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None
+    ) -> GenerationResult:
         """Générer du texte à partir d'un prompt"""
-        pass
 
     @abstractmethod
     def unload(self):
         """Décharger le modèle de la mémoire"""
-        pass
 
     @abstractmethod
     def is_loaded(self) -> bool:
         """Vérifier si le modèle est chargé"""
-        pass
 
 
 class LlamaCppInterface(ModelInterface):
@@ -156,7 +155,9 @@ class LlamaCppInterface(ModelInterface):
         self._loaded = True
         print("⚠ Using mock model (fallback mode)")
 
-    def generate(self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None) -> GenerationResult:
+    def generate(
+        self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None
+    ) -> GenerationResult:
         """Générer du texte"""
         if not self.is_loaded():
             raise RuntimeError("Model not loaded. Call load() first.")
@@ -273,16 +274,13 @@ class PerplexityInterface(ModelInterface):
                 return False
 
             # Initialiser le client OpenAI avec base URL Perplexity
-            self.client = OpenAI(
-                api_key=api_key,
-                base_url="https://api.perplexity.ai"
-            )
+            self.client = OpenAI(api_key=api_key, base_url="https://api.perplexity.ai")
 
             # Initialize rate limiter for API protection
             from runtime.utils.rate_limiter import get_rate_limiter
+
             self._rate_limiter = get_rate_limiter(
-                requests_per_minute=10,  # Conservative limit
-                requests_per_hour=500
+                requests_per_minute=10, requests_per_hour=500  # Conservative limit
             )
 
             # Sauvegarder le nom du modèle
@@ -300,17 +298,14 @@ class PerplexityInterface(ModelInterface):
         except Exception as e:
             # Sanitize error message to avoid leaking sensitive information
             error_str = str(e).lower()
-            if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret']):
+            if any(sensitive in error_str for sensitive in ["api", "key", "token", "secret"]):
                 print("✗ Failed to initialize Perplexity client: Authentication error")
             else:
                 print("✗ Failed to initialize Perplexity client: Configuration error")
             return False
 
     def generate(
-        self,
-        prompt: str,
-        config: GenerationConfig,
-        system_prompt: Optional[str] = None
+        self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None
     ) -> GenerationResult:
         """Générer du texte avec Perplexity API"""
         if not self.is_loaded():
@@ -353,7 +348,7 @@ class PerplexityInterface(ModelInterface):
 
             # Extract citations if available (Perplexity returns source URLs)
             citations = None
-            if hasattr(response, 'citations') and response.citations:
+            if hasattr(response, "citations") and response.citations:
                 citations = response.citations
 
             return GenerationResult(
@@ -371,17 +366,21 @@ class PerplexityInterface(ModelInterface):
 
             # Check for sensitive patterns and provide safe error messages
             # Order matters: check more specific patterns first
-            if 'rate' in error_str and 'limit' in error_str:
+            if "rate" in error_str and "limit" in error_str:
                 safe_error = "Rate limit exceeded. Please wait before retrying."
                 print("⚠ Perplexity generation failed: Rate limit exceeded")
-            elif 'timeout' in error_str or 'connection' in error_str:
+            elif "timeout" in error_str or "connection" in error_str:
                 safe_error = "Connection error. Please check your network."
                 print("⚠ Perplexity generation failed: Connection error")
-            elif 'model' in error_str or 'not found' in error_str:
+            elif "model" in error_str or "not found" in error_str:
                 safe_error = "Model not available. Please check the model name."
                 print("⚠ Perplexity generation failed: Model error")
-            elif any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret', 'auth']):
-                safe_error = "Authentication or authorization error. Please verify your API credentials."
+            elif any(
+                sensitive in error_str for sensitive in ["api", "key", "token", "secret", "auth"]
+            ):
+                safe_error = (
+                    "Authentication or authorization error. Please verify your API credentials."
+                )
                 print("⚠ Perplexity generation failed: Authentication error")
             else:
                 # Generic error without exposing details
@@ -455,9 +454,9 @@ class OpenAIInterface(ModelInterface):
 
             # Initialize rate limiter for API protection
             from runtime.utils.rate_limiter import get_rate_limiter
+
             self._rate_limiter = get_rate_limiter(
-                requests_per_minute=60,  # OpenAI has higher limits
-                requests_per_hour=3000
+                requests_per_minute=60, requests_per_hour=3000  # OpenAI has higher limits
             )
 
             # Sauvegarder le nom du modèle
@@ -475,17 +474,14 @@ class OpenAIInterface(ModelInterface):
         except Exception as e:
             # Sanitize error message to avoid leaking sensitive information
             error_str = str(e).lower()
-            if any(sensitive in error_str for sensitive in ['api', 'key', 'token', 'secret']):
+            if any(sensitive in error_str for sensitive in ["api", "key", "token", "secret"]):
                 print("✗ Failed to initialize OpenAI client: Authentication error")
             else:
                 print("✗ Failed to initialize OpenAI client: Configuration error")
             return False
 
     def generate(
-        self,
-        prompt: str,
-        config: GenerationConfig,
-        system_prompt: Optional[str] = None
+        self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None
     ) -> GenerationResult:
         """Générer du texte avec OpenAI"""
         if not self.is_loaded():
@@ -582,7 +578,9 @@ class ModelFactory:
             # TODO: Implémenter VLLMInterface quand nécessaire
             raise NotImplementedError("vLLM backend not yet implemented")
         else:
-            raise ValueError(f"Unknown backend: {backend}. Supported: llama.cpp, perplexity, openai, vllm")
+            raise ValueError(
+                f"Unknown backend: {backend}. Supported: llama.cpp, perplexity, openai, vllm"
+            )
 
 
 # Instance globale pour le modèle

@@ -177,7 +177,11 @@ class TestDocumentAnalyzerSecurity:
             if result.error:
                 assert any(
                     keyword in result.error.lower()
-                    for keyword in ["not in allowed directories", "access denied", "path validation"]
+                    for keyword in [
+                        "not in allowed directories",
+                        "access denied",
+                        "path validation",
+                    ]
                 )
         finally:
             analyzer.allowed_paths = original_paths
@@ -234,7 +238,9 @@ class TestDocumentAnalyzerSecurity:
                 try:
                     symlink_path.symlink_to(sample_pdf_allowed)
 
-                    result = analyzer.execute({"file_path": str(symlink_path), "analysis_type": "extract"})
+                    result = analyzer.execute(
+                        {"file_path": str(symlink_path), "analysis_type": "extract"}
+                    )
 
                     # Should succeed or fail for non-security reasons
                     assert result.status != ToolStatus.BLOCKED
@@ -263,7 +269,9 @@ class TestDocumentAnalyzerSecurity:
                 try:
                     symlink_path.symlink_to(sample_pdf_blocked)
 
-                    result = analyzer.execute({"file_path": str(symlink_path), "analysis_type": "extract"})
+                    result = analyzer.execute(
+                        {"file_path": str(symlink_path), "analysis_type": "extract"}
+                    )
 
                     # Should be blocked due to symlink target validation
                     assert result.status == ToolStatus.ERROR
@@ -336,7 +344,9 @@ class TestDocumentAnalyzerSecurity:
         # Check for expected paths
         expected_paths = ["working_set/", "temp/", "memory/working_set/", "/tmp/"]
         for expected in expected_paths:
-            assert expected in analyzer.allowed_paths, f"Expected path {expected} not in allowed_paths"
+            assert (
+                expected in analyzer.allowed_paths
+            ), f"Expected path {expected} not in allowed_paths"
 
     def test_max_file_size_configuration(self, analyzer):
         """Test that max_file_size is configured"""
@@ -366,7 +376,9 @@ class TestDocumentAnalyzerSecurityIntegration:
 
         try:
             # 1. Validate arguments
-            is_valid, error = analyzer.validate_arguments({"file_path": sample_pdf_allowed, "analysis_type": "extract"})
+            is_valid, error = analyzer.validate_arguments(
+                {"file_path": sample_pdf_allowed, "analysis_type": "extract"}
+            )
             assert is_valid, f"Validation failed: {error}"
 
             # 2. Execute

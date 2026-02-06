@@ -19,17 +19,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
-    TYPE_CHECKING,
     Any,
     Dict,
     List,
-    Mapping,
     Optional,
     Protocol,
     Sequence,
     TypedDict,
     Union,
-    cast,
 )
 from datetime import datetime
 import json
@@ -45,6 +42,7 @@ from runtime.template_loader import get_template_loader, TemplateLoader
 # Protocol pour l'interface modèle (évite l'import circulaire)
 class ModelInterface(Protocol):
     """Protocol pour les interfaces modèle LLM"""
+
     def generate(
         self,
         messages: List[Dict[str, str]],
@@ -56,25 +54,34 @@ class ModelInterface(Protocol):
 # Protocol pour un outil avec attribut name
 class ToolProtocol(Protocol):
     """Protocol pour les outils du registre"""
+
     name: str
 
 
 # Protocol pour le registre d'outils
 class ToolsRegistry(Protocol):
     """Protocol pour le registre d'outils"""
+
     def get_all(self) -> Sequence[ToolProtocol]: ...
 
 
 # Types stricts pour le planificateur
 PlanningMetadataValue = Union[str, int, float, bool, List[str], Dict[str, str]]
 NestedPlanningMetadataValue = Union[
-    str, int, float, bool, List[str], Dict[str, str],
-    Dict[str, PlanningMetadataValue]  # Pour supporter context imbriqué
+    str,
+    int,
+    float,
+    bool,
+    List[str],
+    Dict[str, str],
+    Dict[str, PlanningMetadataValue],  # Pour supporter context imbriqué
 ]
+
 
 # TypedDict pour les templates de règles
 class TaskTemplateDict(TypedDict, total=False):
     """Template de tâche pour les règles prédéfinies"""
+
     action: str
     extract: int
     depends_on: List[int]
@@ -83,6 +90,7 @@ class TaskTemplateDict(TypedDict, total=False):
 # TypedDict pour les tâches décomposées par le LLM
 class LLMDecomposedTask(TypedDict, total=False):
     """Tâche décomposée par le LLM"""
+
     name: str
     action: str
     params: Dict[str, str]
@@ -93,6 +101,7 @@ class LLMDecomposedTask(TypedDict, total=False):
 # TypedDict pour le résultat de décomposition LLM
 class LLMDecompositionResult(TypedDict, total=False):
     """Résultat de décomposition par le LLM"""
+
     tasks: List[LLMDecomposedTask]
     reasoning: str
 
@@ -297,9 +306,13 @@ class HierarchicalPlanner:
                 tasks_count=0,
             )
 
-            raise TaskDecompositionError(f"Planning failed for query '{query[:50]}...': {str(e)}") from e
+            raise TaskDecompositionError(
+                f"Planning failed for query '{query[:50]}...': {str(e)}"
+            ) from e
 
-    def _plan_rule_based(self, query: str, metadata: Dict[str, PlanningMetadataValue]) -> PlanningResult:
+    def _plan_rule_based(
+        self, query: str, metadata: Dict[str, PlanningMetadataValue]
+    ) -> PlanningResult:
         """
         Planification basée sur des règles prédéfinies
 
@@ -333,7 +346,9 @@ class HierarchicalPlanner:
 
                     # Récupérer les dépendances
                     depends_on_indices = template.get("depends_on", [])
-                    depends_on_ids = [created_tasks[dep_idx].task_id for dep_idx in depends_on_indices]
+                    depends_on_ids = [
+                        created_tasks[dep_idx].task_id for dep_idx in depends_on_indices
+                    ]
 
                     # Créer la tâche
                     task = Task(
@@ -368,7 +383,9 @@ class HierarchicalPlanner:
             metadata=metadata,
         )
 
-    def _plan_llm_based(self, query: str, metadata: Dict[str, PlanningMetadataValue]) -> PlanningResult:
+    def _plan_llm_based(
+        self, query: str, metadata: Dict[str, PlanningMetadataValue]
+    ) -> PlanningResult:
         """
         Planification via LLM (décomposition intelligente)
 
@@ -426,7 +443,9 @@ class HierarchicalPlanner:
         except Exception as e:
             raise TaskDecompositionError(f"LLM-based planning failed: {str(e)}") from e
 
-    def _plan_hybrid(self, query: str, metadata: Dict[str, PlanningMetadataValue]) -> PlanningResult:
+    def _plan_hybrid(
+        self, query: str, metadata: Dict[str, PlanningMetadataValue]
+    ) -> PlanningResult:
         """
         Planification hybride (règles + LLM)
 
@@ -453,17 +472,19 @@ class HierarchicalPlanner:
         except Exception:
             # Fallback sur règles si LLM échoue
             rule_result.strategy_used = PlanningStrategy.HYBRID
-            rule_result.reasoning = f"Hybrid (LLM failed, fallback to rules): {rule_result.reasoning}"
+            rule_result.reasoning = (
+                f"Hybrid (LLM failed, fallback to rules): {rule_result.reasoning}"
+            )
             return rule_result
 
     def _build_decomposition_prompt(self) -> str:
         """
         Construit le prompt système pour décomposition LLM
-        
+
         Uses Jinja2 template from prompts/templates/v1/planner_decomposition.j2
         """
         try:
-            return self.template_loader.render('planner_decomposition')
+            return self.template_loader.render("planner_decomposition")
         except Exception as e:
             # Fallback to inline prompt if template fails
             print(f"Warning: Failed to load planner template, using fallback: {e}")
@@ -482,24 +503,24 @@ Principes:
 - Priorités cohérentes (CRITICAL=5, HIGH=4, NORMAL=3, LOW=2, OPTIONAL=1)
 
 Réponds TOUJOURS en JSON valide sans markdown."""
-    
+
     def _build_user_decomposition_prompt(self, query: str) -> str:
         """
         Construit le prompt utilisateur pour décomposition
-        
+
         Uses Jinja2 template from prompts/templates/v1/planner_user_prompt.j2
-        
+
         Args:
             query: User query to decompose
-            
+
         Returns:
             Formatted user prompt
         """
         available_actions = ", ".join(self._get_available_actions())
-        
+
         try:
             return self.template_loader.render(
-                'planner_user_prompt',
+                "planner_user_prompt",
                 query=query,
                 available_actions=available_actions,
             )
@@ -532,10 +553,15 @@ Actions disponibles: {available_actions}
         if self.tools_registry:
             return [tool.name for tool in self.tools_registry.get_all()]
         return [
-            "read_file", "write_file", "search", "calculate",
-            "analyze_data", "generate_report", "execute_code"
+            "read_file",
+            "write_file",
+            "search",
+            "calculate",
+            "analyze_data",
+            "generate_report",
+            "execute_code",
         ]
-    
+
     def _parse_llm_response(self, response_text: str) -> LLMDecompositionResult:
         """Parse la réponse JSON du LLM en LLMDecompositionResult.
 
@@ -637,7 +663,9 @@ Actions disponibles: {available_actions}
             available_actions = set(self._get_available_actions())
             for task in graph.tasks.values():
                 if task.action not in available_actions and task.action != "generic_execute":
-                    raise TaskDecompositionError(f"Unknown action '{task.action}' in task {task.task_id}")
+                    raise TaskDecompositionError(
+                        f"Unknown action '{task.action}' in task {task.task_id}"
+                    )
 
         # Vérifier tri topologique possible (pas de cycles)
         try:

@@ -46,6 +46,7 @@ warnings.filterwarnings(
 # Optional imports for API testing
 try:
     from fastapi.testclient import TestClient
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -103,6 +104,7 @@ try:
     from runtime.model_interface import GenerationResult, GenerationConfig
     from runtime.config import AgentConfig
     from tools.base import ToolResult, ToolStatus
+
     RUNTIME_AVAILABLE = True
 except ImportError as e:
     RUNTIME_AVAILABLE = False
@@ -119,9 +121,11 @@ except ImportError as e:
 # FIXTURES: Mock Models
 # ============================================================================
 
+
 @dataclass
 class MockGenerationResult:
     """Mock result for generation"""
+
     text: str
     finish_reason: str = "stop"
     tokens_generated: int = 100
@@ -141,7 +145,7 @@ class MockModelInterface:
         self.responses = responses or [
             "I'll help with that task.",
             "Let me analyze the information.",
-            "Here is the final response."
+            "Here is the final response.",
         ]
         self.call_count = 0
         self.calls_history = []
@@ -153,19 +157,18 @@ class MockModelInterface:
         return True
 
     def generate(
-        self,
-        prompt: str,
-        config: GenerationConfig,
-        system_prompt: Optional[str] = None
+        self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None
     ) -> GenerationResult:
         """Simule la génération de texte"""
         # Enregistrer l'appel
-        self.calls_history.append({
-            'prompt': prompt,
-            'config': config,
-            'system_prompt': system_prompt,
-            'timestamp': datetime.utcnow().isoformat()
-        })
+        self.calls_history.append(
+            {
+                "prompt": prompt,
+                "config": config,
+                "system_prompt": system_prompt,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
         # Retourner la réponse suivante (cycle)
         response_text = self.responses[self.call_count % len(self.responses)]
@@ -177,7 +180,7 @@ class MockModelInterface:
             tokens_generated=len(response_text.split()),
             prompt_tokens=len(prompt.split()),
             total_tokens=len(prompt.split()) + len(response_text.split()),
-            tool_calls=None
+            tool_calls=None,
         )
 
     def unload(self):
@@ -199,25 +202,17 @@ class MockToolCallModel(MockModelInterface):
         """
         super().__init__()
         self.tool_sequence = tool_sequence or [
-            {
-                'name': 'python_sandbox',
-                'arguments': {'code': 'print("test")'}
-            }
+            {"name": "python_sandbox", "arguments": {"code": 'print("test")'}}
         ]
         self.tool_index = 0
 
     def generate(
-        self,
-        prompt: str,
-        config: GenerationConfig,
-        system_prompt: Optional[str] = None
+        self, prompt: str, config: GenerationConfig, system_prompt: Optional[str] = None
     ) -> GenerationResult:
         """Simule génération avec appels d'outils"""
-        self.calls_history.append({
-            'prompt': prompt,
-            'config': config,
-            'system_prompt': system_prompt
-        })
+        self.calls_history.append(
+            {"prompt": prompt, "config": config, "system_prompt": system_prompt}
+        )
 
         # Premier appel: retourner un tool call
         if self.tool_index < len(self.tool_sequence):
@@ -232,7 +227,7 @@ class MockToolCallModel(MockModelInterface):
                 tokens_generated=50,
                 prompt_tokens=100,
                 total_tokens=150,
-                tool_calls=[tool_call]
+                tool_calls=[tool_call],
             )
 
         # Appels suivants: réponse normale
@@ -243,12 +238,12 @@ class MockToolCallModel(MockModelInterface):
 def mock_model() -> MockModelInterface:
     """
     Fixture pour un mock model de base
-    
+
     Scope: function (new instance per test for isolation)
-    
+
     Returns:
         MockModelInterface: Mock model avec réponses par défaut
-        
+
     Example:
         def test_with_model(mock_model):
             result = mock_model.generate("test", GenerationConfig())
@@ -261,12 +256,12 @@ def mock_model() -> MockModelInterface:
 def mock_tool_model() -> MockToolCallModel:
     """
     Fixture pour un mock model avec appels d'outils
-    
+
     Scope: function (new instance per test for isolation)
-    
+
     Returns:
         MockToolCallModel: Mock model qui simule des appels d'outils
-        
+
     Example:
         def test_tool_calls(mock_tool_model):
             result = mock_tool_model.generate("test", GenerationConfig())
@@ -279,20 +274,22 @@ def mock_tool_model() -> MockToolCallModel:
 def mock_model_with_responses():
     """
     Factory fixture pour créer des mock models avec réponses personnalisées
-    
+
     Scope: function
-    
+
     Returns:
         Callable: Fonction factory pour créer des mock models
-        
+
     Example:
         def test_custom_responses(mock_model_with_responses):
             model = mock_model_with_responses(["Response 1", "Response 2"])
             result = model.generate("test", GenerationConfig())
             assert result.text == "Response 1"
     """
+
     def _create_mock(responses: List[str]) -> MockModelInterface:
         return MockModelInterface(responses=responses)
+
     return _create_mock
 
 
@@ -300,22 +297,23 @@ def mock_model_with_responses():
 # FIXTURES: Temporary Databases
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def temp_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
     """
     Fixture pour une base de données SQLite temporaire isolée
-    
+
     Automatically patches memory.episodic.DB_PATH for complete isolation.
-    
+
     Scope: function (new database per test)
-    
+
     Args:
         tmp_path: pytest's temporary directory fixture
         monkeypatch: pytest's monkeypatch fixture for patching
-    
+
     Returns:
         Path: Chemin vers la base de données temporaire
-        
+
     Example:
         def test_database(temp_db):
             # Database is isolated and cleaned up automatically
@@ -326,11 +324,13 @@ def temp_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
 
     # Patch the DB_PATH in memory.episodic module for complete isolation
     import memory.episodic
-    monkeypatch.setattr(memory.episodic, 'DB_PATH', db_path)
+
+    monkeypatch.setattr(memory.episodic, "DB_PATH", db_path)
 
     # Create tables using the episodic module's function
     # This ensures the schema matches exactly what the application expects
     from memory.episodic import create_tables
+
     create_tables()
 
     yield db_path
@@ -342,18 +342,18 @@ def temp_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
 def temp_analytics_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
     """
     Fixture pour une base de données analytics SQLite temporaire isolée
-    
+
     Automatically patches memory.analytics.DB_PATH for complete isolation.
-    
+
     Scope: function (new database per test)
-    
+
     Args:
         tmp_path: pytest's temporary directory fixture
         monkeypatch: pytest's monkeypatch fixture for patching
-    
+
     Returns:
         Path: Chemin vers la base de données analytics temporaire
-        
+
     Example:
         def test_analytics(temp_analytics_db):
             # Database is isolated and cleaned up automatically
@@ -364,10 +364,12 @@ def temp_analytics_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
 
     # Patch the DB_PATH in memory.analytics module for complete isolation
     import memory.analytics
-    monkeypatch.setattr(memory.analytics, 'DB_PATH', db_path)
+
+    monkeypatch.setattr(memory.analytics, "DB_PATH", db_path)
 
     # Create tables using the analytics module's function
     from memory.analytics import create_tables
+
     create_tables()
 
     yield db_path
@@ -379,15 +381,15 @@ def temp_analytics_db(tmp_path, monkeypatch) -> Generator[Path, None, None]:
 def temp_faiss(tmp_path) -> Generator[Path, None, None]:
     """
     Fixture pour un index FAISS temporaire isolé
-    
+
     Scope: function (new FAISS index per test)
 
     Args:
         tmp_path: pytest's temporary directory fixture
-    
+
     Returns:
         Path: Répertoire pour les index FAISS
-        
+
     Example:
         def test_semantic_search(temp_faiss):
             # FAISS directory is isolated
@@ -406,6 +408,7 @@ def temp_faiss(tmp_path) -> Generator[Path, None, None]:
 # FIXTURES: Isolated File Systems
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def isolated_fs(tmp_path) -> Generator[Dict[str, Path], None, None]:
     """
@@ -417,15 +420,15 @@ def isolated_fs(tmp_path) -> Generator[Dict[str, Path], None, None]:
     - logs/digests/
     - memory/
     - config/
-    
+
     Scope: function (new filesystem per test)
 
     Args:
         tmp_path: pytest's temporary directory fixture
-    
+
     Returns:
         Dict[str, Path]: Dictionnaire de chemins isolés
-        
+
     Example:
         def test_with_isolated_fs(isolated_fs):
             log_dir = isolated_fs['logs_events']
@@ -433,13 +436,13 @@ def isolated_fs(tmp_path) -> Generator[Dict[str, Path], None, None]:
             (log_dir / "test.log").write_text("test")
     """
     structure = {
-        'root': tmp_path,
-        'logs': tmp_path / "logs",
-        'logs_events': tmp_path / "logs" / "events",
-        'logs_decisions': tmp_path / "logs" / "decisions",
-        'logs_digests': tmp_path / "logs" / "digests",
-        'memory': tmp_path / "memory",
-        'config': tmp_path / "config",
+        "root": tmp_path,
+        "logs": tmp_path / "logs",
+        "logs_events": tmp_path / "logs" / "events",
+        "logs_decisions": tmp_path / "logs" / "decisions",
+        "logs_digests": tmp_path / "logs" / "digests",
+        "memory": tmp_path / "memory",
+        "config": tmp_path / "config",
     }
 
     # Créer tous les répertoires
@@ -456,17 +459,17 @@ def isolated_fs(tmp_path) -> Generator[Dict[str, Path], None, None]:
 def isolated_logging(isolated_fs) -> Generator[Dict[str, Any], None, None]:
     """
     Fixture pour logging isolé avec structure WORM
-    
+
     Depends on isolated_fs fixture for directory structure.
-    
+
     Scope: function (new loggers per test)
 
     Args:
         isolated_fs: isolated filesystem fixture
-    
+
     Returns:
         Dict: Configuration de logging isolé avec event_logger, worm_logger, etc.
-        
+
     Example:
         def test_logging(isolated_logging):
             logger = isolated_logging['event_logger']
@@ -476,20 +479,17 @@ def isolated_logging(isolated_fs) -> Generator[Dict[str, Any], None, None]:
     from runtime.middleware.worm import WormLogger
 
     # Créer logger isolé
-    event_logger = EventLogger(
-        log_dir=str(isolated_fs['logs_events'])
-    )
+    event_logger = EventLogger(log_dir=str(isolated_fs["logs_events"]))
 
     worm_logger = WormLogger(
-        log_dir=str(isolated_fs['logs_events']),
-        digest_dir=str(isolated_fs['logs_digests'])
+        log_dir=str(isolated_fs["logs_events"]), digest_dir=str(isolated_fs["logs_digests"])
     )
 
     return {
-        'event_logger': event_logger,
-        'worm_logger': worm_logger,
-        'event_log_dir': isolated_fs['logs_events'],
-        'digest_dir': isolated_fs['logs_digests']
+        "event_logger": event_logger,
+        "worm_logger": worm_logger,
+        "event_log_dir": isolated_fs["logs_events"],
+        "digest_dir": isolated_fs["logs_digests"],
     }
 
 
@@ -497,19 +497,20 @@ def isolated_logging(isolated_fs) -> Generator[Dict[str, Any], None, None]:
 # FIXTURES: Configuration & Middleware
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def test_config(tmp_path) -> AgentConfig:
     """
     Fixture pour une configuration de test isolée
-    
+
     Scope: function (new config per test)
 
     Args:
         tmp_path: pytest's temporary directory fixture
-    
+
     Returns:
         AgentConfig: Configuration de test
-        
+
     Example:
         def test_with_config(test_config):
             assert test_config.model.backend == "mock"
@@ -558,18 +559,19 @@ def isolated_pii_redactor(tmp_path) -> Generator[Any, None, None]:
 
     # Minimal PII config for testing
     test_config = {
-        'policies': {
-            'pii': {
-                'enabled': True,
-                'replacement_pattern': '[REDACTED]',
-                'fields_to_mask': ['email', 'phone', 'ssn', 'credit_card'],
-                'scan_before_logging': True
+        "policies": {
+            "pii": {
+                "enabled": True,
+                "replacement_pattern": "[REDACTED]",
+                "fields_to_mask": ["email", "phone", "ssn", "credit_card"],
+                "scan_before_logging": True,
             }
         }
     }
 
     import yaml
-    with open(config_file, 'w') as f:
+
+    with open(config_file, "w") as f:
         yaml.dump(test_config, f)
 
     redactor = PIIRedactor(config_path=str(config_file))
@@ -603,31 +605,37 @@ def isolated_rbac_manager(tmp_path) -> Generator[Any, None, None]:
 
     # Test RBAC config with standard roles
     test_config = {
-        'policies': {
-            'rbac': {
-                'roles': [
+        "policies": {
+            "rbac": {
+                "roles": [
                     {
-                        'name': 'admin',
-                        'permissions': ['execute_code', 'read_files', 'write_files', 'network_access'],
-                        'description': 'Administrator with full access'
+                        "name": "admin",
+                        "permissions": [
+                            "execute_code",
+                            "read_files",
+                            "write_files",
+                            "network_access",
+                        ],
+                        "description": "Administrator with full access",
                     },
                     {
-                        'name': 'user',
-                        'permissions': ['read_files'],
-                        'description': 'Regular user with read-only access'
+                        "name": "user",
+                        "permissions": ["read_files"],
+                        "description": "Regular user with read-only access",
                     },
                     {
-                        'name': 'guest',
-                        'permissions': [],
-                        'description': 'Guest with no permissions'
-                    }
+                        "name": "guest",
+                        "permissions": [],
+                        "description": "Guest with no permissions",
+                    },
                 ]
             }
         }
     }
 
     import yaml
-    with open(config_file, 'w') as f:
+
+    with open(config_file, "w") as f:
         yaml.dump(test_config, f)
 
     rbac_manager = RBACManager(config_path=str(config_file))
@@ -661,18 +669,19 @@ def isolated_constraints_engine(tmp_path) -> Generator[Any, None, None]:
 
     # Test guardrails config
     test_config = {
-        'policies': {
-            'guardrails': {
-                'enabled': True,
-                'blocklist_keywords': ['malicious', 'dangerous', 'exploit'],
-                'max_prompt_length': 10000,
-                'max_response_length': 50000
+        "policies": {
+            "guardrails": {
+                "enabled": True,
+                "blocklist_keywords": ["malicious", "dangerous", "exploit"],
+                "max_prompt_length": 10000,
+                "max_response_length": 50000,
             }
         }
     }
 
     import yaml
-    with open(config_file, 'w') as f:
+
+    with open(config_file, "w") as f:
         yaml.dump(test_config, f)
 
     constraints_engine = ConstraintsEngine(config_path=str(config_file))
@@ -680,8 +689,13 @@ def isolated_constraints_engine(tmp_path) -> Generator[Any, None, None]:
 
 
 @pytest.fixture(scope="function")
-def patched_middlewares(isolated_fs, isolated_logging, isolated_pii_redactor,
-                        isolated_rbac_manager, isolated_constraints_engine) -> Generator[Dict[str, Any], None, None]:
+def patched_middlewares(
+    isolated_fs,
+    isolated_logging,
+    isolated_pii_redactor,
+    isolated_rbac_manager,
+    isolated_constraints_engine,
+) -> Generator[Dict[str, Any], None, None]:
     """
     Fixture pour patcher tous les middlewares avec des versions isolées
 
@@ -710,77 +724,65 @@ def patched_middlewares(isolated_fs, isolated_logging, isolated_pii_redactor,
 
     # Patcher le logger
     logger_patch = patch(
-        'runtime.middleware.logging.get_logger',
-        return_value=isolated_logging['event_logger']
+        "runtime.middleware.logging.get_logger", return_value=isolated_logging["event_logger"]
     )
     patches.append(logger_patch)
     logger_patch.start()
 
     # Patcher WORM logger
     worm_patch = patch(
-        'runtime.middleware.worm.get_worm_logger',
-        return_value=isolated_logging['worm_logger']
+        "runtime.middleware.worm.get_worm_logger", return_value=isolated_logging["worm_logger"]
     )
     patches.append(worm_patch)
     worm_patch.start()
 
     # Patcher DR manager
     from runtime.middleware.audittrail import DRManager
-    dr_manager = DRManager(
-        output_dir=str(isolated_fs['logs_decisions'])
-    )
-    dr_patch = patch(
-        'runtime.middleware.audittrail.get_dr_manager',
-        return_value=dr_manager
-    )
+
+    dr_manager = DRManager(output_dir=str(isolated_fs["logs_decisions"]))
+    dr_patch = patch("runtime.middleware.audittrail.get_dr_manager", return_value=dr_manager)
     patches.append(dr_patch)
     dr_patch.start()
 
     # Patcher Provenance tracker
     from runtime.middleware.provenance import ProvenanceTracker
-    tracker = ProvenanceTracker(
-        storage_dir=str(isolated_fs['logs'])
-    )
-    tracker_patch = patch(
-        'runtime.middleware.provenance.get_tracker',
-        return_value=tracker
-    )
+
+    tracker = ProvenanceTracker(storage_dir=str(isolated_fs["logs"]))
+    tracker_patch = patch("runtime.middleware.provenance.get_tracker", return_value=tracker)
     patches.append(tracker_patch)
     tracker_patch.start()
 
     # Patcher PII redactor
     pii_patch = patch(
-        'runtime.middleware.redaction.get_pii_redactor',
-        return_value=isolated_pii_redactor
+        "runtime.middleware.redaction.get_pii_redactor", return_value=isolated_pii_redactor
     )
     patches.append(pii_patch)
     pii_patch.start()
 
     # Patcher RBAC manager
     rbac_patch = patch(
-        'runtime.middleware.rbac.get_rbac_manager',
-        return_value=isolated_rbac_manager
+        "runtime.middleware.rbac.get_rbac_manager", return_value=isolated_rbac_manager
     )
     patches.append(rbac_patch)
     rbac_patch.start()
 
     # Patcher Constraints engine
     constraints_patch = patch(
-        'runtime.middleware.constraints.get_constraints_engine',
-        return_value=isolated_constraints_engine
+        "runtime.middleware.constraints.get_constraints_engine",
+        return_value=isolated_constraints_engine,
     )
     patches.append(constraints_patch)
     constraints_patch.start()
 
     yield {
-        'event_logger': isolated_logging['event_logger'],
-        'worm_logger': isolated_logging['worm_logger'],
-        'dr_manager': dr_manager,
-        'tracker': tracker,
-        'pii_redactor': isolated_pii_redactor,
-        'rbac_manager': isolated_rbac_manager,
-        'constraints_engine': isolated_constraints_engine,
-        'isolated_fs': isolated_fs
+        "event_logger": isolated_logging["event_logger"],
+        "worm_logger": isolated_logging["worm_logger"],
+        "dr_manager": dr_manager,
+        "tracker": tracker,
+        "pii_redactor": isolated_pii_redactor,
+        "rbac_manager": isolated_rbac_manager,
+        "constraints_engine": isolated_constraints_engine,
+        "isolated_fs": isolated_fs,
     }
 
     # Cleanup: arrêter tous les patches
@@ -850,23 +852,24 @@ def mock_middleware_stack(patched_middlewares) -> Dict[str, Any]:
 # FIXTURES: FastAPI Test Client
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def api_client(mock_model, temp_db, patched_middlewares) -> Generator[TestClient, None, None]:
     """
     Fixture pour un client API FastAPI complet avec tous les mocks
-    
+
     Automatically patches the model and database for complete isolation.
-    
+
     Scope: function (new client per test)
 
     Args:
         mock_model: Mock LLM model fixture
         temp_db: Temporary database fixture
         patched_middlewares: Patched middleware fixture
-    
+
     Returns:
         TestClient: Client de test FastAPI configuré
-        
+
     Example:
         def test_api_endpoint(api_client):
             response = api_client.post("/chat", json={
@@ -877,30 +880,32 @@ def api_client(mock_model, temp_db, patched_middlewares) -> Generator[TestClient
     from runtime.server import app
 
     # Patcher le modèle
-    with patch('runtime.agent.init_model', return_value=mock_model):
+    with patch("runtime.agent.init_model", return_value=mock_model):
         # Patcher la DB
-        with patch('memory.episodic.DB_PATH', str(temp_db)):
+        with patch("memory.episodic.DB_PATH", str(temp_db)):
             client = TestClient(app)
             yield client
 
 
 @pytest.fixture(scope="function")
-def api_client_with_tool_model(mock_tool_model, temp_db, patched_middlewares) -> Generator[TestClient, None, None]:
+def api_client_with_tool_model(
+    mock_tool_model, temp_db, patched_middlewares
+) -> Generator[TestClient, None, None]:
     """
     Fixture pour un client API avec mock model supportant les outils
-    
+
     Similar to api_client but uses mock_tool_model for tool call testing.
-    
+
     Scope: function (new client per test)
 
     Args:
         mock_tool_model: Mock model with tool call support
         temp_db: Temporary database fixture
         patched_middlewares: Patched middleware fixture
-    
+
     Returns:
         TestClient: Client de test FastAPI avec support d'outils
-        
+
     Example:
         def test_tool_execution(api_client_with_tool_model):
             response = api_client_with_tool_model.post("/chat", json={
@@ -910,8 +915,8 @@ def api_client_with_tool_model(mock_tool_model, temp_db, patched_middlewares) ->
     """
     from runtime.server import app
 
-    with patch('runtime.agent.init_model', return_value=mock_tool_model):
-        with patch('memory.episodic.DB_PATH', str(temp_db)):
+    with patch("runtime.agent.init_model", return_value=mock_tool_model):
+        with patch("memory.episodic.DB_PATH", str(temp_db)):
             client = TestClient(app)
             yield client
 
@@ -920,35 +925,37 @@ def api_client_with_tool_model(mock_tool_model, temp_db, patched_middlewares) ->
 # FIXTURES: Tool Mocks
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def mock_tool_success() -> MagicMock:
     """
     Fixture pour un outil qui réussit toujours
-    
+
     Scope: function (new mock per test)
-    
+
     Returns:
         MagicMock: Mock tool qui retourne toujours SUCCESS
-        
+
     Example:
         def test_successful_tool(mock_tool_success):
             result = mock_tool_success.execute({'param': 'value'})
             assert result.status == ToolStatus.SUCCESS
     """
+
     def _execute(params: Dict) -> ToolResult:
         return ToolResult(
             status=ToolStatus.SUCCESS,
             output=f"Tool executed successfully with params: {params}",
-            metadata={'execution_time': 0.1}
+            metadata={"execution_time": 0.1},
         )
 
     mock = MagicMock()
     mock.execute = _execute
     mock.name = "mock_tool"
     mock.get_schema.return_value = {
-        'name': 'mock_tool',
-        'description': 'Mock tool for testing',
-        'parameters': {'type': 'object', 'properties': {}}
+        "name": "mock_tool",
+        "description": "Mock tool for testing",
+        "parameters": {"type": "object", "properties": {}},
     }
 
     return mock
@@ -958,31 +965,32 @@ def mock_tool_success() -> MagicMock:
 def mock_tool_failure() -> MagicMock:
     """
     Fixture pour un outil qui échoue toujours
-    
+
     Scope: function (new mock per test)
-    
+
     Returns:
         MagicMock: Mock tool qui retourne toujours ERROR
-        
+
     Example:
         def test_failing_tool(mock_tool_failure):
             result = mock_tool_failure.execute({'param': 'value'})
             assert result.status == ToolStatus.ERROR
     """
+
     def _execute(params: Dict) -> ToolResult:
         return ToolResult(
             status=ToolStatus.ERROR,
             output="Tool execution failed",
-            error_message="Simulated failure"
+            error_message="Simulated failure",
         )
 
     mock = MagicMock()
     mock.execute = _execute
     mock.name = "failing_tool"
     mock.get_schema.return_value = {
-        'name': 'failing_tool',
-        'description': 'Tool that always fails',
-        'parameters': {'type': 'object', 'properties': {}}
+        "name": "failing_tool",
+        "description": "Tool that always fails",
+        "parameters": {"type": "object", "properties": {}},
     }
 
     return mock
@@ -992,19 +1000,20 @@ def mock_tool_failure() -> MagicMock:
 # FIXTURES: Utility Helpers
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def conversation_factory(temp_db):
     """
     Factory fixture pour créer des conversations de test
-    
+
     Scope: function
-    
+
     Args:
         temp_db: Temporary database fixture
 
     Returns:
         Callable: Fonction pour créer des conversations
-        
+
     Example:
         def test_conversation(conversation_factory):
             conv_id = conversation_factory(
@@ -1013,10 +1022,9 @@ def conversation_factory(temp_db):
             )
             # Conversation is now in the database
     """
+
     def _create_conversation(
-        conversation_id: str,
-        messages: List[Dict[str, str]],
-        task_id: Optional[str] = None
+        conversation_id: str, messages: List[Dict[str, str]], task_id: Optional[str] = None
     ) -> str:
         """
         Créer une conversation avec des messages
@@ -1025,7 +1033,7 @@ def conversation_factory(temp_db):
             conversation_id: ID de la conversation
             messages: Liste de messages {'role': str, 'content': str}
             task_id: ID de tâche optionnel
-            
+
         Returns:
             str: conversation_id
         """
@@ -1034,29 +1042,29 @@ def conversation_factory(temp_db):
 
         # Créer la conversation (respect du schéma réel)
         now_iso = datetime.utcnow().isoformat()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO conversations (id, conversation_id, created_at, updated_at, metadata)
             VALUES (?, ?, ?, ?, ?)
-        """, (
-            conversation_id,
-            conversation_id,
-            now_iso,
-            now_iso,
-            None
-        ))
+        """,
+            (conversation_id, conversation_id, now_iso, now_iso, None),
+        )
 
         # Ajouter les messages
         for msg in messages:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO messages (conversation_id, role, content, timestamp, task_id)
                 VALUES (?, ?, ?, ?, ?)
-            """, (
-                conversation_id,
-                msg['role'],
-                msg['content'],
-                datetime.utcnow().isoformat(),
-                task_id
-            ))
+            """,
+                (
+                    conversation_id,
+                    msg["role"],
+                    msg["content"],
+                    datetime.utcnow().isoformat(),
+                    task_id,
+                ),
+            )
 
         conn.commit()
         conn.close()
@@ -1070,24 +1078,26 @@ def conversation_factory(temp_db):
 def assert_file_contains():
     """
     Helper fixture pour asserter le contenu de fichiers
-    
+
     Scope: function
-    
+
     Returns:
         Callable: Fonction d'assertion
-        
+
     Example:
         def test_log_content(assert_file_contains, tmp_path):
             log_file = tmp_path / "test.log"
             log_file.write_text("Test log content")
             assert_file_contains(log_file, "Test log")
     """
+
     def _assert_contains(file_path: Path, expected_content: str) -> None:
         """Vérifie qu'un fichier contient le contenu attendu"""
         assert file_path.exists(), f"File {file_path} does not exist"
         content = file_path.read_text()
-        assert expected_content in content, \
-            f"Expected '{expected_content}' not found in {file_path}"
+        assert (
+            expected_content in content
+        ), f"Expected '{expected_content}' not found in {file_path}"
 
     return _assert_contains
 
@@ -1096,12 +1106,12 @@ def assert_file_contains():
 def assert_json_file_valid():
     """
     Helper fixture pour valider des fichiers JSON
-    
+
     Scope: function
-    
+
     Returns:
         Callable: Fonction de validation JSON
-        
+
     Example:
         def test_json_structure(assert_json_file_valid, tmp_path):
             json_file = tmp_path / "data.json"
@@ -1109,11 +1119,12 @@ def assert_json_file_valid():
             data = assert_json_file_valid(json_file, {"key": str})
             assert data["key"] == "value"
     """
+
     def _assert_valid(file_path: Path, schema: Optional[Dict] = None) -> Dict:
         """Vérifie qu'un fichier est un JSON valide"""
         assert file_path.exists(), f"File {file_path} does not exist"
 
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             data = json.load(f)
 
         if schema:
@@ -1130,12 +1141,12 @@ def assert_json_file_valid():
 def performance_tracker():
     """
     Fixture to track test performance and timing
-    
+
     Scope: function
-    
+
     Returns:
         Callable: Context manager for timing code blocks
-        
+
     Example:
         def test_performance(performance_tracker):
             with performance_tracker("database_query") as timer:
@@ -1145,28 +1156,28 @@ def performance_tracker():
     """
     import time
     from contextlib import contextmanager
-    
+
     class Timer:
         def __init__(self):
             self.start_time = None
             self.end_time = None
             self.elapsed = None
-    
+
     @contextmanager
     def _track(label: str = ""):
         """Track execution time of code block"""
         timer = Timer()
         timer.start_time = time.time()
-        
+
         yield timer
-        
+
         timer.end_time = time.time()
         timer.elapsed = timer.end_time - timer.start_time
-        
+
         # Optionally print timing info
         if label:
             print(f"\n⏱ {label}: {timer.elapsed:.4f}s")
-    
+
     return _track
 
 
@@ -1176,13 +1187,15 @@ def performance_tracker():
 
 # Check if llama_cpp is available for conditional test skipping
 import importlib.util
+
 _LLAMA_CPP_AVAILABLE = importlib.util.find_spec("llama_cpp") is not None
 
 # Reusable skip marker for tests requiring llama-cpp-python
 skip_if_no_llama_cpp = pytest.mark.skipif(
     not _LLAMA_CPP_AVAILABLE,
-    reason="llama-cpp-python not installed (optional ml dependency). Install with: pdm install --with ml"
+    reason="llama-cpp-python not installed (optional ml dependency). Install with: pdm install --with ml",
 )
+
 
 def pytest_configure(config):
     """
@@ -1196,23 +1209,14 @@ def pytest_configure(config):
     - fixtures: Tests for fixture functionality
     - requires_llama_cpp: Tests requiring llama-cpp-python package
     """
+    config.addinivalue_line("markers", "e2e: Tests end-to-end complets")
+    config.addinivalue_line("markers", "compliance: Tests de conformité et validation")
+    config.addinivalue_line("markers", "resilience: Tests de résilience et fallbacks")
+    config.addinivalue_line("markers", "slow: Tests lents (> 1 seconde)")
+    config.addinivalue_line("markers", "fixtures: Tests validating fixture functionality")
     config.addinivalue_line(
-        "markers", "e2e: Tests end-to-end complets"
-    )
-    config.addinivalue_line(
-        "markers", "compliance: Tests de conformité et validation"
-    )
-    config.addinivalue_line(
-        "markers", "resilience: Tests de résilience et fallbacks"
-    )
-    config.addinivalue_line(
-        "markers", "slow: Tests lents (> 1 seconde)"
-    )
-    config.addinivalue_line(
-        "markers", "fixtures: Tests validating fixture functionality"
-    )
-    config.addinivalue_line(
-        "markers", "requires_llama_cpp: Tests requiring llama-cpp-python package (optional ml dependency)"
+        "markers",
+        "requires_llama_cpp: Tests requiring llama-cpp-python package (optional ml dependency)",
     )
 
 
@@ -1220,22 +1224,23 @@ def pytest_configure(config):
 # FIXTURES: Cleanup & Teardown
 # ============================================================================
 
+
 @pytest.fixture(scope="function", autouse=True)
 def clean_environment(monkeypatch) -> Generator[None, None, None]:
     """
     Auto-fixture pour isoler les variables d'environnement entre tests
-    
+
     Automatically applied to all tests (autouse=True).
     Ensures environment variables don't leak between tests.
-    
+
     Scope: function (applied to each test)
-    
+
     Args:
         monkeypatch: pytest's monkeypatch fixture
-        
+
     Yields:
         None
-        
+
     Example:
         # This fixture is applied automatically
         def test_with_env(monkeypatch):
@@ -1244,9 +1249,9 @@ def clean_environment(monkeypatch) -> Generator[None, None, None]:
     """
     # Store original environment
     original_env = os.environ.copy()
-    
+
     yield
-    
+
     # Restore original environment (monkeypatch handles this, but explicit for clarity)
     # The monkeypatch fixture automatically undoes all changes
 
@@ -1255,15 +1260,15 @@ def clean_environment(monkeypatch) -> Generator[None, None, None]:
 def reset_singletons() -> Generator[None, None, None]:
     """
     Auto-fixture pour réinitialiser tous les singletons entre les tests
-    
+
     Important pour éviter les effets de bord entre tests.
     Automatically applied to all tests (autouse=True).
-    
+
     Scope: function (applied to each test)
-    
+
     Yields:
         None
-        
+
     Note:
         Singleton cleanup is primarily handled by the patched_middlewares fixture
         which creates isolated instances. This fixture ensures any global state
@@ -1281,51 +1286,51 @@ def reset_singletons() -> Generator[None, None, None]:
 def configure_document_analyzer_for_tests():
     """
     Configure DocumentAnalyzerPME to allow test fixtures directory
-    
+
     This fixture automatically adds the tests/fixtures directory to
     DocumentAnalyzerPME.allowed_paths for all tests, enabling tests
     to use fixture files without security errors.
-    
+
     Scope: function (applied to each test)
     Autouse: True (automatically applied)
-    
+
     Yields:
         None
-        
+
     Note:
         This is necessary because the path validation security fix
         requires all file paths to be in allowed_paths. Test files
         in tests/fixtures/ need to be accessible.
     """
     from pathlib import Path
-    
+
     # Import DocumentAnalyzerPME
     try:
         from tools.document_analyzer_pme import DocumentAnalyzerPME
-        
+
         # Get test fixtures directory
         fixtures_dir = Path(__file__).parent / "fixtures"
         fixtures_path_str = str(fixtures_dir) + "/"
-        
+
         # Store original allowed_paths class attribute if it exists
         # Note: We need to patch at class level to affect all instances
         original_init = DocumentAnalyzerPME.__init__
-        
+
         def patched_init(self, *args, **kwargs):
             # Call original init
             original_init(self, *args, **kwargs)
             # Add fixtures directory to allowed_paths if not already there
             if fixtures_path_str not in self.allowed_paths:
                 self.allowed_paths.append(fixtures_path_str)
-        
+
         # Patch the __init__ method
         DocumentAnalyzerPME.__init__ = patched_init
-        
+
         yield
-        
+
         # Restore original __init__
         DocumentAnalyzerPME.__init__ = original_init
-        
+
     except ImportError:
         # DocumentAnalyzerPME not available, skip patching
         yield

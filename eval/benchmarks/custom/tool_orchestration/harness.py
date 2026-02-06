@@ -19,9 +19,7 @@ from eval.base import BenchmarkHarness, BenchmarkResult, BenchmarkTask
 # Type aliases for strict typing
 MetricValue = Union[str, int, float, bool]
 TaskMetadata = Dict[str, Union[str, int, float, bool, List[str]]]
-EvaluatorFunc = Callable[
-    ["ToolOrchestrationHarness", BenchmarkTask, str], BenchmarkResult
-]
+EvaluatorFunc = Callable[["ToolOrchestrationHarness", BenchmarkTask, str], BenchmarkResult]
 
 
 class ToolOrchestrationHarness(BenchmarkHarness):
@@ -37,9 +35,7 @@ class ToolOrchestrationHarness(BenchmarkHarness):
     """
 
     def __init__(self) -> None:
-        super().__init__(
-            "Tool-Orchestration", "Tool orchestration capability benchmark"
-        )
+        super().__init__("Tool-Orchestration", "Tool orchestration capability benchmark")
         self.tasks_dir = Path("eval/benchmarks/custom/tool_orchestration/tasks")
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
@@ -275,9 +271,7 @@ class ToolOrchestrationHarness(BenchmarkHarness):
 
         return evaluator(task, response)
 
-    def _evaluate_selection(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_selection(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer selection d'outil"""
         if task.metadata is None:
             return BenchmarkResult(
@@ -481,9 +475,7 @@ class ToolOrchestrationHarness(BenchmarkHarness):
             metadata={"found_parallel": found_parallel},
         )
 
-    def _evaluate_conditional(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_conditional(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer selection conditionnelle"""
         conditional_indicators = ["if", "si", "else", "sinon", "depending", "selon"]
         found = sum(1 for ind in conditional_indicators if ind in response.lower())
@@ -514,9 +506,7 @@ class ToolOrchestrationHarness(BenchmarkHarness):
             metadata={"response_length": len(response.split()), "min": min_length},
         )
 
-    def _evaluate_transformation(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_transformation(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer pipeline de transformation"""
         transform_keywords = ["convert", "filter", "sort", "transform", "export"]
         found = sum(1 for kw in transform_keywords if kw in response.lower())
@@ -545,9 +535,7 @@ class ToolOrchestrationHarness(BenchmarkHarness):
             ground_truth=task.ground_truth,
         )
 
-    def _evaluate_resources(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_resources(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer gestion de ressources limitees"""
         resource_keywords = ["stream", "chunk", "batch", "memory", "limit"]
         found = sum(1 for kw in resource_keywords if kw in response.lower())
@@ -561,9 +549,7 @@ class ToolOrchestrationHarness(BenchmarkHarness):
             ground_truth=task.ground_truth,
         )
 
-    def _evaluate_versioning(
-        self, task: BenchmarkTask, response: str
-    ) -> BenchmarkResult:
+    def _evaluate_versioning(self, task: BenchmarkTask, response: str) -> BenchmarkResult:
         """Evaluer gestion de versions d'outils"""
         if task.metadata is None:
             return BenchmarkResult(

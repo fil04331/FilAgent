@@ -1,6 +1,7 @@
 """
 Tests d'intégration pour le Document Analyzer dans l'interface Gradio
 """
+
 import pytest
 from pathlib import Path
 import sys
@@ -33,23 +34,23 @@ class TestGradioDocumentAnalyzer:
         assert "file_path" in error
 
         # Test avec file_path invalide (type incorrect)
-        is_valid, error = tool.validate_arguments({'file_path': 123})
+        is_valid, error = tool.validate_arguments({"file_path": 123})
         assert not is_valid
         assert "string" in error.lower()
 
         # Test avec extension non supportée
-        is_valid, error = tool.validate_arguments({'file_path': 'test.txt'})
+        is_valid, error = tool.validate_arguments({"file_path": "test.txt"})
         assert not is_valid
         assert "Unsupported" in error
 
         # Test avec arguments valides
-        is_valid, error = tool.validate_arguments({'file_path': 'test.pdf'})
+        is_valid, error = tool.validate_arguments({"file_path": "test.pdf"})
         assert is_valid
         assert error is None
 
     @pytest.mark.skipif(
         not Path("/Users/felixlefebvre/FilAgent/tests/fixtures").exists(),
-        reason="Fixtures directory not found"
+        reason="Fixtures directory not found",
     )
     def test_tool_execution_with_fixture(self):
         """Test l'exécution de l'outil avec un fichier fixture (si disponible)"""
@@ -61,30 +62,23 @@ class TestGradioDocumentAnalyzer:
         excel_files = list(fixtures_dir.glob("*.xlsx"))
 
         if pdf_files:
-            result = tool.execute({
-                'file_path': str(pdf_files[0]),
-                'analysis_type': 'invoice'
-            })
+            result = tool.execute({"file_path": str(pdf_files[0]), "analysis_type": "invoice"})
             # Vérifier que l'exécution ne plante pas
             assert result is not None
-            assert hasattr(result, 'status')
+            assert hasattr(result, "status")
 
         if excel_files:
-            result = tool.execute({
-                'file_path': str(excel_files[0]),
-                'analysis_type': 'extract'
-            })
+            result = tool.execute({"file_path": str(excel_files[0]), "analysis_type": "extract"})
             assert result is not None
-            assert hasattr(result, 'status')
+            assert hasattr(result, "status")
 
     def test_tool_handles_missing_file(self):
         """Test que l'outil gère correctement un fichier manquant"""
         tool = DocumentAnalyzerPME()
 
-        result = tool.execute({
-            'file_path': '/path/to/nonexistent/file.pdf',
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute(
+            {"file_path": "/path/to/nonexistent/file.pdf", "analysis_type": "invoice"}
+        )
 
         assert result.status == ToolStatus.ERROR
         assert "not found" in result.error.lower()
@@ -94,13 +88,13 @@ class TestGradioDocumentAnalyzer:
         tool = DocumentAnalyzerPME()
         schema = tool.get_parameters_schema()
 
-        assert 'type' in schema
-        assert schema['type'] == 'object'
-        assert 'properties' in schema
-        assert 'file_path' in schema['properties']
-        assert 'analysis_type' in schema['properties']
-        assert 'required' in schema
-        assert 'file_path' in schema['required']
+        assert "type" in schema
+        assert schema["type"] == "object"
+        assert "properties" in schema
+        assert "file_path" in schema["properties"]
+        assert "analysis_type" in schema["properties"]
+        assert "required" in schema
+        assert "file_path" in schema["required"]
 
 
 @pytest.mark.unit

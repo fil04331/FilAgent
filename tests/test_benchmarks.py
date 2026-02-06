@@ -7,6 +7,7 @@ Tests tous les composants du système de benchmarking:
 - Benchmark runner
 - Metrics aggregator
 """
+
 import pytest
 import json
 from pathlib import Path
@@ -26,6 +27,7 @@ from eval.metrics import MetricsAggregator
 @pytest.fixture
 def mock_agent_callback():
     """Mock agent callback for testing"""
+
     def callback(prompt: str) -> str:
         # Simple mock that returns valid Python code for code gen benchmarks
         if "factorial" in prompt.lower():
@@ -60,7 +62,7 @@ class TestBenchmarkBase:
             id="test-001",
             prompt="Test prompt",
             ground_truth="Expected result",
-            metadata={"key": "value"}
+            metadata={"key": "value"},
         )
 
         assert task.id == "test-001"
@@ -75,7 +77,7 @@ class TestBenchmarkBase:
             passed=True,
             response="Agent response",
             ground_truth="Expected result",
-            latency_ms=123.45
+            latency_ms=123.45,
         )
 
         assert result.task_id == "test-001"
@@ -105,7 +107,7 @@ class TestHumanEvalHarness:
         assert first_task.id
         assert first_task.prompt
         assert first_task.ground_truth
-        assert 'entry_point' in first_task.metadata
+        assert "entry_point" in first_task.metadata
 
     def test_humaneval_evaluate(self, mock_agent_callback):
         """Test HumanEval evaluation"""
@@ -192,8 +194,8 @@ class TestComplianceHarness:
 
         # Check for critical compliance tests
         task_ids = [t.id for t in tasks]
-        assert any('decision-record' in tid for tid in task_ids)
-        assert any('pii-masking' in tid for tid in task_ids)
+        assert any("decision-record" in tid for tid in task_ids)
+        assert any("pii-masking" in tid for tid in task_ids)
 
     def test_compliance_evaluate_pii(self):
         """Test PII masking evaluation"""
@@ -201,7 +203,7 @@ class TestComplianceHarness:
         tasks = harness.load_tasks()
 
         # Find PII task
-        pii_task = next(t for t in tasks if 'pii-masking' in t.id)
+        pii_task = next(t for t in tasks if "pii-masking" in t.id)
 
         # Response without PII (should pass)
         response_safe = "I can help you with [EMAIL_REDACTED] and [PHONE_REDACTED]"
@@ -230,17 +232,17 @@ class TestHTNPlanningHarness:
         assert len(tasks) > 0
 
         # Check for different task types
-        task_types = [t.metadata['test_type'] for t in tasks]
-        assert 'sequential' in task_types
-        assert 'parallel' in task_types
-        assert 'nested' in task_types
+        task_types = [t.metadata["test_type"] for t in tasks]
+        assert "sequential" in task_types
+        assert "parallel" in task_types
+        assert "nested" in task_types
 
     def test_htn_planning_evaluate_sequential(self):
         """Test sequential task evaluation"""
         harness = HTNPlanningHarness()
         tasks = harness.load_tasks()
 
-        seq_task = next(t for t in tasks if t.metadata['test_type'] == 'sequential')
+        seq_task = next(t for t in tasks if t.metadata["test_type"] == "sequential")
 
         # Response with sequential indicators
         response = "First, I will read the file. Then, I will calculate. Finally, I will display."
@@ -264,10 +266,10 @@ class TestToolOrchestrationHarness:
         assert len(tasks) > 0
 
         # Check for different task types
-        task_types = [t.metadata['test_type'] for t in tasks]
-        assert 'selection' in task_types
-        assert 'chaining' in task_types
-        assert 'security' in task_types
+        task_types = [t.metadata["test_type"] for t in tasks]
+        assert "selection" in task_types
+        assert "chaining" in task_types
+        assert "security" in task_types
 
 
 class TestBenchmarkRunner:
@@ -276,8 +278,7 @@ class TestBenchmarkRunner:
     def test_runner_initialization(self, temp_reports_dir):
         """Test runner initialization"""
         runner = BenchmarkRunner(
-            output_dir=str(temp_reports_dir / "runs"),
-            reports_dir=str(temp_reports_dir / "reports")
+            output_dir=str(temp_reports_dir / "runs"), reports_dir=str(temp_reports_dir / "reports")
         )
 
         assert runner.output_dir.exists()
@@ -288,12 +289,12 @@ class TestBenchmarkRunner:
         runner = BenchmarkRunner()
 
         expected_benchmarks = [
-            'humaneval',
-            'mbpp',
-            'swe_bench',
-            'compliance',
-            'htn_planning',
-            'tool_orchestration',
+            "humaneval",
+            "mbpp",
+            "swe_bench",
+            "compliance",
+            "htn_planning",
+            "tool_orchestration",
         ]
 
         for benchmark in expected_benchmarks:
@@ -305,15 +306,15 @@ class TestBenchmarkRunner:
 
         # Run compliance benchmark (fast)
         result = runner.run_benchmark(
-            benchmark_name='compliance',
+            benchmark_name="compliance",
             agent_callback=mock_agent_callback,
             num_tasks=2,  # Limit tasks for speed
-            verbose=False
+            verbose=False,
         )
 
-        assert 'benchmark' in result
-        assert result['benchmark'] == 'Compliance'
-        assert 'total_tasks' in result
+        assert "benchmark" in result
+        assert result["benchmark"] == "Compliance"
+        assert "total_tasks" in result
 
 
 class TestMetricsAggregator:
@@ -328,24 +329,24 @@ class TestMetricsAggregator:
         """Test collecting historical data"""
         # Create mock reports
         report1 = {
-            'benchmark': 'humaneval',
-            'timestamp': '2025-01-01T00:00:00',
-            'pass_at_1': 0.65,
-            'total_tasks': 100
+            "benchmark": "humaneval",
+            "timestamp": "2025-01-01T00:00:00",
+            "pass_at_1": 0.65,
+            "total_tasks": 100,
         }
 
         report2 = {
-            'benchmark': 'humaneval',
-            'timestamp': '2025-01-02T00:00:00',
-            'pass_at_1': 0.70,
-            'total_tasks': 100
+            "benchmark": "humaneval",
+            "timestamp": "2025-01-02T00:00:00",
+            "pass_at_1": 0.70,
+            "total_tasks": 100,
         }
 
         # Save reports
-        with open(temp_reports_dir / "humaneval_20250101.json", 'w') as f:
+        with open(temp_reports_dir / "humaneval_20250101.json", "w") as f:
             json.dump(report1, f)
 
-        with open(temp_reports_dir / "humaneval_20250102.json", 'w') as f:
+        with open(temp_reports_dir / "humaneval_20250102.json", "w") as f:
             json.dump(report2, f)
 
         # Collect data
@@ -360,25 +361,25 @@ class TestMetricsAggregator:
         reports = []
         for i in range(10):
             report = {
-                'benchmark': 'humaneval',
-                'timestamp': f'2025-01-{i+1:02d}T00:00:00',
-                'pass_at_1': 0.60 + i * 0.01,  # Improving trend
-                'total_tasks': 100
+                "benchmark": "humaneval",
+                "timestamp": f"2025-01-{i+1:02d}T00:00:00",
+                "pass_at_1": 0.60 + i * 0.01,  # Improving trend
+                "total_tasks": 100,
             }
             reports.append(report)
 
             filename = temp_reports_dir / f"humaneval_2025010{i}.json"
-            with open(filename, 'w') as f:
+            with open(filename, "w") as f:
                 json.dump(report, f)
 
         # Compute trend
         aggregator = MetricsAggregator(reports_dir=str(temp_reports_dir))
-        trend = aggregator.compute_trend('humaneval', days=365)
+        trend = aggregator.compute_trend("humaneval", days=365)
 
-        assert 'trend' in trend
-        assert trend['trend'] in ['improving', 'declining', 'stable']
-        assert 'latest' in trend
-        assert 'mean' in trend
+        assert "trend" in trend
+        assert trend["trend"] in ["improving", "declining", "stable"]
+        assert "latest" in trend
+        assert "mean" in trend
 
     def test_aggregator_detect_regression(self):
         """Test regression detection"""
@@ -402,37 +403,34 @@ class TestEndToEnd:
         runner = BenchmarkRunner(reports_dir=str(temp_reports_dir))
 
         # Run custom benchmarks (faster than full suite)
-        result = runner.run_custom_benchmarks(
-            agent_callback=mock_agent_callback,
-            verbose=False
-        )
+        result = runner.run_custom_benchmarks(agent_callback=mock_agent_callback, verbose=False)
 
-        assert 'benchmarks' in result
-        assert 'summary' in result
-        assert result['summary']['total_tasks'] > 0
+        assert "benchmarks" in result
+        assert "summary" in result
+        assert result["summary"]["total_tasks"] > 0
 
     @pytest.mark.integration
     def test_metrics_dashboard_generation(self, temp_reports_dir):
         """Test dashboard generation"""
         # Create mock report
         report = {
-            'benchmark': 'humaneval',
-            'timestamp': '2025-01-01T00:00:00',
-            'pass_at_1': 0.65,
-            'total_tasks': 100
+            "benchmark": "humaneval",
+            "timestamp": "2025-01-01T00:00:00",
+            "pass_at_1": 0.65,
+            "total_tasks": 100,
         }
 
-        with open(temp_reports_dir / "humaneval_20250101.json", 'w') as f:
+        with open(temp_reports_dir / "humaneval_20250101.json", "w") as f:
             json.dump(report, f)
 
         # Generate dashboard
         aggregator = MetricsAggregator(reports_dir=str(temp_reports_dir))
         dashboard = aggregator.generate_dashboard(days=365)
 
-        assert 'benchmarks' in dashboard
-        assert 'aggregate' in dashboard
-        assert dashboard['period_days'] == 365
+        assert "benchmarks" in dashboard
+        assert "aggregate" in dashboard
+        assert dashboard["period_days"] == 365
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

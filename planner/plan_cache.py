@@ -49,6 +49,7 @@ StatsDict = Dict[str, Union[int, float, Optional[int]]]
 @dataclass
 class CacheEntry:
     """Entree de cache pour un plan"""
+
     plan_result: PlanningResult
     cached_at: datetime
     access_count: int = 0
@@ -139,7 +140,7 @@ class PlanCache:
         # Creer un dict pour hash coherent
         cache_data: Dict[str, Union[str, ContextDict]] = {
             "query": normalized_query,
-            "strategy": getattr(strategy, 'value', str(strategy)),  # Support string ou enum
+            "strategy": getattr(strategy, "value", str(strategy)),  # Support string ou enum
             "context": self._normalize_context(context) if context else {},
         }
 
@@ -147,7 +148,7 @@ class PlanCache:
         json_str = json.dumps(cache_data, sort_keys=True, ensure_ascii=False)
 
         # Hash SHA256
-        return hashlib.sha256(json_str.encode('utf-8')).hexdigest()
+        return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     def _normalize_context(self, context: ContextDict) -> ContextDict:
         """Normalise le contexte pour hash coherent"""
@@ -275,8 +276,7 @@ class PlanCache:
 
         with self._lock:
             expired_keys = [
-                key for key, entry in self._cache.items()
-                if entry.is_expired(self.ttl_seconds)
+                key for key, entry in self._cache.items() if entry.is_expired(self.ttl_seconds)
             ]
 
             # BUG FIX: Incrementer le compteur une seule fois en dehors de la boucle
@@ -293,10 +293,7 @@ class PlanCache:
         """Retourne les statistiques du cache"""
         with self._lock:
             total_requests = self._stats["hits"] + self._stats["misses"]
-            hit_rate = (
-                self._stats["hits"] / total_requests
-                if total_requests > 0 else 0.0
-            )
+            hit_rate = self._stats["hits"] / total_requests if total_requests > 0 else 0.0
 
             return {
                 "hits": self._stats["hits"],
@@ -312,7 +309,7 @@ class PlanCache:
 
     def _record_metrics(self, event: str) -> None:
         """Enregistre les metriques Prometheus"""
-        if not self.metrics or not hasattr(self.metrics, 'record_plan_cache'):
+        if not self.metrics or not hasattr(self.metrics, "record_plan_cache"):
             return
 
         try:

@@ -19,12 +19,7 @@ from datetime import datetime
 from unittest.mock import patch, MagicMock
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from runtime.middleware.audittrail import (
-    DecisionRecord,
-    DRManager,
-    get_dr_manager,
-    init_dr_manager
-)
+from runtime.middleware.audittrail import DecisionRecord, DRManager, get_dr_manager, init_dr_manager
 
 
 @pytest.fixture
@@ -47,7 +42,9 @@ def temp_signature_dir(tmp_path):
 def dr_manager_isolated(temp_dr_dir, temp_signature_dir, monkeypatch):
     """Isolated DR manager for testing"""
     # Patch the signature directory
-    monkeypatch.setattr('pathlib.Path', lambda x: temp_signature_dir if 'provenance' in str(x) else Path(x))
+    monkeypatch.setattr(
+        "pathlib.Path", lambda x: temp_signature_dir if "provenance" in str(x) else Path(x)
+    )
 
     manager = DRManager(output_dir=str(temp_dr_dir))
     return manager
@@ -59,10 +56,7 @@ class TestDecisionRecordCreation:
     def test_basic_creation(self):
         """Test création basique d'un DecisionRecord"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="execute_tool",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="execute_tool", prompt_hash="abc123"
         )
 
         assert dr.actor == "agent.core"
@@ -75,10 +69,7 @@ class TestDecisionRecordCreation:
     def test_dr_id_format(self):
         """Test format de l'ID de décision"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         # Format: DR-YYYYMMDD-XXXXXX
@@ -91,10 +82,7 @@ class TestDecisionRecordCreation:
     def test_timestamp_format(self):
         """Test format ISO8601 du timestamp"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         # Should be valid ISO8601
@@ -113,7 +101,7 @@ class TestDecisionRecordCreation:
             alternatives_considered=["ask_user", "skip"],
             constraints={"timeout": 30},
             expected_risk=["code_execution"],
-            reasoning_markers=["plan:3-steps"]
+            reasoning_markers=["plan:3-steps"],
         )
 
         assert dr.policy_version == "v2.0"
@@ -127,10 +115,7 @@ class TestDecisionRecordCreation:
     def test_default_values(self):
         """Test valeurs par défaut"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         assert dr.policy_version == "policies@0.1.0"
@@ -148,10 +133,7 @@ class TestDecisionRecordSerialization:
     def test_to_dict_basic(self):
         """Test conversion en dictionnaire"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="execute_tool",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="execute_tool", prompt_hash="abc123"
         )
 
         dr_dict = dr.to_dict()
@@ -165,10 +147,7 @@ class TestDecisionRecordSerialization:
     def test_to_dict_includes_signature(self):
         """Test que to_dict inclut la signature si présente"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         # Sign the DR
@@ -191,16 +170,25 @@ class TestDecisionRecordSerialization:
             alternatives_considered=["alt1"],
             constraints={"key": "value"},
             expected_risk=["risk1"],
-            reasoning_markers=["marker1"]
+            reasoning_markers=["marker1"],
         )
 
         dr_dict = dr.to_dict()
 
         required_fields = [
-            "dr_id", "ts", "actor", "task_id", "policy_version",
-            "model_fingerprint", "prompt_hash", "reasoning_markers",
-            "tools_used", "alternatives_considered", "decision",
-            "constraints", "expected_risk"
+            "dr_id",
+            "ts",
+            "actor",
+            "task_id",
+            "policy_version",
+            "model_fingerprint",
+            "prompt_hash",
+            "reasoning_markers",
+            "tools_used",
+            "alternatives_considered",
+            "decision",
+            "constraints",
+            "expected_risk",
         ]
 
         for field in required_fields:
@@ -213,10 +201,7 @@ class TestDecisionRecordSignature:
     def test_sign_decision_record(self):
         """Test signature d'un DecisionRecord"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         private_key = ed25519.Ed25519PrivateKey.generate()
@@ -228,10 +213,7 @@ class TestDecisionRecordSignature:
     def test_verify_valid_signature(self):
         """Test vérification d'une signature valide"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         private_key = ed25519.Ed25519PrivateKey.generate()
@@ -244,10 +226,7 @@ class TestDecisionRecordSignature:
     def test_verify_invalid_signature(self):
         """Test vérification d'une signature invalide"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         private_key1 = ed25519.Ed25519PrivateKey.generate()
@@ -262,10 +241,7 @@ class TestDecisionRecordSignature:
     def test_verify_unsigned_record(self):
         """Test vérification d'un record non signé"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         private_key = ed25519.Ed25519PrivateKey.generate()
@@ -276,10 +252,7 @@ class TestDecisionRecordSignature:
     def test_signature_tampering_detection(self):
         """Test détection de modification après signature"""
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         private_key = ed25519.Ed25519PrivateKey.generate()
@@ -328,7 +301,7 @@ class TestDRManagerInitialization:
         sig_dir = tmp_path / "provenance" / "signatures"
         sig_dir.mkdir(parents=True, exist_ok=True)
 
-        with patch('pathlib.Path') as mock_path:
+        with patch("pathlib.Path") as mock_path:
             mock_path.return_value = sig_dir
             manager = DRManager(output_dir=str(temp_dr_dir))
 
@@ -344,10 +317,7 @@ class TestDRManagerCreation:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="execute_tool",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="execute_tool", prompt_hash="abc123"
         )
 
         assert dr is not None
@@ -364,7 +334,7 @@ class TestDRManagerCreation:
             decision="execute_tool",
             prompt_hash="abc123",
             tools_used=["python_sandbox"],
-            policy_version="v2.0"
+            policy_version="v2.0",
         )
 
         assert dr.tools_used == ["python_sandbox"]
@@ -375,10 +345,7 @@ class TestDRManagerCreation:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         assert dr.signature is not None
@@ -389,16 +356,13 @@ class TestDRManagerCreation:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         dr_file = temp_dr_dir / f"{dr.dr_id}.json"
         assert dr_file.exists()
 
-        with open(dr_file, 'r') as f:
+        with open(dr_file, "r") as f:
             saved_data = json.load(f)
 
         assert saved_data["dr_id"] == dr.dr_id
@@ -412,7 +376,7 @@ class TestDRManagerCreation:
             conversation_id="conv-123",
             decision_type="tool_invocation",
             context={"tool": "python_sandbox"},
-            rationale="User requested code execution"
+            rationale="User requested code execution",
         )
 
         assert decision_id.startswith("DR-")
@@ -430,10 +394,7 @@ class TestDRManagerPersistence:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = DecisionRecord(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
         dr.sign(manager.private_key)
 
@@ -448,10 +409,7 @@ class TestDRManagerPersistence:
 
         # Create and save DR
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         # Load DR
@@ -476,10 +434,7 @@ class TestDRManagerPersistence:
 
         # Create and save DR
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         # Load DR
@@ -506,7 +461,7 @@ class TestThreadSafety:
                     actor=f"thread-{thread_id}",
                     task_id=f"task-{thread_id}-{i}",
                     decision="test",
-                    prompt_hash=f"hash-{thread_id}-{i}"
+                    prompt_hash=f"hash-{thread_id}-{i}",
                 )
                 with lock:
                     created_drs.append(dr.dr_id)
@@ -557,7 +512,7 @@ class TestEdgeCases:
             task_id="task-123",
             decision="test",
             prompt_hash="abc123",
-            tools_used=[]
+            tools_used=[],
         )
 
         assert dr.tools_used == []
@@ -571,7 +526,7 @@ class TestEdgeCases:
             task_id="task-123",
             decision="test",
             prompt_hash="abc123",
-            constraints={}
+            constraints={},
         )
 
         assert dr.constraints == {}
@@ -584,7 +539,7 @@ class TestEdgeCases:
             actor="agent.core",
             task_id="task-éàü-123",
             decision="Décision avec accents",
-            prompt_hash="abc123"
+            prompt_hash="abc123",
         )
 
         # Should save and load correctly
@@ -598,10 +553,7 @@ class TestEdgeCases:
         long_decision = "x" * 10000
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision=long_decision,
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision=long_decision, prompt_hash="abc123"
         )
 
         loaded_dr = manager.load_dr(dr.dr_id)
@@ -613,7 +565,7 @@ class TestEdgeCases:
 
         # Create a corrupted file
         dr_file = temp_dr_dir / "DR-20250101-CORRUPT.json"
-        with open(dr_file, 'w') as f:
+        with open(dr_file, "w") as f:
             f.write("{ invalid json")
 
         # Should handle gracefully
@@ -633,15 +585,19 @@ class TestComplianceRequirements:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         required_fields = [
-            "dr_id", "ts", "actor", "task_id", "policy_version",
-            "model_fingerprint", "prompt_hash", "decision", "signature"
+            "dr_id",
+            "ts",
+            "actor",
+            "task_id",
+            "policy_version",
+            "model_fingerprint",
+            "prompt_hash",
+            "decision",
+            "signature",
         ]
 
         dr_dict = dr.to_dict()
@@ -653,10 +609,7 @@ class TestComplianceRequirements:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         dr_dict = dr.to_dict()
@@ -667,10 +620,7 @@ class TestComplianceRequirements:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         assert dr.signature.startswith("ed25519:")
@@ -680,14 +630,11 @@ class TestComplianceRequirements:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         dr_file = temp_dr_dir / f"{dr.dr_id}.json"
-        with open(dr_file, 'r') as f:
+        with open(dr_file, "r") as f:
             data = json.load(f)
 
         assert isinstance(data, dict)
@@ -698,10 +645,7 @@ class TestComplianceRequirements:
         manager = DRManager(output_dir=str(temp_dr_dir))
 
         dr = manager.create_dr(
-            actor="agent.core",
-            task_id="task-123",
-            decision="test",
-            prompt_hash="abc123"
+            actor="agent.core", task_id="task-123", decision="test", prompt_hash="abc123"
         )
 
         # Load DR from file

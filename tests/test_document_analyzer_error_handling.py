@@ -8,6 +8,7 @@ Couvre:
 - Gestion d'erreurs dans les exports
 - Scénarios edge cases
 """
+
 import pytest
 from pathlib import Path
 import sys
@@ -27,7 +28,7 @@ try:
         ERROR_MESSAGES,
         validate_file,
         check_disk_space,
-        cleanup_temp_files
+        cleanup_temp_files,
     )
 except ImportError as e:
     print(f"⚠️ Impossible d'importer depuis gradio_app_production: {e}")
@@ -41,6 +42,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # ============================================================================
 # TESTS UNITAIRES - Fonction validate_file()
 # ============================================================================
+
 
 class TestValidateFile:
     """Tests pour la fonction validate_file()"""
@@ -88,12 +90,12 @@ class TestValidateFile:
     def test_validate_file_too_large(self):
         """Test validation fichier > 50 MB"""
         # Créer un fichier temporaire de 60 MB
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
             temp_path = temp_file.name
             # Écrire 60 MB de données
             chunk_size = 1024 * 1024  # 1 MB
             for _ in range(60):
-                temp_file.write(b'x' * chunk_size)
+                temp_file.write(b"x" * chunk_size)
 
         try:
             is_valid, error = validate_file(temp_path)
@@ -120,6 +122,7 @@ class TestValidateFile:
 # TESTS UNITAIRES - Fonction check_disk_space()
 # ============================================================================
 
+
 class TestCheckDiskSpace:
     """Tests pour la fonction check_disk_space()"""
 
@@ -137,6 +140,7 @@ class TestCheckDiskSpace:
 # ============================================================================
 # TESTS UNITAIRES - Fonction cleanup_temp_files()
 # ============================================================================
+
 
 class TestCleanupTempFiles:
     """Tests pour la fonction cleanup_temp_files()"""
@@ -193,6 +197,7 @@ class TestCleanupTempFiles:
 # TESTS D'INTÉGRATION - DocumentAnalyzerTool avec fichiers corrompus
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestDocumentAnalyzerCorruptedFiles:
     """Tests d'intégration avec fichiers corrompus"""
@@ -205,10 +210,7 @@ class TestDocumentAnalyzerCorruptedFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "corrupted_file.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Devrait retourner une erreur
         assert result.status == ToolStatus.ERROR
@@ -222,10 +224,7 @@ class TestDocumentAnalyzerCorruptedFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "corrupted_document.pdf")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Devrait retourner une erreur
         assert result.status == ToolStatus.ERROR
@@ -239,10 +238,7 @@ class TestDocumentAnalyzerCorruptedFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "corrupted_report.docx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'extract'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "extract"})
 
         # Devrait retourner une erreur
         assert result.status == ToolStatus.ERROR
@@ -252,6 +248,7 @@ class TestDocumentAnalyzerCorruptedFiles:
 # ============================================================================
 # TESTS D'INTÉGRATION - Fichiers vides
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestDocumentAnalyzerEmptyFiles:
@@ -264,10 +261,7 @@ class TestDocumentAnalyzerEmptyFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "empty_file.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Peut retourner succès avec données vides ou erreur
         # On vérifie juste qu'il ne crash pas
@@ -281,10 +275,7 @@ class TestDocumentAnalyzerEmptyFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "empty_document.pdf")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Un PDF vide devrait donner une erreur
         assert result.status == ToolStatus.ERROR
@@ -293,6 +284,7 @@ class TestDocumentAnalyzerEmptyFiles:
 # ============================================================================
 # TESTS D'INTÉGRATION - Fichiers valides
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestDocumentAnalyzerValidFiles:
@@ -306,10 +298,7 @@ class TestDocumentAnalyzerValidFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_invoice.xlsx")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'invoice'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "invoice"})
 
         # Devrait réussir
         assert result.status == ToolStatus.SUCCESS
@@ -323,10 +312,7 @@ class TestDocumentAnalyzerValidFiles:
         tool = DocumentAnalyzerPME()
         file_path = str(FIXTURES_DIR / "valid_document.pdf")
 
-        result = tool.execute({
-            'file_path': file_path,
-            'analysis_type': 'extract'
-        })
+        result = tool.execute({"file_path": file_path, "analysis_type": "extract"})
 
         # Devrait réussir (même si extraction minimale)
         assert result.status == ToolStatus.SUCCESS
@@ -336,6 +322,7 @@ class TestDocumentAnalyzerValidFiles:
 # ============================================================================
 # TESTS DE PERFORMANCE - Timeout
 # ============================================================================
+
 
 @pytest.mark.performance
 @pytest.mark.slow
@@ -354,6 +341,7 @@ class TestPerformance:
 # TESTS EDGE CASES
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestEdgeCases:
     """Tests de cas limites"""
@@ -362,9 +350,7 @@ class TestEdgeCases:
         """Test fichier avec espaces dans le nom"""
         # Créer un fichier temporaire avec espaces
         with tempfile.NamedTemporaryFile(
-            suffix='.xlsx',
-            prefix='test file with spaces ',
-            delete=False
+            suffix=".xlsx", prefix="test file with spaces ", delete=False
         ) as temp_file:
             temp_path = temp_file.name
             temp_file.write(b"test data")
@@ -380,9 +366,7 @@ class TestEdgeCases:
         """Test fichier avec caractères Unicode"""
         # Créer un fichier temporaire avec caractères accentués
         with tempfile.NamedTemporaryFile(
-            suffix='.xlsx',
-            prefix='test_éàü_',
-            delete=False
+            suffix=".xlsx", prefix="test_éàü_", delete=False
         ) as temp_file:
             temp_path = temp_file.name
             temp_file.write(b"test data")

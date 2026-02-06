@@ -2,6 +2,7 @@
 Tests de sécurité pour l'interface Gradio
 Focus: Path validation in validate_file function
 """
+
 import pytest
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Note: We need to import it carefully since it's in a module with dependencies
 try:
     from gradio_app_production import validate_file
+
     GRADIO_AVAILABLE = True
 except ImportError as e:
     GRADIO_AVAILABLE = False
@@ -22,6 +24,7 @@ except ImportError as e:
 # ============================================================================
 # FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def temp_allowed_dir(tmp_path):
@@ -34,7 +37,7 @@ def temp_allowed_dir(tmp_path):
 def sample_pdf_in_tmp(temp_allowed_dir):
     """Create a sample PDF in /tmp/ which is allowed"""
     pdf_path = temp_allowed_dir / "test_invoice.pdf"
-    
+
     # Create minimal valid PDF
     pdf_content = b"""%PDF-1.4
 1 0 obj
@@ -71,7 +74,7 @@ trailer
 startxref
 195
 %%EOF"""
-    
+
     pdf_path.write_bytes(pdf_content)
     return str(pdf_path)
 
@@ -80,16 +83,17 @@ startxref
 def sample_xlsx_in_tmp(temp_allowed_dir):
     """Create a sample Excel file in /tmp/"""
     xlsx_path = temp_allowed_dir / "test_data.xlsx"
-    
+
     # Create minimal valid xlsx using pandas if available
     try:
         import pandas as pd
+
         df = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
         df.to_excel(xlsx_path, index=False)
     except ImportError:
         # Create empty file as fallback
         xlsx_path.write_bytes(b"")
-    
+
     return str(xlsx_path)
 
 
@@ -97,7 +101,11 @@ def sample_xlsx_in_tmp(temp_allowed_dir):
 # SECURITY TESTS - GRADIO INTERFACE
 # ============================================================================
 
-@pytest.mark.skipif(not GRADIO_AVAILABLE, reason=f"Gradio app not available: {IMPORT_ERROR if not GRADIO_AVAILABLE else ''}")
+
+@pytest.mark.skipif(
+    not GRADIO_AVAILABLE,
+    reason=f"Gradio app not available: {IMPORT_ERROR if not GRADIO_AVAILABLE else ''}",
+)
 @pytest.mark.unit
 class TestGradioValidationSecurity:
     """Tests de sécurité pour validation de fichiers Gradio"""
@@ -105,7 +113,7 @@ class TestGradioValidationSecurity:
     def test_validate_file_in_tmp(self, sample_pdf_in_tmp):
         """Test that files in /tmp/ (allowed) can be validated"""
         is_valid, error = validate_file(sample_pdf_in_tmp)
-        
+
         # Should succeed (file is in allowed /tmp/ directory)
         assert is_valid, f"Expected valid, got error: {error}"
         assert error is None
@@ -113,9 +121,9 @@ class TestGradioValidationSecurity:
     def test_validate_file_null_byte(self):
         """Test that null byte injection is blocked"""
         malicious_path = "test_file.pdf\x00.txt"
-        
+
         is_valid, error = validate_file(malicious_path)
-        
+
         assert not is_valid
         assert error is not None
         assert "null" in error.lower() or "sécurité" in error.lower()
@@ -123,9 +131,9 @@ class TestGradioValidationSecurity:
     def test_validate_file_path_too_long(self):
         """Test that excessively long paths are blocked"""
         long_path = "a" * 5000 + ".pdf"
-        
+
         is_valid, error = validate_file(long_path)
-        
+
         assert not is_valid
         assert error is not None
         assert "trop long" in error.lower() or "too long" in error.lower()
@@ -136,13 +144,13 @@ class TestGradioValidationSecurity:
         # Note: We need to ensure this is truly outside allowed paths
         blocked_dir = tmp_path / "not_allowed" / "deeply" / "nested"
         blocked_dir.mkdir(parents=True, exist_ok=True)
-        
+
         blocked_file = blocked_dir / "secret.pdf"
         blocked_file.write_text("fake pdf content")
-        
+
         # Try to validate - might fail at existence or path validation
         is_valid, error = validate_file(str(blocked_file))
-        
+
         # If tmp_path is under /tmp/, it might be allowed
         # So we need to check if error is about path or something else
         if "/tmp/" not in str(tmp_path):
@@ -162,10 +170,10 @@ class TestGradioValidationSecurity:
             "..\\..\\..\\Windows\\System32\\config\\SAM",
             "/tmp/../etc/passwd",
         ]
-        
+
         for path in traversal_paths:
             is_valid, error = validate_file(path)
-            
+
             # Should either not exist or be blocked by validation
             assert not is_valid
             # Error should mention either file not found or access denied
@@ -179,10 +187,10 @@ class TestGradioValidationSecurity:
             "/root/.ssh/id_rsa",
             "C:\\Windows\\System32\\config\\SAM",
         ]
-        
+
         for path in system_paths:
             is_valid, error = validate_file(path)
-            
+
             # Should be blocked
             assert not is_valid
             assert error is not None
@@ -195,25 +203,27 @@ class TestGradioValidationSecurity:
         # Create file with invalid extension in allowed directory
         invalid_file = temp_allowed_dir / "test.exe"
         invalid_file.write_bytes(b"fake exe content")
-        
+
         is_valid, error = validate_file(str(invalid_file))
-        
+
         # Should be invalid due to extension
         assert not is_valid
         assert error is not None
         # Error should mention unsupported format
-        assert "format" in error.lower() or "extension" in error.lower() or "supporté" in error.lower()
+        assert (
+            "format" in error.lower() or "extension" in error.lower() or "supporté" in error.lower()
+        )
 
     def test_validate_file_size_check(self, temp_allowed_dir):
         """Test that file size validation works"""
         # Create file larger than max size (50 MB)
         large_file = temp_allowed_dir / "large.pdf"
-        
+
         # Write 51 MB of data
         large_file.write_bytes(b"0" * (51 * 1024 * 1024))
-        
+
         is_valid, error = validate_file(str(large_file))
-        
+
         # Should be invalid due to size
         assert not is_valid
         assert error is not None
@@ -222,7 +232,7 @@ class TestGradioValidationSecurity:
     def test_validate_file_nonexistent(self):
         """Test that nonexistent files are rejected"""
         is_valid, error = validate_file("/tmp/this_file_does_not_exist_xyz123.pdf")
-        
+
         assert not is_valid
         assert error is not None
         assert "not found" in error.lower() or "trouvé" in error.lower()
@@ -230,14 +240,14 @@ class TestGradioValidationSecurity:
     def test_validate_file_directory_not_file(self, temp_allowed_dir):
         """Test that directories are rejected"""
         is_valid, error = validate_file(str(temp_allowed_dir))
-        
+
         assert not is_valid
         assert error is not None
 
     def test_validate_file_valid_pdf(self, sample_pdf_in_tmp):
         """Test that valid PDF in allowed directory passes all checks"""
         is_valid, error = validate_file(sample_pdf_in_tmp)
-        
+
         # Should be valid
         assert is_valid
         assert error is None
@@ -247,7 +257,7 @@ class TestGradioValidationSecurity:
         # Only run if pandas created a valid file
         if Path(sample_xlsx_in_tmp).stat().st_size > 0:
             is_valid, error = validate_file(sample_xlsx_in_tmp)
-            
+
             # Should be valid
             assert is_valid
             assert error is None
@@ -263,11 +273,11 @@ class TestGradioSecurityIntegration:
         # Step 1: Validate file
         is_valid, error = validate_file(sample_pdf_in_tmp)
         assert is_valid, f"Validation failed: {error}"
-        
+
         # Step 2: File should be readable
         content = Path(sample_pdf_in_tmp).read_bytes()
         assert len(content) > 0
-        
+
         # Step 3: Path should resolve correctly
         resolved = Path(sample_pdf_in_tmp).resolve()
         assert resolved.exists()
@@ -281,7 +291,7 @@ class TestGradioSecurityIntegration:
             ("long_path", "a" * 5000 + ".pdf"),
             ("system_file", "/etc/passwd"),
         ]
-        
+
         for attack_name, attack_path in attack_vectors:
             is_valid, error = validate_file(attack_path)
             assert not is_valid, f"Attack vector '{attack_name}' was not blocked!"

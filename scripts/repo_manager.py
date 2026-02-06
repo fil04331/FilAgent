@@ -12,7 +12,9 @@ import logging
 # Configuration des chemins pour garantir l'import des modules runtime
 # Assumes script is in scripts/ or root
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir) if os.path.basename(current_dir) == "scripts" else current_dir
+project_root = (
+    os.path.dirname(current_dir) if os.path.basename(current_dir) == "scripts" else current_dir
+)
 
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -28,8 +30,7 @@ except ImportError as e:
 
 # --- Configuration du Logging Spécifique ---
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - [REPO-AGENT] - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - [REPO-AGENT] - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("RepoAgent")
 
@@ -106,7 +107,9 @@ def interactive_session():
         # 3. Initialiser le modèle (chargement des poids/connexion API)
         agent.initialize_model()
 
-        print("\n✅ Agent prêt. Posez vos questions sur le dépôt (ex: 'Analyse runtime/agent.py', 'Génère un test pour...').")
+        print(
+            "\n✅ Agent prêt. Posez vos questions sur le dépôt (ex: 'Analyse runtime/agent.py', 'Génère un test pour...')."
+        )
         print("Tapez 'exit' ou 'quit' pour quitter.\n")
 
         conversation_id = f"repo_session_cli_{uuid.uuid4()}"

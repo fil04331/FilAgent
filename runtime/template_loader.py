@@ -18,7 +18,6 @@ Usage:
     prompt = loader.render('system_prompt', tools="...", semantic_context="...")
 """
 
-import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 from functools import lru_cache
@@ -88,7 +87,9 @@ class TemplateLoader:
         """List available template versions"""
         if not self.templates_dir.exists():
             return []
-        return [d.name for d in self.templates_dir.iterdir() if d.is_dir() and d.name.startswith("v")]
+        return [
+            d.name for d in self.templates_dir.iterdir() if d.is_dir() and d.name.startswith("v")
+        ]
 
     def render(
         self,
@@ -187,7 +188,8 @@ class TemplateLoader:
         if not new_versioned_dir.exists():
             available = self._list_available_versions()
             raise FileNotFoundError(
-                f"Template version '{version}' not found.\n" f"Available versions: {', '.join(available)}"
+                f"Template version '{version}' not found.\n"
+                f"Available versions: {', '.join(available)}"
             )
 
         # Update paths and reload

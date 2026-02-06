@@ -57,6 +57,7 @@ class ConversationData:
         created_at: Timestamp de création
         task_id: ID de tâche optionnel
     """
+
     conversation_id: str
     messages: List[Dict[str, Any]]
     metadata: Dict[str, Any]
@@ -93,7 +94,7 @@ def generate_message(
     content: Optional[str] = None,
     message_type: str = "text",
     metadata: Optional[Dict[str, Any]] = None,
-    timestamp: Optional[str] = None
+    timestamp: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Générer un message de conversation
@@ -122,14 +123,14 @@ def generate_message(
         timestamp = datetime.now(timezone.utc).isoformat()
 
     message = {
-        'role': role,
-        'content': content,
-        'message_type': message_type,
-        'timestamp': timestamp
+        "role": role,
+        "content": content,
+        "message_type": message_type,
+        "timestamp": timestamp,
     }
 
     if metadata:
-        message['metadata'] = metadata
+        message["metadata"] = metadata
 
     return message
 
@@ -142,7 +143,7 @@ def _generate_content_for_role(role: str, message_type: str) -> str:
         "Analyse les données dans data.csv",
         "Crée un rapport à partir de ces résultats",
         "Calcule la moyenne des valeurs",
-        "Lis le fichier et génère un résumé"
+        "Lis le fichier et génère un résumé",
     ]
 
     assistant_messages = [
@@ -150,19 +151,19 @@ def _generate_content_for_role(role: str, message_type: str) -> str:
         "D'accord, je vais lire les données et les analyser.",
         "Je vais créer un rapport basé sur ces informations.",
         "Laissez-moi calculer ces statistiques.",
-        "Je vais générer un résumé détaillé."
+        "Je vais générer un résumé détaillé.",
     ]
 
     system_messages = [
         "System initialized",
         "Configuration loaded",
-        "Tools registered successfully"
+        "Tools registered successfully",
     ]
 
     tool_call_messages = [
         "Calling python_sandbox with code: print('test')",
         "Using file_reader to read data.csv",
-        "Executing calculator for statistics"
+        "Executing calculator for statistics",
     ]
 
     if message_type == "tool_call":
@@ -182,7 +183,7 @@ def generate_conversation(
     include_system: bool = False,
     include_tool_calls: bool = False,
     conversation_id: Optional[str] = None,
-    task_id: Optional[str] = None
+    task_id: Optional[str] = None,
 ) -> ConversationData:
     """
     Générer une conversation complète avec plusieurs tours
@@ -213,51 +214,61 @@ def generate_conversation(
 
     # Add system message if requested
     if include_system:
-        messages.append(generate_message(
-            role="system",
-            content="FilAgent initialized with HTN planning enabled",
-            timestamp=(base_time + timedelta(seconds=len(messages))).isoformat()
-        ))
+        messages.append(
+            generate_message(
+                role="system",
+                content="FilAgent initialized with HTN planning enabled",
+                timestamp=(base_time + timedelta(seconds=len(messages))).isoformat(),
+            )
+        )
 
     # Generate conversation turns
     for turn in range(num_turns):
         # User message
-        messages.append(generate_message(
-            role="user",
-            timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat()
-        ))
+        messages.append(
+            generate_message(
+                role="user",
+                timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat(),
+            )
+        )
 
         # Assistant message (possibly with tool calls)
         if include_tool_calls and turn % 2 == 0:
             # Add tool call message
-            messages.append(generate_message(
-                role="assistant",
-                message_type="tool_call",
-                content="I need to use a tool to help with this.",
-                metadata={'tool_name': 'python_sandbox'},
-                timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat()
-            ))
+            messages.append(
+                generate_message(
+                    role="assistant",
+                    message_type="tool_call",
+                    content="I need to use a tool to help with this.",
+                    metadata={"tool_name": "python_sandbox"},
+                    timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat(),
+                )
+            )
 
             # Add tool result message
-            messages.append(generate_message(
-                role="assistant",
-                message_type="tool_result",
-                content="Tool execution successful: Output data",
-                metadata={'tool_name': 'python_sandbox', 'status': 'success'},
-                timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat()
-            ))
+            messages.append(
+                generate_message(
+                    role="assistant",
+                    message_type="tool_result",
+                    content="Tool execution successful: Output data",
+                    metadata={"tool_name": "python_sandbox", "status": "success"},
+                    timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat(),
+                )
+            )
         else:
             # Regular assistant response
-            messages.append(generate_message(
-                role="assistant",
-                timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat()
-            ))
+            messages.append(
+                generate_message(
+                    role="assistant",
+                    timestamp=(base_time + timedelta(seconds=len(messages) * 10)).isoformat(),
+                )
+            )
 
     metadata = {
-        'num_turns': num_turns,
-        'has_tool_calls': include_tool_calls,
-        'created_at': base_time.isoformat(),
-        'language': 'fr'
+        "num_turns": num_turns,
+        "has_tool_calls": include_tool_calls,
+        "created_at": base_time.isoformat(),
+        "language": "fr",
     }
 
     return ConversationData(
@@ -265,13 +276,12 @@ def generate_conversation(
         messages=messages,
         metadata=metadata,
         created_at=base_time.isoformat(),
-        task_id=task_id
+        task_id=task_id,
     )
 
 
 def generate_multi_user_conversation(
-    num_participants: int = 2,
-    num_turns: int = 5
+    num_participants: int = 2, num_turns: int = 5
 ) -> ConversationData:
     """
     Générer une conversation avec plusieurs utilisateurs
@@ -297,23 +307,27 @@ def generate_multi_user_conversation(
         # Rotate through participants
         user = user_names[turn % num_participants]
 
-        messages.append(generate_message(
-            role="user",
-            content=f"Message from {user}: Can you help with this?",
-            metadata={'user_id': user},
-            timestamp=(base_time + timedelta(seconds=turn * 30)).isoformat()
-        ))
+        messages.append(
+            generate_message(
+                role="user",
+                content=f"Message from {user}: Can you help with this?",
+                metadata={"user_id": user},
+                timestamp=(base_time + timedelta(seconds=turn * 30)).isoformat(),
+            )
+        )
 
-        messages.append(generate_message(
-            role="assistant",
-            content=f"Response to {user}: I can help with that.",
-            timestamp=(base_time + timedelta(seconds=turn * 30 + 15)).isoformat()
-        ))
+        messages.append(
+            generate_message(
+                role="assistant",
+                content=f"Response to {user}: I can help with that.",
+                timestamp=(base_time + timedelta(seconds=turn * 30 + 15)).isoformat(),
+            )
+        )
 
     metadata = {
-        'num_participants': num_participants,
-        'num_turns': num_turns,
-        'created_at': base_time.isoformat()
+        "num_participants": num_participants,
+        "num_turns": num_turns,
+        "created_at": base_time.isoformat(),
     }
 
     return ConversationData(
@@ -321,7 +335,7 @@ def generate_multi_user_conversation(
         messages=messages,
         metadata=metadata,
         created_at=base_time.isoformat(),
-        task_id=task_id
+        task_id=task_id,
     )
 
 
@@ -330,7 +344,7 @@ def generate_multi_user_conversation(
 # ============================================================================
 
 
-def generate_simple_task_graph() -> 'TaskGraph':
+def generate_simple_task_graph() -> "TaskGraph":
     """
     Générer un graphe de tâches simple (linéaire)
 
@@ -356,7 +370,7 @@ def generate_simple_task_graph() -> 'TaskGraph':
         action="read_file",
         params={"file_path": "data.csv"},
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t1)
 
@@ -367,7 +381,7 @@ def generate_simple_task_graph() -> 'TaskGraph':
         params={"analysis_type": "statistical"},
         depends_on=[t1.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t2)
 
@@ -378,14 +392,14 @@ def generate_simple_task_graph() -> 'TaskGraph':
         params={"format": "pdf"},
         depends_on=[t2.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t3)
 
     return graph
 
 
-def generate_parallel_task_graph() -> 'TaskGraph':
+def generate_parallel_task_graph() -> "TaskGraph":
     """
     Générer un graphe de tâches avec exécution parallèle
 
@@ -409,7 +423,7 @@ def generate_parallel_task_graph() -> 'TaskGraph':
         action="initialize",
         params={},
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t1)
 
@@ -420,7 +434,7 @@ def generate_parallel_task_graph() -> 'TaskGraph':
         params={"file": "a.csv"},
         depends_on=[t1.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t2)
 
@@ -430,7 +444,7 @@ def generate_parallel_task_graph() -> 'TaskGraph':
         params={"file": "b.csv"},
         depends_on=[t1.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t3)
 
@@ -440,7 +454,7 @@ def generate_parallel_task_graph() -> 'TaskGraph':
         params={"file": "c.csv"},
         depends_on=[t1.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t4)
 
@@ -451,14 +465,14 @@ def generate_parallel_task_graph() -> 'TaskGraph':
         params={"output": "combined.csv"},
         depends_on=[t2.task_id, t3.task_id, t4.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t5)
 
     return graph
 
 
-def generate_complex_task_graph() -> 'TaskGraph':
+def generate_complex_task_graph() -> "TaskGraph":
     """
     Générer un graphe de tâches complexe avec multiples niveaux
 
@@ -481,7 +495,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         action="initialize",
         params={"workflow_id": "wf-001"},
         priority=TaskPriority.CRITICAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t1)
 
@@ -492,7 +506,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"source": "sales.db", "table": "transactions"},
         depends_on=[t1.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t2)
 
@@ -502,7 +516,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"source": "customers.db", "table": "profiles"},
         depends_on=[t1.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t3)
 
@@ -512,7 +526,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"source": "products.csv"},
         depends_on=[t1.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t4)
 
@@ -523,7 +537,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"remove_nulls": True, "deduplicate": True},
         depends_on=[t2.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t5)
 
@@ -533,7 +547,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"add_demographics": True},
         depends_on=[t3.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t6)
 
@@ -544,7 +558,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"join_type": "left", "on_field": "customer_id"},
         depends_on=[t5.task_id, t6.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t7)
 
@@ -554,7 +568,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"join_type": "left", "on_field": "product_id"},
         depends_on=[t7.task_id, t4.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t8)
 
@@ -565,7 +579,7 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"metrics": ["revenue", "churn_rate", "ltv"]},
         depends_on=[t8.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t9)
 
@@ -576,14 +590,14 @@ def generate_complex_task_graph() -> 'TaskGraph':
         params={"format": "pdf", "include_charts": True},
         depends_on=[t9.task_id],
         priority=TaskPriority.CRITICAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t10)
 
     return graph
 
 
-def generate_task_graph_with_failures() -> 'TaskGraph':
+def generate_task_graph_with_failures() -> "TaskGraph":
     """
     Générer un graphe avec des tâches en état d'échec
 
@@ -603,7 +617,7 @@ def generate_task_graph_with_failures() -> 'TaskGraph':
         params={"file_path": "data.csv"},
         priority=TaskPriority.HIGH,
         status=TaskStatus.COMPLETED,
-        result={"rows": 100, "columns": 5}
+        result={"rows": 100, "columns": 5},
     )
     graph.add_task(t1)
 
@@ -615,7 +629,7 @@ def generate_task_graph_with_failures() -> 'TaskGraph':
         depends_on=[t1.task_id],
         priority=TaskPriority.CRITICAL,
         status=TaskStatus.FAILED,
-        error="Schema validation failed: missing required field 'timestamp'"
+        error="Schema validation failed: missing required field 'timestamp'",
     )
     graph.add_task(t2)
 
@@ -626,14 +640,14 @@ def generate_task_graph_with_failures() -> 'TaskGraph':
         params={},
         depends_on=[t2.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.SKIPPED
+        status=TaskStatus.SKIPPED,
     )
     graph.add_task(t3)
 
     return graph
 
 
-def generate_task_graph_with_priorities() -> 'TaskGraph':
+def generate_task_graph_with_priorities() -> "TaskGraph":
     """
     Générer un graphe avec différents niveaux de priorité
 
@@ -652,7 +666,7 @@ def generate_task_graph_with_priorities() -> 'TaskGraph':
         action="security_scan",
         params={},
         priority=TaskPriority.CRITICAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t1)
 
@@ -663,7 +677,7 @@ def generate_task_graph_with_priorities() -> 'TaskGraph':
         params={"encrypted": True},
         depends_on=[t1.task_id],
         priority=TaskPriority.HIGH,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t2)
 
@@ -674,7 +688,7 @@ def generate_task_graph_with_priorities() -> 'TaskGraph':
         params={},
         depends_on=[t2.task_id],
         priority=TaskPriority.NORMAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t3)
 
@@ -685,7 +699,7 @@ def generate_task_graph_with_priorities() -> 'TaskGraph':
         params={"verbose": True},
         depends_on=[t2.task_id],
         priority=TaskPriority.LOW,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t4)
 
@@ -696,17 +710,14 @@ def generate_task_graph_with_priorities() -> 'TaskGraph':
         params={"endpoint": "metrics.example.com"},
         depends_on=[t3.task_id],
         priority=TaskPriority.OPTIONAL,
-        status=TaskStatus.PENDING
+        status=TaskStatus.PENDING,
     )
     graph.add_task(t5)
 
     return graph
 
 
-def generate_task_graph(
-    complexity: str = "simple",
-    num_tasks: Optional[int] = None
-) -> 'TaskGraph':
+def generate_task_graph(complexity: str = "simple", num_tasks: Optional[int] = None) -> "TaskGraph":
     """
     Générateur flexible de graphes de tâches
 
@@ -745,7 +756,7 @@ def generate_decision_record(
     decision_type: str = "tool_invocation",
     actor: str = "agent.core",
     task_id: Optional[str] = None,
-    include_signature: bool = True
+    include_signature: bool = True,
 ) -> Dict[str, Any]:
     """
     Générer un Decision Record (DR) de test
@@ -792,7 +803,7 @@ def generate_decision_record(
         "alternatives_considered": decision_content["alternatives"],
         "decision": decision_content["decision"],
         "constraints": decision_content.get("constraints", {}),
-        "expected_risk": decision_content.get("expected_risk", [])
+        "expected_risk": decision_content.get("expected_risk", []),
     }
 
     if include_signature:
@@ -814,7 +825,7 @@ def _generate_decision_content(decision_type: str) -> Dict[str, Any]:
             "tools_used": ["python_sandbox@v0.3"],
             "alternatives": ["do_nothing", "ask_clarification"],
             "constraints": {"max_execution_time": 30, "memory_limit_mb": 512},
-            "expected_risk": ["code_execution", "resource_usage"]
+            "expected_risk": ["code_execution", "resource_usage"],
         },
         "planning": {
             "decision": "decompose_to_htn",
@@ -822,7 +833,7 @@ def _generate_decision_content(decision_type: str) -> Dict[str, Any]:
             "tools_used": ["planner@v1.0"],
             "alternatives": ["simple_loop", "ask_user"],
             "constraints": {"max_depth": 3, "max_tasks": 20},
-            "expected_risk": ["complexity", "execution_time"]
+            "expected_risk": ["complexity", "execution_time"],
         },
         "data_access": {
             "decision": "proceed_read_file",
@@ -830,7 +841,7 @@ def _generate_decision_content(decision_type: str) -> Dict[str, Any]:
             "tools_used": ["file_reader@v1.0"],
             "alternatives": ["deny_access", "ask_permission"],
             "constraints": {"max_file_size_mb": 10, "allowed_extensions": [".csv", ".txt"]},
-            "expected_risk": ["data_leak", "file_access"]
+            "expected_risk": ["data_leak", "file_access"],
         },
         "pii_handling": {
             "decision": "mask_pii_before_logging",
@@ -838,16 +849,15 @@ def _generate_decision_content(decision_type: str) -> Dict[str, Any]:
             "tools_used": ["redaction@v1.0"],
             "alternatives": ["block_completely", "ask_consent"],
             "constraints": {"redaction_level": "strict", "keep_format": True},
-            "expected_risk": ["privacy_violation", "data_exposure"]
-        }
+            "expected_risk": ["privacy_violation", "data_exposure"],
+        },
     }
 
     return decision_types.get(decision_type, decision_types["tool_invocation"])
 
 
 def generate_prov_graph(
-    conversation_id: Optional[str] = None,
-    include_tool_calls: bool = True
+    conversation_id: Optional[str] = None, include_tool_calls: bool = True
 ) -> Dict[str, Any]:
     """
     Générer un graphe de provenance W3C PROV-JSON
@@ -890,14 +900,14 @@ def generate_prov_graph(
                 "prov:label": "User prompt",
                 "prov:type": "Input",
                 "content_hash": f"sha256:{input_hash}",
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
             },
             f"output:{output_hash}": {
                 "prov:label": "Agent response",
                 "prov:type": "Output",
                 "content_hash": f"sha256:{output_hash}",
-                "conversation_id": conversation_id
-            }
+                "conversation_id": conversation_id,
+            },
         },
         "activity": {
             f"generation:{generation_id}": {
@@ -905,43 +915,25 @@ def generate_prov_graph(
                 "prov:startTime": start_time,
                 "prov:endTime": end_time,
                 "model": "llama-3-8b",
-                "temperature": 0.7
+                "temperature": 0.7,
             }
         },
         "agent": {
-            "agent:filagent": {
-                "prov:type": "softwareAgent",
-                "version": "1.0.0"
-            },
-            "model:llama3": {
-                "prov:type": "softwareAgent",
-                "version": "llama-3-8b"
-            }
+            "agent:filagent": {"prov:type": "softwareAgent", "version": "1.0.0"},
+            "model:llama3": {"prov:type": "softwareAgent", "version": "llama-3-8b"},
         },
         "wasGeneratedBy": [
-            {
-                "prov:entity": f"output:{output_hash}",
-                "prov:activity": f"generation:{generation_id}"
-            }
+            {"prov:entity": f"output:{output_hash}", "prov:activity": f"generation:{generation_id}"}
         ],
         "used": [
-            {
-                "prov:activity": f"generation:{generation_id}",
-                "prov:entity": f"input:{input_hash}"
-            }
+            {"prov:activity": f"generation:{generation_id}", "prov:entity": f"input:{input_hash}"}
         ],
         "wasAssociatedWith": [
-            {
-                "prov:activity": f"generation:{generation_id}",
-                "prov:agent": "agent:filagent"
-            }
+            {"prov:activity": f"generation:{generation_id}", "prov:agent": "agent:filagent"}
         ],
         "wasAttributedTo": [
-            {
-                "prov:entity": f"output:{output_hash}",
-                "prov:agent": "agent:filagent"
-            }
-        ]
+            {"prov:entity": f"output:{output_hash}", "prov:agent": "agent:filagent"}
+        ],
     }
 
     # Add tool calls if requested
@@ -952,30 +944,34 @@ def generate_prov_graph(
         prov_graph["entity"][f"tool_output:{tool_output_hash}"] = {
             "prov:label": "Tool execution result",
             "prov:type": "ToolOutput",
-            "tool_name": "python_sandbox"
+            "tool_name": "python_sandbox",
         }
 
         prov_graph["activity"][f"tool_exec:{tool_id}"] = {
             "prov:type": "ToolExecution",
             "prov:startTime": start_time,
             "prov:endTime": (datetime.now(timezone.utc) + timedelta(seconds=2)).isoformat(),
-            "tool_name": "python_sandbox"
+            "tool_name": "python_sandbox",
         }
 
-        prov_graph["wasGeneratedBy"].append({
-            "prov:entity": f"tool_output:{tool_output_hash}",
-            "prov:activity": f"tool_exec:{tool_id}"
-        })
+        prov_graph["wasGeneratedBy"].append(
+            {
+                "prov:entity": f"tool_output:{tool_output_hash}",
+                "prov:activity": f"tool_exec:{tool_id}",
+            }
+        )
 
-        prov_graph["used"].append({
-            "prov:activity": f"generation:{generation_id}",
-            "prov:entity": f"tool_output:{tool_output_hash}"
-        })
+        prov_graph["used"].append(
+            {
+                "prov:activity": f"generation:{generation_id}",
+                "prov:entity": f"tool_output:{tool_output_hash}",
+            }
+        )
 
         prov_graph["wasDerivedFrom"] = [
             {
                 "prov:generatedEntity": f"output:{output_hash}",
-                "prov:usedEntity": f"tool_output:{tool_output_hash}"
+                "prov:usedEntity": f"tool_output:{tool_output_hash}",
             }
         ]
 
@@ -987,7 +983,7 @@ def generate_compliance_event(
     level: str = "INFO",
     conversation_id: Optional[str] = None,
     task_id: Optional[str] = None,
-    pii_redacted: bool = True
+    pii_redacted: bool = True,
 ) -> Dict[str, Any]:
     """
     Générer un événement de conformité (structured log)
@@ -1026,7 +1022,7 @@ def generate_compliance_event(
         "event": event_type,
         "task_id": task_id,
         "conversation_id": conversation_id,
-        "pii_redacted": pii_redacted
+        "pii_redacted": pii_redacted,
     }
 
     # Add event-specific data
@@ -1043,23 +1039,23 @@ def _generate_event_data(event_type: str) -> Dict[str, Any]:
         "tool.call": {
             "tool_name": "python_sandbox",
             "tool_version": "v0.3",
-            "execution_time_ms": 120
+            "execution_time_ms": 120,
         },
         "pii.detected": {
             "pii_types": ["email", "phone"],
             "redaction_applied": True,
-            "patterns_matched": 2
+            "patterns_matched": 2,
         },
         "decision.made": {
             "decision_type": "tool_invocation",
             "confidence": 0.85,
-            "reasoning": "User requested code execution"
+            "reasoning": "User requested code execution",
         },
         "error.occurred": {
             "error_type": "ValidationError",
             "error_message": "Input validation failed",
-            "stack_trace": "..."
-        }
+            "stack_trace": "...",
+        },
     }
 
     return event_types.get(event_type, {})
@@ -1069,7 +1065,7 @@ def generate_pii_scenario(
     include_email: bool = True,
     include_phone: bool = True,
     include_ssn: bool = False,
-    include_address: bool = False
+    include_address: bool = False,
 ) -> Tuple[str, Dict[str, List[str]]]:
     """
     Générer un scénario avec PII pour tester la redaction
@@ -1094,22 +1090,22 @@ def generate_pii_scenario(
     if include_email:
         email = "john.doe@example.com"
         text_parts.append(f"Email: {email}")
-        pii_detected['email'] = [email]
+        pii_detected["email"] = [email]
 
     if include_phone:
         phone = "+1 (555) 123-4567"
         text_parts.append(f"Téléphone: {phone}")
-        pii_detected['phone'] = [phone]
+        pii_detected["phone"] = [phone]
 
     if include_ssn:
         ssn = "123-45-6789"
         text_parts.append(f"SSN: {ssn}")
-        pii_detected['ssn'] = [ssn]
+        pii_detected["ssn"] = [ssn]
 
     if include_address:
         address = "123 Main Street, Montreal, QC H3A 1A1"
         text_parts.append(f"Adresse: {address}")
-        pii_detected['address'] = [address]
+        pii_detected["address"] = [address]
 
     full_text = " ".join(text_parts)
 
@@ -1122,9 +1118,7 @@ def generate_pii_scenario(
 
 
 def generate_batch_conversations(
-    count: int = 10,
-    min_turns: int = 1,
-    max_turns: int = 5
+    count: int = 10, min_turns: int = 1, max_turns: int = 5
 ) -> List[ConversationData]:
     """
     Générer un lot de conversations pour tests de performance
@@ -1147,20 +1141,14 @@ def generate_batch_conversations(
         num_turns = random.randint(min_turns, max_turns)
         include_tool_calls = random.choice([True, False])
 
-        conv = generate_conversation(
-            num_turns=num_turns,
-            include_tool_calls=include_tool_calls
-        )
+        conv = generate_conversation(num_turns=num_turns, include_tool_calls=include_tool_calls)
 
         conversations.append(conv)
 
     return conversations
 
 
-def generate_batch_task_graphs(
-    count: int = 10,
-    complexity: str = "simple"
-) -> List['TaskGraph']:
+def generate_batch_task_graphs(count: int = 10, complexity: str = "simple") -> List["TaskGraph"]:
     """
     Générer un lot de graphes de tâches
 
@@ -1181,8 +1169,7 @@ def generate_batch_task_graphs(
 
 
 def generate_batch_decision_records(
-    count: int = 10,
-    decision_types: Optional[List[str]] = None
+    count: int = 10, decision_types: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
     """
     Générer un lot de Decision Records
@@ -1213,9 +1200,7 @@ def generate_batch_decision_records(
 
 
 def populate_test_database(
-    db_connection,
-    num_conversations: int = 5,
-    messages_per_conversation: int = 10
+    db_connection, num_conversations: int = 5, messages_per_conversation: int = 10
 ) -> List[str]:
     """
     Peupler une base de données de test avec des conversations
@@ -1241,19 +1226,18 @@ def populate_test_database(
 
     for i in range(num_conversations):
         conv_data = generate_conversation(
-            num_turns=messages_per_conversation // 2,
-            include_tool_calls=i % 2 == 0
+            num_turns=messages_per_conversation // 2, include_tool_calls=i % 2 == 0
         )
 
         # Add messages to database
         for msg in conv_data.messages:
             add_message(
                 conversation_id=conv_data.conversation_id,
-                role=msg['role'],
-                content=msg['content'],
+                role=msg["role"],
+                content=msg["content"],
                 task_id=conv_data.task_id,
-                message_type=msg.get('message_type', 'text'),
-                metadata=msg.get('metadata')
+                message_type=msg.get("message_type", "text"),
+                metadata=msg.get("metadata"),
             )
 
         conversation_ids.append(conv_data.conversation_id)
@@ -1292,7 +1276,7 @@ def generate_complete_test_scenario() -> Dict[str, Any]:
         include_system=True,
         include_tool_calls=True,
         conversation_id=conversation_id,
-        task_id=task_id
+        task_id=task_id,
     )
 
     # Generate HTN task graph
@@ -1300,38 +1284,22 @@ def generate_complete_test_scenario() -> Dict[str, Any]:
 
     # Generate decision records for each major step
     decision_records = [
-        generate_decision_record(
-            decision_type="planning",
-            task_id=task_id
-        ),
-        generate_decision_record(
-            decision_type="tool_invocation",
-            task_id=task_id
-        ),
-        generate_decision_record(
-            decision_type="data_access",
-            task_id=task_id
-        )
+        generate_decision_record(decision_type="planning", task_id=task_id),
+        generate_decision_record(decision_type="tool_invocation", task_id=task_id),
+        generate_decision_record(decision_type="data_access", task_id=task_id),
     ]
 
     # Generate provenance graph
-    provenance = generate_prov_graph(
-        conversation_id=conversation_id,
-        include_tool_calls=True
-    )
+    provenance = generate_prov_graph(conversation_id=conversation_id, include_tool_calls=True)
 
     # Generate compliance events
     compliance_events = [
         generate_compliance_event(
-            event_type="tool.call",
-            conversation_id=conversation_id,
-            task_id=task_id
+            event_type="tool.call", conversation_id=conversation_id, task_id=task_id
         ),
         generate_compliance_event(
-            event_type="decision.made",
-            conversation_id=conversation_id,
-            task_id=task_id
-        )
+            event_type="decision.made", conversation_id=conversation_id, task_id=task_id
+        ),
     ]
 
     return {
@@ -1345,6 +1313,6 @@ def generate_complete_test_scenario() -> Dict[str, Any]:
         "metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "scenario_type": "complete_integration",
-            "version": "1.0.0"
-        }
+            "version": "1.0.0",
+        },
     }
