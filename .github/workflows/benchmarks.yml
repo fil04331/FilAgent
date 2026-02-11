@@ -114,7 +114,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload benchmark reports
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: benchmark-reports
           path: |
@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload regression report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: regression-report
           path: regression_report.txt
@@ -157,7 +157,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download benchmark reports
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: benchmark-reports
           path: eval/reports
