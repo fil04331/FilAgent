@@ -103,7 +103,7 @@ pydantic-core==2.41.5
 pydantic-settings==2.12.0
 pydub==0.25.1
 pygments==2.19.2
-pyopenssl==24.3.0
+pyopenssl==26.0.0
 pypdf2==3.0.1
 pyrate-limiter==3.9.0
 pytest==8.4.2
