@@ -50,7 +50,7 @@ huggingface-hub==1.4.1
 hypothesis==6.151.5
 hypothesis-graphql==0.12.0
 hypothesis-jsonschema==0.23.1
-idna==3.11
+idna==3.15
 importlib-metadata==8.7.1
 iniconfig==2.3.0
 isoduration==20.11.0
